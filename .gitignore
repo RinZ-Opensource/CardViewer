@@ -37,4 +37,4 @@ public/fonts/private/*
 *.bak
 sprite_test.py
 holo_compare_output/
-scripts/
+/scripts/

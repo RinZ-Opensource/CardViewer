@@ -1,4 +1,5 @@
 use base64::{engine::general_purpose, Engine};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -15,6 +16,8 @@ use std::{
 const UNITY_EXTRACT_SCRIPT: &str = include_str!("../scripts/extract_unity_image.py");
 const UNITY_BUNDLE_EXTRACT_SCRIPT: &str = include_str!("../scripts/extract_unity_bundle.py");
 const THUMBNAIL_SCRIPT: &str = include_str!("../scripts/generate_thumbnails.py");
+const MAI_COMPOSITE_SCRIPT: &str =
+    include_str!("../scripts/generate_mai_composite_thumbnails.py");
 const MAI_STATIC_NOT_FOUND_MAP_ID: i32 = 3;
 const MU3_PRINT_AWAKEN_LEVEL0: &str = "1";
 const HOLO_ENABLED: bool = false;
@@ -228,6 +231,18 @@ struct ThumbnailPlan {
     job: Option<ThumbnailJob>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+struct UnityExtractJob {
+    source: String,
+    output: String,
+}
+
+enum ExportAssetKind {
+    Image,
+    Unity,
+    Unsupported,
+}
+
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanStats {
@@ -355,6 +370,7 @@ struct OnlineAssetExporter {
     thumbnail_count: usize,
     reused_thumbnail_count: usize,
     skipped_thumbnail_count: usize,
+    unity_jobs: Vec<UnityExtractJob>,
     warnings: Vec<String>,
 }
 
@@ -713,6 +729,10 @@ where
         exporter.export_referenced_dynamic_assets(&scan, &content_roots, &mut progress);
     }
     rewrite_scan_result_for_online(&mut scan, &mut exporter);
+    // Flush after rewrite too: rewriting card image/thumbnail/layer paths also
+    // queues asset extractions (e.g. the MAI "_s" thumbnail bundles). Thumbnail
+    // generation below reads these files, so they must exist first.
+    exporter.flush_unity_jobs(&mut progress);
     generate_online_thumbnails(&mut scan, &mut exporter, &mut progress);
     scan.streaming_assets = format!("{public_base_url}/assets");
     if export_prune_enabled() {
@@ -737,12 +757,16 @@ where
 
     let manifest_path = output_root.join("cards.json");
     progress(format!("Writing manifest: {}", manifest_path.display()));
-    let manifest = serde_json::to_string_pretty(&scan)
+    let manifest = serde_json::to_string(&scan)
         .map_err(|err| format!("Failed to serialize online manifest: {err}"))?;
     fs::write(&manifest_path, manifest)
         .map_err(|err| format!("Failed to write online manifest: {err}"))?;
     let (index_manifest_path, shard_count) =
         write_online_manifest_shards(&scan, &output_root, &mut progress)?;
+    // Replace MAI card thumbnails with base+character composites. Runs after the
+    // manifests are written and rewrites the MAI thumbnailPath entries in place,
+    // so re-running export no longer clobbers them back to the bare "_s" base.
+    composite_mai_thumbnails(&output_root, &public_base_url, &mut scan.warnings, &mut progress);
     progress("Online export finished".to_string());
 
     Ok(OnlineExportResult {
@@ -962,6 +986,7 @@ impl OnlineAssetExporter {
             thumbnail_count: 0,
             reused_thumbnail_count: 0,
             skipped_thumbnail_count: 0,
+            unity_jobs: Vec::new(),
             warnings: Vec::new(),
         }
     }
@@ -1165,20 +1190,136 @@ impl OnlineAssetExporter {
             return Some(url);
         }
 
-        if let Err(err) =
-            export_image_asset(&source_path, &output_path, &self.unity_extract_script_path)
-        {
-            self.skipped_asset_count += 1;
-            self.warnings
-                .push(format!("Skipped asset {}: {err}", source_path.display()));
-            return None;
+        if let Some(parent) = output_path.parent() {
+            if let Err(err) = fs::create_dir_all(parent) {
+                self.skipped_asset_count += 1;
+                self.warnings
+                    .push(format!("Skipped asset {}: {err}", source_path.display()));
+                return None;
+            }
+        }
+
+        // Copy plain images inline (cheap), but batch Unity-bundle extraction so
+        // Python/UnityPy is spawned once for the whole run instead of per asset.
+        match classify_export_asset(&source_path) {
+            Ok(ExportAssetKind::Image) => {
+                if let Err(err) = fs::copy(&source_path, &output_path) {
+                    self.skipped_asset_count += 1;
+                    self.warnings
+                        .push(format!("Skipped asset {}: failed to copy image: {err}", source_path.display()));
+                    return None;
+                }
+                self.asset_count += 1;
+            }
+            Ok(ExportAssetKind::Unity) => {
+                self.unity_jobs.push(UnityExtractJob {
+                    source: path_string(&source_path),
+                    output: path_string(&output_path),
+                });
+                // Counted in flush_unity_jobs once extraction actually runs.
+            }
+            Ok(ExportAssetKind::Unsupported) | Err(_) => {
+                self.skipped_asset_count += 1;
+                self.warnings
+                    .push(format!("Skipped asset {}: unsupported image payload", source_path.display()));
+                return None;
+            }
         }
 
         self.asset_urls.insert(cache_key, url.clone());
         self.remember_url_output_path(&url, &output_path);
         self.remember_asset_output_path(&output_path);
-        self.asset_count += 1;
         Some(url)
+    }
+
+    fn flush_unity_jobs<F>(&mut self, progress: &mut F)
+    where
+        F: FnMut(String),
+    {
+        if self.unity_jobs.is_empty() {
+            return;
+        }
+        let all_jobs = std::mem::take(&mut self.unity_jobs);
+        let total = all_jobs.len();
+
+        if let Err(err) = write_extract_script(&self.unity_extract_script_path) {
+            self.warnings.push(err);
+        }
+        let tools_dir = self.output_root.join(".tools");
+        if let Err(err) = fs::create_dir_all(&tools_dir) {
+            self.warnings
+                .push(format!("Failed to create Unity job directory: {err}"));
+        }
+        let unitypy_path = find_unitypy_path()
+            .map(|path| path_string(&path))
+            .unwrap_or_default();
+        let worker_count = unity_worker_count().min(total).max(1);
+        let chunk_size = (total + worker_count - 1) / worker_count;
+        progress(format!(
+            "Extracting {total} Unity image assets across {worker_count} worker process(es)"
+        ));
+
+        // UnityPy is not reliable inside a spawned process pool, so run several
+        // serial extractor processes in parallel instead: each imports UnityPy
+        // once and handles a contiguous slice of the jobs.
+        let script_path = &self.unity_extract_script_path;
+        let chunk_warnings: Vec<String> = all_jobs
+            .par_chunks(chunk_size)
+            .enumerate()
+            .flat_map(|(index, chunk)| {
+                let mut warnings = Vec::new();
+                let jobs_path = tools_dir.join(format!("unity_extract_jobs_{index}.json"));
+                let body = match serde_json::to_string(chunk) {
+                    Ok(body) => body,
+                    Err(err) => {
+                        warnings.push(format!("Failed to serialize Unity jobs: {err}"));
+                        return warnings;
+                    }
+                };
+                if let Err(err) = fs::write(&jobs_path, body) {
+                    warnings.push(format!("Failed to write Unity jobs: {err}"));
+                    return warnings;
+                }
+                let mut ran = false;
+                let mut errors = Vec::new();
+                for candidate in python_candidates() {
+                    let mut command = Command::new(&candidate);
+                    command.arg(script_path).arg("--jobs").arg(&jobs_path);
+                    if !unitypy_path.is_empty() {
+                        command.env("PYTHONPATH", &unitypy_path);
+                    }
+                    match command.status() {
+                        Ok(status) if status.success() => {
+                            ran = true;
+                            break;
+                        }
+                        Ok(status) => errors.push(format!("{candidate}: exited with {status}")),
+                        Err(err) => errors.push(format!("{candidate}: {err}")),
+                    }
+                }
+                if !ran {
+                    warnings.push(format!(
+                        "Failed to extract Unity images (worker {index}). {}",
+                        errors.join(" | ")
+                    ));
+                }
+                warnings
+            })
+            .collect();
+        self.warnings.extend(chunk_warnings);
+
+        // Reconcile counts against what actually landed on disk.
+        for job in &all_jobs {
+            if Path::new(&job.output).exists() {
+                self.asset_count += 1;
+            } else {
+                self.skipped_asset_count += 1;
+                self.warnings.push(format!(
+                    "Skipped asset {}: Unity extraction produced no image",
+                    job.source
+                ));
+            }
+        }
     }
 
     fn remember_url_output_path(&mut self, url: &str, output_path: &Path) {
@@ -1573,7 +1714,7 @@ where
             path.display(),
             cards.len()
         ));
-        let body = serde_json::to_string_pretty(&shard)
+        let body = serde_json::to_string(&shard)
             .map_err(|err| format!("Failed to serialize online manifest shard: {err}"))?;
         fs::write(&path, body)
             .map_err(|err| format!("Failed to write online manifest shard: {err}"))?;
@@ -1612,6 +1753,11 @@ fn generate_online_thumbnails<F>(
 {
     let mut plans_by_source = HashMap::new();
     for card in &scan.cards {
+        // MAI cards get base+character composite thumbnails afterwards, so skip
+        // the redundant "_s" thumbnail pass for them here.
+        if card.game == "MAI" && card.record_type == "Card" {
+            continue;
+        }
         let Some(source_url) = card
             .thumbnail_path
             .as_ref()
@@ -2277,6 +2423,22 @@ fn export_image_asset(
     Err("unsupported image payload".to_string())
 }
 
+fn classify_export_asset(source_path: &Path) -> Result<ExportAssetKind, String> {
+    let header = read_file_header(source_path, 16)?;
+    let lower_ext = source_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if is_image_extension(&lower_ext) || detect_image_mime(&header).is_some() {
+        Ok(ExportAssetKind::Image)
+    } else if is_unity_asset_bundle(&header) {
+        Ok(ExportAssetKind::Unity)
+    } else {
+        Ok(ExportAssetKind::Unsupported)
+    }
+}
+
 fn read_file_header(path: &Path, max_len: usize) -> Result<Vec<u8>, String> {
     let mut file =
         fs::File::open(path).map_err(|err| format!("Failed to open {}: {err}", path.display()))?;
@@ -2325,17 +2487,26 @@ fn scan_chu_cards(
     stats: &mut ScanStats,
     warnings: &mut Vec<String>,
 ) {
-    for card_root in game_data_leaf_roots(content_root, "CHU", "card") {
-        for xml_path in find_named_files(&card_root, "Card.xml") {
-            match fs::read_to_string(&xml_path) {
-                Ok(xml) => {
-                    if let Some(card) = parse_chu_card(&xml_path, &xml) {
-                        stats.chu_cards += 1;
-                        cards.push(card);
-                    }
-                }
-                Err(err) => warnings.push(format!("Failed to read {}: {err}", xml_path.display())),
+    let xml_paths: Vec<PathBuf> = game_data_leaf_roots(content_root, "CHU", "card")
+        .into_iter()
+        .flat_map(|card_root| find_named_files(&card_root, "Card.xml"))
+        .collect();
+    // Read + parse XMLs in parallel; merge sequentially to preserve order.
+    let results: Vec<Result<Option<CardRecord>, String>> = xml_paths
+        .par_iter()
+        .map(|xml_path| match fs::read_to_string(xml_path) {
+            Ok(xml) => Ok(parse_chu_card(xml_path, &xml)),
+            Err(err) => Err(format!("Failed to read {}: {err}", xml_path.display())),
+        })
+        .collect();
+    for result in results {
+        match result {
+            Ok(Some(card)) => {
+                stats.chu_cards += 1;
+                cards.push(card);
             }
+            Ok(None) => {}
+            Err(warning) => warnings.push(warning),
         }
     }
 }
@@ -2426,25 +2597,34 @@ fn scan_mai_cards(
     stats: &mut ScanStats,
     warnings: &mut Vec<String>,
 ) {
-    for card_root in game_data_leaf_roots(content_root, "MAI", "card") {
-        for xml_path in find_named_files(&card_root, "Card.xml") {
-            match fs::read_to_string(&xml_path) {
-                Ok(xml) => {
-                    if let Some(card) = parse_mai_card(
-                        &xml_path,
-                        &xml,
-                        content_root,
-                        content_roots,
-                        card_types,
-                        charas,
-                        chara_packs,
-                    ) {
-                        stats.mai_cards += 1;
-                        cards.push(card);
-                    }
-                }
-                Err(err) => warnings.push(format!("Failed to read {}: {err}", xml_path.display())),
+    let xml_paths: Vec<PathBuf> = game_data_leaf_roots(content_root, "MAI", "card")
+        .into_iter()
+        .flat_map(|card_root| find_named_files(&card_root, "Card.xml"))
+        .collect();
+    // Read + parse XMLs in parallel; merge sequentially to preserve order.
+    let results: Vec<Result<Option<CardRecord>, String>> = xml_paths
+        .par_iter()
+        .map(|xml_path| match fs::read_to_string(xml_path) {
+            Ok(xml) => Ok(parse_mai_card(
+                xml_path,
+                &xml,
+                content_root,
+                content_roots,
+                card_types,
+                charas,
+                chara_packs,
+            )),
+            Err(err) => Err(format!("Failed to read {}: {err}", xml_path.display())),
+        })
+        .collect();
+    for result in results {
+        match result {
+            Ok(Some(card)) => {
+                stats.mai_cards += 1;
+                cards.push(card);
             }
+            Ok(None) => {}
+            Err(warning) => warnings.push(warning),
         }
     }
 }
@@ -3036,7 +3216,7 @@ fn parse_mai_card(
                 priority.map(|id| id.to_string()).unwrap_or_default(),
             ),
             print_metadata_bool("disabled", "Disabled in data", disabled),
-            print_metadata_bool("holo", "Holographic print", official_holo),
+            print_bool("holo", "Holographic print", official_holo),
             print_bool("hideSerialAndQR", "Hide serial and QR", false),
             print_bool("hidePlayerName", "Hide player name", false),
             print_bool("hideRating", "Hide rating", false),
@@ -3129,7 +3309,7 @@ fn parse_mai_card_type(content_root: &Path, xml_path: &Path, xml: &str) -> Optio
                 extend_bit.map(|id| id.to_string()).unwrap_or_default(),
             ),
             print_field("maiAssetRoot", "MAI asset root", "metadata", mai_asset_root),
-            print_metadata_bool("holo", "Holographic print", mai_card_type_is_holo(type_id)),
+            print_bool("holo", "Holographic print", mai_card_type_is_holo(type_id)),
             print_bool("hideSerialAndQR", "Hide serial and QR", false),
             print_bool("hidePlayerName", "Hide player name", false),
             print_bool("hideRating", "Hide rating", false),
@@ -4256,8 +4436,61 @@ fn extract_unity_bundle_to_mobile_dir(
     ))
 }
 
+fn unity_worker_count() -> usize {
+    if let Ok(value) = std::env::var("CARDVIEWER_UNITY_WORKERS") {
+        if let Ok(count) = value.trim().parse::<usize>() {
+            if count > 0 {
+                return count;
+            }
+        }
+    }
+    // Each worker loads a whole Unity bundle + UnityPy into memory, so default
+    // to a conservative concurrency to avoid exhausting RAM. Raise it with
+    // CARDVIEWER_UNITY_WORKERS on machines with spare memory.
+    let cores = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
+    cores.min(4)
+}
+
 fn write_extract_script(script_path: &Path) -> Result<(), String> {
     write_tool_script(script_path, UNITY_EXTRACT_SCRIPT, "Unity extraction")
+}
+
+fn composite_mai_thumbnails<F>(
+    output_root: &Path,
+    public_base_url: &str,
+    warnings: &mut Vec<String>,
+    progress: &mut F,
+) where
+    F: FnMut(String),
+{
+    progress("Compositing MAI card thumbnails (base + character)".to_string());
+    let script_path = output_root
+        .join(".tools")
+        .join("generate_mai_composite_thumbnails.py");
+    if let Err(err) = write_tool_script(&script_path, MAI_COMPOSITE_SCRIPT, "MAI composite thumbnail")
+    {
+        warnings.push(err);
+        return;
+    }
+    let mut errors = Vec::new();
+    for candidate in python_candidates() {
+        let mut command = Command::new(&candidate);
+        command
+            .arg(&script_path)
+            .arg(output_root)
+            .arg(public_base_url);
+        match command.status() {
+            Ok(status) if status.success() => return,
+            Ok(status) => errors.push(format!("{candidate}: exited with {status}")),
+            Err(err) => errors.push(format!("{candidate}: {err}")),
+        }
+    }
+    warnings.push(format!(
+        "MAI composite thumbnails were not generated. {}",
+        errors.join(" | ")
+    ));
 }
 
 fn write_thumbnail_script(script_path: &Path) -> Result<(), String> {

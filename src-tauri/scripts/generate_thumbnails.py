@@ -18,9 +18,9 @@ def generate_thumbnail(job):
         image = ImageOps.exif_transpose(image)
         if image.mode not in ("RGB", "RGBA"):
             image = image.convert("RGBA")
-        image.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+        image.thumbnail((max_width, max_height), Image.Resampling.BICUBIC)
         output.parent.mkdir(parents=True, exist_ok=True)
-        image.save(output, "WEBP", quality=quality, method=6)
+        image.save(output, "WEBP", quality=quality, method=4)
 
 
 def main() -> int:
@@ -32,6 +32,8 @@ def main() -> int:
     jobs = json.loads(jobs_path.read_text(encoding="utf-8"))
     workers = int(os.environ.get("CARDVIEWER_THUMBNAIL_WORKERS") or "0")
     if workers <= 0:
+        # Conservative default so a many-core machine doesn't spawn a huge
+        # number of image workers at once; override via the env var above.
         workers = min(max(os.cpu_count() or 1, 1), 4)
 
     failed = []
