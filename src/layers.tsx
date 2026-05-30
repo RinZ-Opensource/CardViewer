@@ -1,6 +1,6 @@
 import React from "react";
 import QRCode from "qrcode";
-import { OFFICIAL_ASSET_ROOT, OfficialFontContext, SpriteCrop, TmpFontContext, officialAsset } from "./constants";
+import { OFFICIAL_ASSET_ROOT, OfficialFontContext, TmpFontContext, officialAsset } from "./constants";
 import { unityRect } from "./geometry";
 import { TMP_TEXT_PADDING, TmpHorizontalAlign, TmpTextVariant, TmpVerticalAlign, clearCanvas, layoutUnityText, loadTmpAtlas, reactText, renderCanvasText, renderTmpText, waitForCanvasFont } from "./textRendering";
 import { OfficialFontKey } from "./types";
@@ -45,46 +45,6 @@ export function LayerImage({
       onError={onError}
       style={unityRect(x, y, w, h, { rotation, scale })}
     />
-  );
-}
-
-export function LayerSpriteCrop({
-  src,
-  className,
-  crop,
-  x,
-  y,
-  w,
-  h,
-  rotation,
-  scale,
-}: {
-  src: string;
-  className?: string;
-  crop: SpriteCrop;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  rotation?: number;
-  scale?: number;
-}) {
-  const imageStyle: React.CSSProperties = {
-    left: `${(-crop.x / crop.w) * 100}%`,
-    top: `${(-crop.y / crop.h) * 100}%`,
-    width: `${(crop.sourceW / crop.w) * 100}%`,
-    height: `${(crop.sourceH / crop.h) * 100}%`,
-    objectFit: "fill",
-  };
-  return (
-    <div className="official-layer-crop" style={unityRect(x, y, w, h, { rotation, scale })}>
-      <img
-        className={["official-layer-img", className].filter(Boolean).join(" ")}
-        src={src}
-        alt=""
-        style={imageStyle}
-      />
-    </div>
   );
 }
 

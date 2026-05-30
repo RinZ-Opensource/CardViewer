@@ -1,5 +1,6 @@
 import { maiCharaChoice } from "./cards";
-import { HOLO_ENABLED, MU3_LEVEL_LIMITS, MU3_LIMIT_BREAK_STAR_POSITIONS, MU3_LIMIT_BREAK_STAR_Y, officialAsset } from "./constants";
+import { HOLO_ENABLED, MAI_FRAME_ASSETS, MAI_PASS_CROPS, MAI_PASS_RECT, MU3_LEVEL_LIMITS, MU3_LIMIT_BREAK_STAR_POSITIONS, MU3_LIMIT_BREAK_STAR_Y, officialAsset } from "./constants";
+import { spriteCropDisplayRect } from "./geometry";
 import { LayerImage, QrSource } from "./layers";
 import { CardEdits, CardRecord, PrintField, PrintFieldValue } from "./types";
 
@@ -299,6 +300,21 @@ export function maiRatingPlatePattern(rating: number) {
   return pattern;
 }
 
+// Frame pattern → frame sprite, pass-name plate, and its crop/display rect.
+// Shared verbatim by the visual card (cards.tsx) and the holo mask (holo.tsx).
+export function maiFrameAssets(card: CardRecord) {
+  const framePattern = maiFramePattern(card);
+  const frameAsset = framePattern >= 0 ? MAI_FRAME_ASSETS[framePattern] : undefined;
+  const passAsset = framePattern >= 0 ? `UI_CMA_PassName_${twoDigits(framePattern)}` : null;
+  const passCrop = framePattern >= 0 ? MAI_PASS_CROPS[framePattern] : null;
+  const passRect = passCrop ? spriteCropDisplayRect(MAI_PASS_RECT, passCrop) : MAI_PASS_RECT;
+  return { framePattern, frameAsset, passAsset, passCrop, passRect };
+}
+
+export function maiRatingBaseAsset(card: CardRecord) {
+  return `UI_CMA_Rating_Base_${twoDigits(maiRatingPlatePattern(fieldNumber(card, "rating", 0)))}`;
+}
+
 export function Mu3LimitBreakStars({ card }: { card: CardRecord }) {
   const maxStars = mu3MaxOwnCount(card);
   const activeStars = clampInt(numericField(card, "ownCount", 0), 0, maxStars);
@@ -394,6 +410,20 @@ export function mu3RarityKind(card: CardRecord) {
   if (rare === 3) return "SSR";
   if (rare === 12) return "SRPlus";
   return "N";
+}
+
+// Title-block names, derived identically by the visual card and the holo mask.
+// `characterName` is the common-model name; `baseCharacterName` is used by the
+// non-common card and the asset card.
+export function mu3CardNames(card: CardRecord) {
+  const fallback = fieldString(card, "characterName") || card.displayName;
+  return {
+    isCommonModel: fieldBool(card, "isCommonModel"),
+    nickname: fieldString(card, "nickName"),
+    characterName: fieldString(card, "nameForCommonModel") || fallback,
+    baseCharacterName: fieldString(card, "baseCharacterName") || fallback,
+    ipName: fieldString(card, "ipName"),
+  };
 }
 
 export function mu3RareSpriteName(card: CardRecord) {

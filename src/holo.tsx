@@ -1,7 +1,7 @@
 import React from "react";
-import { clampInt, fieldBool, fieldNumber, fieldString, maiCardTypeEffects, maiEffectIconAsset, maiFramePattern, maiRatingPlatePattern, mu3AttributeName, mu3AwakenMarkAsset, mu3HoloBgAsset, mu3HoloFrameBaseAsset, mu3HoloFrameOverlayAsset, mu3NeedsSign, mu3RareSpriteName, mu3SkillAsset, numericField, twoDigits } from "./cardData";
-import { CARD_HEIGHT, CARD_WIDTH, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_HOLO_UI_MASKS, MAI_NAME_BASE_RECT, MAI_PASS_CROPS, MAI_PASS_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, TmpFontContext, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
-import { spriteCropDisplayRect, withUnityCanvasRect } from "./geometry";
+import { clampInt, fieldBool, fieldNumber, fieldString, maiCardTypeEffects, maiEffectIconAsset, maiFrameAssets, maiRatingBaseAsset, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3HoloBgAsset, mu3HoloFrameBaseAsset, mu3HoloFrameOverlayAsset, mu3NeedsSign, mu3RareSpriteName, mu3SkillAsset, numericField, twoDigits } from "./cardData";
+import { CARD_HEIGHT, CARD_WIDTH, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_HOLO_UI_MASKS, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, TmpFontContext, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
+import { withUnityCanvasRect } from "./geometry";
 import { TMP_TEXT_PADDING, TmpHorizontalAlign, TmpTextVariant, TmpVerticalAlign, clampNumber, loadTmpAtlas, rasterizeTmpText } from "./textRendering";
 import { CardRecord, TmpFontMetrics } from "./types";
 
@@ -162,12 +162,8 @@ export function MaiOfficialHoloLayer({
   const hideChara = fieldBool(card, "hideChara");
   const maskSrc = assetDataUrls.maiMask || assetDataUrls.maiMaskFallback;
   const charaSrc = assetDataUrls.maiChara || assetDataUrls.maiCharaFallback;
-  const framePattern = maiFramePattern(card);
-  const frameAsset = ["UI_CMA_Card_Frame_00_Gold", "UI_CMA_Card_Frame_01_Silver", "UI_CMA_Card_Frame_02_Bronze", "UI_CMA_Card_Frame_03_Freedom"][framePattern];
-  const passAsset = framePattern >= 0 ? `UI_CMA_PassName_${twoDigits(framePattern)}` : null;
-  const passCrop = framePattern >= 0 ? MAI_PASS_CROPS[framePattern] : null;
-  const passRect = passCrop ? spriteCropDisplayRect(MAI_PASS_RECT, passCrop) : MAI_PASS_RECT;
-  const ratingBase = `UI_CMA_Rating_Base_${twoDigits(maiRatingPlatePattern(fieldNumber(card, "rating", 0)))}`;
+  const { frameAsset, passAsset, passRect } = maiFrameAssets(card);
+  const ratingBase = maiRatingBaseAsset(card);
   const effects = maiCardTypeEffects(card);
   const effectIconAsset = maiEffectIconAsset(card);
   const rootImages: Mu3SvgImage[] = [];
@@ -262,17 +258,13 @@ export function Mu3OfficialHoloLayer({
   const signClearImages: Mu3SvgImage[] = [];
   const excludeImages: Mu3SvgImage[] = [];
   const tmpFont = React.useContext(TmpFontContext);
-  const isCommonModel = fieldBool(card, "isCommonModel");
-  const mu3Nickname = fieldString(card, "nickName");
-  const mu3CharacterName =
-    fieldString(card, "nameForCommonModel") ||
-    fieldString(card, "characterName") ||
-    card.displayName;
-  const mu3BaseCharacterName =
-    fieldString(card, "baseCharacterName") ||
-    fieldString(card, "characterName") ||
-    card.displayName;
-  const mu3IpName = fieldString(card, "ipName");
+  const {
+    isCommonModel,
+    nickname: mu3Nickname,
+    characterName: mu3CharacterName,
+    baseCharacterName: mu3BaseCharacterName,
+    ipName: mu3IpName,
+  } = mu3CardNames(card);
 
   if (assetDataUrls.mu3Holo) {
     rootImages.push({ href: assetDataUrls.mu3Holo, x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
@@ -799,25 +791,6 @@ export function drawMu3TmpTextMask(
   paintBinaryMask(output, outputMask);
   rawCtx.putImageData(output, 0, 0);
   ctx.drawImage(rawCanvas, 0, 0);
-}
-
-export function cssImageUrl(url: string) {
-  return `url("${url.replace(/"/g, '\\"')}")`;
-}
-
-export function HoloColorMask({
-  className,
-  maskUrl,
-}: {
-  className: string;
-  maskUrl: string;
-}) {
-  return (
-    <div className={`holo-color-mask ${className}`} style={holoMaskStyle(maskUrl)}>
-      <div className="holo-rainbow holo-rainbow-mask" />
-      <div className="holo-fixed-light holo-fixed-light-mask" />
-    </div>
-  );
 }
 
 export function holoMaskStyle(maskUrl: string): React.CSSProperties | undefined {

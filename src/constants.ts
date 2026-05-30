@@ -32,6 +32,12 @@ export type SpriteCrop = { sourceW: number; sourceH: number; x: number; y: numbe
 export const OFFICIAL_ASSET_ROOT = "/official/";
 export const CARD_WIDTH = 768;
 export const CARD_HEIGHT = 1052;
+export const MAI_FRAME_ASSETS: string[] = [
+  "UI_CMA_Card_Frame_00_Gold",
+  "UI_CMA_Card_Frame_01_Silver",
+  "UI_CMA_Card_Frame_02_Bronze",
+  "UI_CMA_Card_Frame_03_Freedom",
+];
 export const MAI_PASS_RECT = { x: -134, y: 444, w: 420, h: 124 } as const;
 export const MAI_PASS_CROPS: SpriteCrop[] = [
   { sourceW: 420, sourceH: 124, x: 7.0429, y: 5.0267, w: 337.9303, h: 111.9398 },

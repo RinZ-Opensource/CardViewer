@@ -1,9 +1,8 @@
 import React from "react";
-import { Mu3LimitBreakStars, clampInt, fieldBool, fieldNumber, fieldString, formatDisplaySerial, formatMaiEndDate, maiCardTypeEffects, maiEffectIconAsset, maiFramePattern, maiOfficialHolo, maiRatingPlatePattern, mu3AttackValue, mu3AttributeName, mu3AwakenMarkAsset, mu3FrameAsset, mu3NeedsSign, mu3RareSpriteName, mu3RarityKind, mu3ShowMainFrame, mu3SkillAsset, numericField, officialHolo, qrSource, twoDigits } from "./cardData";
-import { CANVAS_FONT_SEGA_MARU_DB, CARD_TILT_X_MAX, CARD_TILT_Y_MAX, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_NAME_BASE_RECT, MAI_PASS_CROPS, MAI_PASS_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
+import { Mu3LimitBreakStars, clampInt, fieldBool, fieldNumber, fieldString, formatDisplaySerial, formatMaiEndDate, maiCardTypeEffects, maiEffectIconAsset, maiFrameAssets, maiOfficialHolo, maiRatingBaseAsset, mu3AttackValue, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3FrameAsset, mu3NeedsSign, mu3RareSpriteName, mu3RarityKind, mu3ShowMainFrame, mu3SkillAsset, numericField, officialHolo, qrSource, twoDigits } from "./cardData";
+import { CANVAS_FONT_SEGA_MARU_DB, CARD_TILT_X_MAX, CARD_TILT_Y_MAX, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
 import { HoloShaderLayer } from "./holo";
 import { ImageLoadPriority, isStaticAssetPath } from "./imageLoader";
-import { spriteCropDisplayRect } from "./geometry";
 import { LayerCanvasText, LayerChuCounter, LayerDigitCounter, LayerImage, LayerQr, LayerTmpText, LayerUnityText } from "./layers";
 import { clampNumber } from "./textRendering";
 import { AssetLayer, CardRecord, ViewMode } from "./types";
@@ -509,12 +508,8 @@ export function MaiOfficialCard({
   const hideCharaNameAndPeriod = fieldBool(card, "hideCharaNameAndPeriod");
   const hideFriendCode = fieldBool(card, "hideFriendCode");
   const hideChara = fieldBool(card, "hideChara");
-  const framePattern = maiFramePattern(card);
-  const frameAsset = ["UI_CMA_Card_Frame_00_Gold", "UI_CMA_Card_Frame_01_Silver", "UI_CMA_Card_Frame_02_Bronze", "UI_CMA_Card_Frame_03_Freedom"][framePattern];
-  const passAsset = framePattern >= 0 ? `UI_CMA_PassName_${twoDigits(framePattern)}` : null;
-  const passCrop = framePattern >= 0 ? MAI_PASS_CROPS[framePattern] : null;
-  const passRect = passCrop ? spriteCropDisplayRect(MAI_PASS_RECT, passCrop) : MAI_PASS_RECT;
-  const ratingBase = `UI_CMA_Rating_Base_${twoDigits(maiRatingPlatePattern(fieldNumber(card, "rating", 0)))}`;
+  const { frameAsset, passAsset, passRect } = maiFrameAssets(card);
+  const ratingBase = maiRatingBaseAsset(card);
   const effects = maiCardTypeEffects(card);
   const effectIconAsset = maiEffectIconAsset(card);
 
@@ -647,17 +642,13 @@ export function Mu3OfficialCard({
   const rightsId = numericField(card, "rightsId", -1);
   const attackValue = mu3AttackValue(card);
   const awakenMark = mu3AwakenMarkAsset(card);
-  const isCommonModel = fieldBool(card, "isCommonModel");
-  const mu3Nickname = fieldString(card, "nickName");
-  const mu3CharacterName =
-    fieldString(card, "nameForCommonModel") ||
-    fieldString(card, "characterName") ||
-    card.displayName;
-  const mu3BaseCharacterName =
-    fieldString(card, "baseCharacterName") ||
-    fieldString(card, "characterName") ||
-    card.displayName;
-  const mu3IpName = fieldString(card, "ipName");
+  const {
+    isCommonModel,
+    nickname: mu3Nickname,
+    characterName: mu3CharacterName,
+    baseCharacterName: mu3BaseCharacterName,
+    ipName: mu3IpName,
+  } = mu3CardNames(card);
 
   return (
     <div className="official-card official-mu3">
@@ -821,11 +812,7 @@ export function Mu3AssetCard({
   const rightsId = numericField(card, "rightsId", -1);
   const attackValue = mu3AttackValue(card);
   const awakenMark = mu3AwakenMarkAsset(card);
-  const mu3Nickname = fieldString(card, "nickName");
-  const mu3CharacterName =
-    fieldString(card, "baseCharacterName") ||
-    fieldString(card, "characterName") ||
-    card.displayName;
+  const { nickname: mu3Nickname, baseCharacterName: mu3CharacterName } = mu3CardNames(card);
   return (
     <div className="official-card official-mu3 official-mu3-asset">
       {imageDataUrl ? (
