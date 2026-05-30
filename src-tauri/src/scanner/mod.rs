@@ -13,11 +13,11 @@ use std::{
     time::UNIX_EPOCH,
 };
 
-const UNITY_EXTRACT_SCRIPT: &str = include_str!("../scripts/extract_unity_image.py");
-const UNITY_BUNDLE_EXTRACT_SCRIPT: &str = include_str!("../scripts/extract_unity_bundle.py");
-const THUMBNAIL_SCRIPT: &str = include_str!("../scripts/generate_thumbnails.py");
+const UNITY_EXTRACT_SCRIPT: &str = include_str!("../../scripts/extract_unity_image.py");
+const UNITY_BUNDLE_EXTRACT_SCRIPT: &str = include_str!("../../scripts/extract_unity_bundle.py");
+const THUMBNAIL_SCRIPT: &str = include_str!("../../scripts/generate_thumbnails.py");
 const MAI_COMPOSITE_SCRIPT: &str =
-    include_str!("../scripts/generate_mai_composite_thumbnails.py");
+    include_str!("../../scripts/generate_mai_composite_thumbnails.py");
 const MAI_STATIC_NOT_FOUND_MAP_ID: i32 = 3;
 const MU3_PRINT_AWAKEN_LEVEL0: &str = "1";
 const HOLO_ENABLED: bool = false;
@@ -26,59 +26,16 @@ const ONLINE_THUMBNAIL_MAX_HEIGHT: u32 = 256;
 const ONLINE_THUMBNAIL_QUALITY: u8 = 72;
 static IMAGE_DATA_URL_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ScanResult {
-    pub package_root: String,
-    pub streaming_assets: String,
-    pub cards: Vec<CardRecord>,
-    pub stats: ScanStats,
-    pub warnings: Vec<String>,
-}
+mod config;
+mod types;
+mod xmlutil;
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OnlineExportResult {
-    pub package_root: String,
-    pub output_root: String,
-    pub manifest_path: String,
-    pub index_manifest_path: String,
-    pub public_manifest_url: String,
-    pub public_index_manifest_url: String,
-    pub public_base_url: String,
-    pub card_count: usize,
-    pub shard_count: usize,
-    pub asset_count: usize,
-    pub reused_asset_count: usize,
-    pub skipped_asset_count: usize,
-    pub pruned_asset_count: usize,
-    pub thumbnail_count: usize,
-    pub reused_thumbnail_count: usize,
-    pub skipped_thumbnail_count: usize,
-    pub warnings: Vec<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MobilePackResult {
-    pub package_root: String,
-    pub output_path: String,
-    pub staging_root: String,
-    pub manifest_path: String,
-    pub cards_manifest_path: String,
-    pub index_manifest_path: String,
-    pub card_count: usize,
-    pub shard_count: usize,
-    pub asset_count: usize,
-    pub reused_asset_count: usize,
-    pub skipped_asset_count: usize,
-    pub raw_file_count: usize,
-    pub bundle_count: usize,
-    pub bundle_object_count: usize,
-    pub pack_file_count: usize,
-    pub pack_size_bytes: u64,
-    pub warnings: Vec<String>,
-}
+pub use types::{
+    AssetLayer, CardRecord, MobilePackResult, OnlineExportResult, PrintField, PrintOption,
+    ScanResult, ScanStats,
+};
+use config::*;
+use xmlutil::*;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -243,20 +200,6 @@ enum ExportAssetKind {
     Unsupported,
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ScanStats {
-    pub chu_cards: usize,
-    pub mai_cards: usize,
-    pub mai_card_types: usize,
-    pub mai_card_charas: usize,
-    pub mu3_asset_cards: usize,
-    pub mu3_xml_records: usize,
-    pub png_assets: usize,
-    pub unity_bundles: usize,
-    pub unity_bundle_bytes: u64,
-}
-
 #[derive(Clone, Debug)]
 struct MaiCardTypeInfo {
     id: Option<i32>,
@@ -301,57 +244,6 @@ struct VfsPackEntry {
     name_length: usize,
     data_size: usize,
     data_offset: usize,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CardRecord {
-    pub id: String,
-    pub game: String,
-    pub record_type: String,
-    pub data_name: String,
-    pub display_name: String,
-    pub character_name: String,
-    pub skill_name: String,
-    pub skill_text: String,
-    pub rare_type: Option<i32>,
-    pub label_type: Option<i32>,
-    pub dif_type: Option<i32>,
-    pub miss: Option<i32>,
-    pub combo: Option<i32>,
-    pub chain: Option<i32>,
-    pub image_path: Option<String>,
-    pub thumbnail_path: Option<String>,
-    pub asset_layers: Vec<AssetLayer>,
-    pub source_xml: String,
-    pub editable_fields: Vec<String>,
-    pub print_fields: Vec<PrintField>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AssetLayer {
-    pub key: String,
-    pub label: String,
-    pub path: String,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrintField {
-    pub key: String,
-    pub label: String,
-    pub field_type: String,
-    pub value: String,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub options: Vec<PrintOption>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrintOption {
-    pub value: String,
-    pub label: String,
 }
 
 struct OnlineAssetExporter {
@@ -1817,129 +1709,6 @@ fn generate_online_thumbnails<F>(
             card.thumbnail_path = Some(thumbnail_url.clone());
         }
     }
-}
-
-fn resolve_export_output_root(output_root: String) -> PathBuf {
-    let trimmed = output_root.trim();
-    if !trimmed.is_empty() {
-        return PathBuf::from(trimmed);
-    }
-
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("private-assets")
-        .join("official")
-        .join("generated")
-}
-
-fn normalize_public_base_url(value: &str) -> String {
-    let trimmed = value.trim();
-    let base = if trimmed.is_empty() {
-        "/official/generated"
-    } else {
-        trimmed
-    };
-    let normalized = base.trim_end_matches('/');
-    if normalized.is_empty() {
-        "/".to_string()
-    } else {
-        normalized.to_string()
-    }
-}
-
-fn export_force_enabled() -> bool {
-    std::env::var("CARDVIEWER_EXPORT_FORCE")
-        .map(|value| {
-            let value = value.trim().to_ascii_lowercase();
-            matches!(value.as_str(), "1" | "true" | "yes" | "on")
-        })
-        .unwrap_or(false)
-}
-
-fn export_all_assets_enabled() -> bool {
-    std::env::var("CARDVIEWER_EXPORT_ALL_ASSETS")
-        .map(|value| {
-            let value = value.trim().to_ascii_lowercase();
-            matches!(value.as_str(), "1" | "true" | "yes" | "on")
-        })
-        .unwrap_or(false)
-}
-
-fn export_prune_enabled() -> bool {
-    std::env::var("CARDVIEWER_EXPORT_PRUNE")
-        .map(|value| {
-            let value = value.trim().to_ascii_lowercase();
-            matches!(value.as_str(), "1" | "true" | "yes" | "on")
-        })
-        .unwrap_or(false)
-}
-
-fn mobile_referenced_only_enabled() -> bool {
-    std::env::var("CARDVIEWER_MOBILE_REFERENCED_ONLY")
-        .map(|value| {
-            let value = value.trim().to_ascii_lowercase();
-            matches!(value.as_str(), "1" | "true" | "yes" | "on")
-        })
-        .unwrap_or(false)
-}
-
-fn mobile_skip_raw_enabled() -> bool {
-    std::env::var("CARDVIEWER_MOBILE_SKIP_RAW")
-        .map(|value| {
-            let value = value.trim().to_ascii_lowercase();
-            matches!(value.as_str(), "1" | "true" | "yes" | "on")
-        })
-        .unwrap_or(false)
-}
-
-fn mobile_card_limit_per_game() -> Option<usize> {
-    std::env::var("CARDVIEWER_MOBILE_CARD_LIMIT_PER_GAME")
-        .ok()
-        .and_then(|value| value.trim().parse::<usize>().ok())
-        .filter(|limit| *limit > 0)
-}
-
-fn mobile_card_id_filter() -> Option<HashSet<(String, String)>> {
-    let value = std::env::var("CARDVIEWER_MOBILE_CARD_IDS").ok()?;
-    let mut filters = HashSet::new();
-    for token in value.split([',', ';', '\n', '\r']) {
-        let token = token.trim();
-        if token.is_empty() {
-            continue;
-        }
-        let (game, id) = token
-            .split_once(':')
-            .or_else(|| token.split_once('='))
-            .unwrap_or(("", token));
-        let game = game.trim().to_ascii_uppercase();
-        let id = id.trim().to_string();
-        if id.is_empty() {
-            continue;
-        }
-        filters.insert((game, id));
-    }
-    if filters.is_empty() {
-        None
-    } else {
-        Some(filters)
-    }
-}
-
-fn mobile_card_id_filter_label(filters: &HashSet<(String, String)>) -> String {
-    let mut values: Vec<String> = filters
-        .iter()
-        .map(|(game, id)| {
-            if game.is_empty() {
-                id.clone()
-            } else {
-                format!("{game}:{id}")
-            }
-        })
-        .collect();
-    values.sort();
-    values.join(",")
 }
 
 fn filter_mobile_cards_by_id(cards: &mut Vec<CardRecord>, filters: &HashSet<(String, String)>) {
@@ -4198,69 +3967,6 @@ fn mai_chara_options(
         .collect()
 }
 
-fn block(xml: &str, tag_name: &str) -> Option<String> {
-    let open = format!("<{tag_name}>");
-    let close = format!("</{tag_name}>");
-    let start = xml.find(&open)? + open.len();
-    let end = xml[start..].find(&close)? + start;
-    Some(xml[start..end].to_string())
-}
-
-fn tag(xml: &str, tag_name: &str) -> Option<String> {
-    block(xml, tag_name).map(|value| decode_xml_text(value.trim()))
-}
-
-fn blocks(xml: &str, tag_name: &str) -> Vec<String> {
-    let open = format!("<{tag_name}>");
-    let close = format!("</{tag_name}>");
-    let mut values = Vec::new();
-    let mut cursor = 0;
-
-    while let Some(relative_start) = xml[cursor..].find(&open) {
-        let start = cursor + relative_start + open.len();
-        let Some(relative_end) = xml[start..].find(&close) else {
-            break;
-        };
-        let end = start + relative_end;
-        values.push(xml[start..end].to_string());
-        cursor = end + close.len();
-    }
-
-    values
-}
-
-fn block_any(xml: &str, tag_names: &[&str]) -> Option<String> {
-    tag_names.iter().find_map(|tag_name| block(xml, tag_name))
-}
-
-fn tag_any(xml: &str, tag_names: &[&str]) -> Option<String> {
-    block_any(xml, tag_names).map(|value| decode_xml_text(value.trim()))
-}
-
-fn int_tag(xml: &str, tag_name: &str) -> Option<i32> {
-    tag(xml, tag_name).and_then(|value| value.parse::<i32>().ok())
-}
-
-fn int_tag_any(xml: &str, tag_names: &[&str]) -> Option<i32> {
-    tag_any(xml, tag_names).and_then(|value| value.parse::<i32>().ok())
-}
-
-fn bool_tag(xml: &str, tag_name: &str) -> Option<bool> {
-    tag(xml, tag_name).and_then(|value| match value.to_ascii_lowercase().as_str() {
-        "true" => Some(true),
-        "false" => Some(false),
-        _ => None,
-    })
-}
-
-fn bool_tag_any(xml: &str, tag_names: &[&str]) -> Option<bool> {
-    tag_any(xml, tag_names).and_then(|value| match value.to_ascii_lowercase().as_str() {
-        "true" => Some(true),
-        "false" => Some(false),
-        _ => None,
-    })
-}
-
 fn detect_image_mime(bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]) {
         return Some("image/png");
@@ -4682,21 +4388,6 @@ fn write_tar_field(target: &mut [u8], value: &[u8]) {
 fn write_tar_octal(target: &mut [u8], value: u64) {
     let text = format!("{value:0width$o}\0", width = target.len() - 1);
     write_tar_field(target, text.as_bytes());
-}
-
-fn decode_xml_text(value: &str) -> String {
-    let mut entities = HashMap::new();
-    entities.insert("&lt;", "<");
-    entities.insert("&gt;", ">");
-    entities.insert("&amp;", "&");
-    entities.insert("&quot;", "\"");
-    entities.insert("&apos;", "'");
-
-    let mut decoded = value.replace("\r\n", "\n");
-    for (from, to) in entities {
-        decoded = decoded.replace(from, to);
-    }
-    decoded
 }
 
 fn path_string(path: &Path) -> String {

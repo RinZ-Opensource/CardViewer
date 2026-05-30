@@ -1,5 +1,5 @@
 #[allow(dead_code)]
-#[path = "../scanner.rs"]
+#[path = "../scanner/mod.rs"]
 mod scanner;
 
 use scanner::export_online_package_with_progress_impl;
