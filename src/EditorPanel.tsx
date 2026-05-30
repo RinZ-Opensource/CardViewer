@@ -1,0 +1,138 @@
+import { applyEdits, randomDigitString } from "./cardData";
+import { CardEdits, CardRecord, PrintField, PrintFieldValue } from "./types";
+
+export function EditorPanel({
+  card,
+  edits,
+  onChange,
+  onReset,
+}: {
+  card: CardRecord | null;
+  edits: CardEdits | undefined;
+  onChange: (fieldKey: string, value: PrintFieldValue) => void;
+  onReset: () => void;
+}) {
+  if (!card) {
+    return <aside className="editor-panel empty">No selection</aside>;
+  }
+
+  const merged = applyEdits(card, edits);
+  const valueFields = merged.printFields.filter((field) => field.fieldType !== "bool" && field.fieldType !== "metadata");
+  const flagFields = merged.printFields.filter((field) => field.fieldType === "bool");
+  const editJson = JSON.stringify(edits ?? {}, null, 2);
+
+  return (
+    <aside className="editor-panel">
+      <div className="editor-header">
+        <div>
+          <h3>Print Surface</h3>
+        </div>
+        <button className="ghost-button" onClick={onReset} disabled={!edits}>
+          Reset
+        </button>
+      </div>
+
+      <div className="form-grid">
+        {valueFields.map((field) => (
+          <PrintFieldControl key={field.key} field={field} onChange={onChange} />
+        ))}
+        {flagFields.length ? (
+          <div className="flag-section">
+            <h4>Visibility / print flags</h4>
+            {flagFields.map((field) => (
+              <PrintFieldControl key={field.key} field={field} onChange={onChange} />
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <details className="edit-json">
+        <summary>Override JSON</summary>
+        <pre>{editJson}</pre>
+      </details>
+    </aside>
+  );
+}
+
+export function PrintFieldControl({
+  field,
+  onChange,
+}: {
+  field: PrintField;
+  onChange: (fieldKey: string, value: PrintFieldValue) => void;
+}) {
+  if (field.fieldType === "bool") {
+    return (
+      <label className="control toggle-control">
+        <input
+          type="checkbox"
+          checked={field.value === "true"}
+          onChange={(event) => onChange(field.key, event.target.checked)}
+        />
+        <span>{field.label}</span>
+      </label>
+    );
+  }
+
+  if (field.fieldType === "multiline") {
+    return (
+      <label className="control wide">
+        <span>{field.label}</span>
+        <textarea
+          value={field.value ?? ""}
+          onChange={(event) => onChange(field.key, event.target.value)}
+          rows={5}
+        />
+      </label>
+    );
+  }
+
+  if (field.fieldType === "select") {
+    return (
+      <label className="control">
+        <span>{field.label}</span>
+        <select
+          value={field.value ?? ""}
+          onChange={(event) => onChange(field.key, event.target.value)}
+        >
+          {(field.options ?? []).map((option) => (
+            <option value={option.value} key={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+
+  const input = (
+    <input
+      type={field.fieldType === "number" ? "number" : "text"}
+      value={field.value ?? ""}
+      onChange={(event) => onChange(field.key, event.target.value)}
+    />
+  );
+
+  return (
+    <label className="control">
+      <span>{field.label}</span>
+      {field.key === "serialId" ? (
+        <span className="input-with-action">
+          {input}
+          <button
+            type="button"
+            className="input-action-button"
+            aria-label="Generate 20 digit random serial"
+            title="Generate 20 digit random serial"
+            onClick={() => onChange(field.key, randomDigitString(20))}
+          >
+            ↻
+          </button>
+        </span>
+      ) : (
+        input
+      )}
+    </label>
+  );
+}
+
