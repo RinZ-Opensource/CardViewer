@@ -1,9 +1,10 @@
 import React from "react";
+import { toPng } from "html-to-image";
 import { invoke } from "@tauri-apps/api/core";
 import { EditorPanel } from "./EditorPanel";
 import { applyEdits, maiLinkedPrintEdits } from "./cardData";
 import { PreviewStage, assetLayerLoadPriority, selectedAssetSignature, usesPrimaryImageDataUrl, visibleAssetLayers } from "./cards";
-import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT, DEFAULT_PACKAGE_ROOT, EDIT_STORAGE_KEY, OfficialFontContext, TmpFontContext, USE_OFFICIAL_ASSETS, canInvokeTauri } from "./constants";
+import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT, CARD_WIDTH, DEFAULT_PACKAGE_ROOT, EDIT_STORAGE_KEY, OfficialFontContext, TmpFontContext, USE_OFFICIAL_ASSETS, canInvokeTauri } from "./constants";
 import { loadOfficialFonts, loadOfficialTmpFont } from "./fonts";
 import { THUMBNAIL_BUFFER_ROWS, isStaticAssetPath, readCachedImageDataUrl } from "./imageLoader";
 import { loadStaticScanResult } from "./manifest";
@@ -28,6 +29,8 @@ export function App() {
   const autoLoadStartedRef = React.useRef(false);
   const loadSequenceRef = React.useRef(0);
   const cardListRef = React.useRef<HTMLElement | null>(null);
+  const cardCaptureRef = React.useRef<HTMLDivElement | null>(null);
+  const [exportingPng, setExportingPng] = React.useState(false);
   const [cardListViewport, setCardListViewport] = React.useState({ height: 0, scrollTop: 0 });
   const [officialFonts, setOfficialFonts] = React.useState<
     Partial<Record<OfficialFontKey, UnityFontMetrics>>
@@ -49,6 +52,12 @@ export function App() {
   React.useEffect(() => {
     localStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(edits));
   }, [edits]);
+
+  React.useEffect(() => {
+    if (!error) return;
+    const timer = window.setTimeout(() => setError(""), 5000);
+    return () => window.clearTimeout(timer);
+  }, [error]);
 
   React.useEffect(() => {
     thumbCacheRef.current = thumbCache;
@@ -405,6 +414,42 @@ export function App() {
     });
   }
 
+  async function exportCardPng() {
+    // Capture .card-face (not just .official-card) so the holo is included for
+    // every game: MU3 paints it inside the card, MAI overlays it on top.
+    const target = cardCaptureRef.current;
+    if (!target || !selected) return;
+    try {
+      setExportingPng(true);
+      // Let the button repaint to its "Exporting…" state before the heavy,
+      // main-thread rasterization below briefly blocks the UI.
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve(null))),
+      );
+      const width = target.offsetWidth || CARD_WIDTH;
+      const pixelRatio = Math.min(4, Math.max(1, CARD_WIDTH / width));
+      const dataUrl = await toPng(target, {
+        pixelRatio,
+        // Keep the card art + holo overlay, drop the soft edge-light glow.
+        filter: (node) =>
+          !(node instanceof HTMLElement && node.classList.contains("edge-light")),
+      });
+      const baseName =
+        (selected.displayName || selected.dataName || "card")
+          .replace(/[\\/:*?"<>|]/g, "_")
+          .replace(/[.\s]+$/, "")
+          .trim() || "card";
+      const anchor = document.createElement("a");
+      anchor.href = dataUrl;
+      anchor.download = `${baseName}.png`;
+      anchor.click();
+    } catch (err) {
+      setError(`Export failed: ${String(err)}`);
+    } finally {
+      setExportingPng(false);
+    }
+  }
+
   const games = React.useMemo(
     () => ["ALL", ...Array.from(new Set(displayCards.map((card) => card.game))).sort()],
     [displayCards],
@@ -498,6 +543,7 @@ export function App() {
             imageDataUrl={imageDataUrl}
             assetDataUrls={assetDataUrls}
             mode={viewMode}
+            captureRef={cardCaptureRef}
           />
           <EditorPanel
             card={selected}
@@ -507,6 +553,38 @@ export function App() {
           />
         </div>
       </section>
+      {error ? (
+        <div className="error-toast" role="alert">
+          <span className="error-toast-text">{error}</span>
+        </div>
+      ) : null}
+
+      {selected ? (
+        <button
+          type="button"
+          className="export-fab"
+          onClick={exportCardPng}
+          disabled={exportingPng}
+          title="Export current card as PNG"
+          aria-label="Export current card as PNG"
+        >
+          <svg
+            className="export-fab-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span>{exportingPng ? "Exporting…" : "Export"}</span>
+        </button>
+      ) : null}
       </main>
       </TmpFontContext.Provider>
     </OfficialFontContext.Provider>

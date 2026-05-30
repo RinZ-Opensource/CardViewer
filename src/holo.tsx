@@ -1,7 +1,8 @@
 import React from "react";
 import { clampInt, fieldBool, fieldNumber, fieldString, maiCardTypeEffects, maiEffectIconAsset, maiFramePattern, maiRatingPlatePattern, mu3AttributeName, mu3AwakenMarkAsset, mu3HoloBgAsset, mu3HoloFrameBaseAsset, mu3HoloFrameOverlayAsset, mu3NeedsSign, mu3RareSpriteName, mu3SkillAsset, numericField, twoDigits } from "./cardData";
 import { CARD_HEIGHT, CARD_WIDTH, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_HOLO_UI_MASKS, MAI_NAME_BASE_RECT, MAI_PASS_CROPS, MAI_PASS_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, TmpFontContext, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
-import { TMP_TEXT_PADDING, TmpHorizontalAlign, TmpTextVariant, TmpVerticalAlign, clampNumber, loadTmpAtlas, rasterizeTmpText, spriteCropDisplayRect } from "./layers";
+import { spriteCropDisplayRect } from "./layers";
+import { TMP_TEXT_PADDING, TmpHorizontalAlign, TmpTextVariant, TmpVerticalAlign, clampNumber, loadTmpAtlas, rasterizeTmpText } from "./textRendering";
 import { CardRecord, TmpFontMetrics } from "./types";
 
 export function HoloShaderLayer({
@@ -434,12 +435,14 @@ export function useOfficialHoloMask(
 
   React.useEffect(() => {
     let cancelled = false;
-    setMaskUrl("");
     if (!enabled) {
+      setMaskUrl("");
       return () => {
         cancelled = true;
       };
     }
+    // Keep the previous mask visible while the new one renders so toggling
+    // visibility/print flags doesn't flash the holo off for a frame.
     renderOfficialHoloMask(rootImages, frontImages, frontRects, options, signMaskImages, signClearImages, frontTextMasks, tmpFont, excludeImages)
       .then((url) => {
         if (!cancelled) setMaskUrl(url);

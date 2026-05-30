@@ -19,6 +19,11 @@ export function EditorPanel({
   const merged = applyEdits(card, edits);
   const valueFields = merged.printFields.filter((field) => field.fieldType !== "bool" && field.fieldType !== "metadata");
   const flagFields = merged.printFields.filter((field) => field.fieldType === "bool");
+  // Keep the holo toggle at the top of the flags section.
+  const holoFlagIndex = flagFields.findIndex((field) => field.key === "holo");
+  if (holoFlagIndex > 0) {
+    flagFields.unshift(flagFields.splice(holoFlagIndex, 1)[0]);
+  }
   const editJson = JSON.stringify(edits ?? {}, null, 2);
 
   return (

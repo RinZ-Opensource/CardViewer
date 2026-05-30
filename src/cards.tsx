@@ -3,7 +3,8 @@ import { Mu3LimitBreakStars, clampInt, fieldBool, fieldNumber, fieldString, form
 import { CANVAS_FONT_SEGA_MARU_DB, CARD_TILT_X_MAX, CARD_TILT_Y_MAX, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_NAME_BASE_RECT, MAI_PASS_CROPS, MAI_PASS_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
 import { HoloShaderLayer } from "./holo";
 import { ImageLoadPriority, isStaticAssetPath } from "./imageLoader";
-import { LayerCanvasText, LayerChuCounter, LayerDigitCounter, LayerImage, LayerQr, LayerTmpText, LayerUnityText, clampNumber, spriteCropDisplayRect } from "./layers";
+import { LayerCanvasText, LayerChuCounter, LayerDigitCounter, LayerImage, LayerQr, LayerTmpText, LayerUnityText, spriteCropDisplayRect } from "./layers";
+import { clampNumber } from "./textRendering";
 import { AssetLayer, CardRecord, ViewMode } from "./types";
 
 export function PreviewStage({
@@ -11,19 +12,25 @@ export function PreviewStage({
   imageDataUrl,
   assetDataUrls,
   mode,
+  captureRef,
 }: {
   card: CardRecord | null;
   imageDataUrl: string;
   assetDataUrls: Record<string, string>;
   mode: ViewMode;
+  captureRef?: React.Ref<HTMLDivElement>;
 }) {
   const [tilt, setTilt] = React.useState({ x: 0, y: 0 });
   const [flipped, setFlipped] = React.useState(false);
   const [flipAnimating, setFlipAnimating] = React.useState(false);
   const flipTimerRef = React.useRef<number | null>(null);
   const holo = card ? officialHolo(card) : false;
+  // Official MU3 and MAI cards paint their holo inline (inside .official-card);
+  // the stage overlay only handles the remaining cases (e.g. public mode).
   const renderStageHolo =
-    !!card && holo && !(USE_OFFICIAL_ASSETS && card.game === "MU3" && card.recordType === "Card");
+    !!card &&
+    holo &&
+    !(USE_OFFICIAL_ASSETS && ((card.game === "MU3" && card.recordType === "Card") || card.game === "MAI"));
   const cardRenderKey = card ? `${card.game}:${card.recordType}:${card.dataName}` : "empty";
   const lightStyle = cardLightStyle(tilt, mode);
   const previewTransform =
@@ -96,7 +103,7 @@ export function PreviewStage({
           transform: previewTransform,
         }}
       >
-        <div className="card-face">
+        <div className="card-face" ref={captureRef}>
           <OfficialCardCanvas
             key={cardRenderKey}
             card={card}
@@ -358,7 +365,7 @@ export function OfficialCardCanvas({
   }
 
   if (card.game === "MAI") {
-    return <MaiOfficialCard card={card} imageDataUrl={imageDataUrl} assetDataUrls={assetDataUrls} />;
+    return <MaiOfficialCard card={card} imageDataUrl={imageDataUrl} assetDataUrls={assetDataUrls} lightStyle={lightStyle} />;
   }
 
   return <Mu3OfficialCard card={card} imageDataUrl={imageDataUrl} assetDataUrls={assetDataUrls} lightStyle={lightStyle} />;
@@ -375,19 +382,6 @@ export function PublicCardCanvas({
   card: CardRecord;
   imageDataUrl: string;
 }) {
-  const title =
-    fieldString(card, "characterName") ||
-    fieldString(card, "charaName") ||
-    fieldString(card, "userName") ||
-    card.displayName;
-  const skillName = fieldString(card, "skillName") || fieldString(card, "cardKind") || card.recordType;
-  const skillText =
-    fieldString(card, "skillText") ||
-    fieldString(card, "effectText") ||
-    `${card.game} ${card.dataName}`;
-  const serial = fieldString(card, "serialId") || fieldString(card, "cardNo") || card.id;
-  const hasQr = card.game !== "CHU";
-
   return (
     <div className={`official-card public-card public-card-${card.game.toLowerCase()}`}>
       <div className="public-card-bg" />
@@ -396,27 +390,6 @@ export function PublicCardCanvas({
       ) : (
         <div className="public-card-emblem">{card.game}</div>
       )}
-      <div className="public-card-surface">
-        <div className="public-card-kicker">{card.game}</div>
-        <div className="public-card-title">{title}</div>
-        <div className="public-card-skill">{skillName}</div>
-        <div className="public-card-body">{skillText}</div>
-        {card.game === "CHU" ? (
-          <div className="public-card-counters">
-            <span>MISS {fieldString(card, "miss") || "0"}</span>
-            <span>COMBO {fieldString(card, "combo") || "0"}</span>
-            <span>CHAIN {fieldString(card, "chain") || "0"}</span>
-          </div>
-        ) : null}
-        {card.game === "MAI" ? (
-          <div className="public-card-counters">
-            <span>{fieldString(card, "userName") || "PLAYER"}</span>
-            <span>RATING {fieldString(card, "rating") || "0"}</span>
-          </div>
-        ) : null}
-        <div className="public-card-serial">{serial}</div>
-      </div>
-      {hasQr ? <LayerQr source={qrSource(card, serial)} x={250} y={-392} w={113} h={113} /> : null}
     </div>
   );
 }
@@ -489,10 +462,12 @@ export function MaiOfficialCard({
   card,
   imageDataUrl,
   assetDataUrls,
+  lightStyle,
 }: {
   card: CardRecord;
   imageDataUrl: string;
   assetDataUrls: Record<string, string>;
+  lightStyle: React.CSSProperties;
 }) {
   const hasFriendCode = fieldBool(card, "hasFriendCode");
   const serial = fieldString(card, "serialId");
@@ -608,6 +583,9 @@ export function MaiOfficialCard({
           <LayerImage src={officialAsset("UI_CMA_QRCode_Base_00")} x={249.7} y={-394.7} w={164} h={164} />
           <LayerQr source={qrSource(card, serial)} x={249.7} y={-394.7} w={113} h={113} />
         </>
+      ) : null}
+      {officialHolo(card) ? (
+        <HoloShaderLayer card={card} assetDataUrls={assetDataUrls} lightStyle={lightStyle} inline />
       ) : null}
     </div>
   );
