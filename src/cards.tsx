@@ -3,7 +3,8 @@ import { Mu3LimitBreakStars, clampInt, fieldBool, fieldNumber, fieldString, form
 import { CANVAS_FONT_SEGA_MARU_DB, CARD_TILT_X_MAX, CARD_TILT_Y_MAX, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_NAME_BASE_RECT, MAI_PASS_CROPS, MAI_PASS_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
 import { HoloShaderLayer } from "./holo";
 import { ImageLoadPriority, isStaticAssetPath } from "./imageLoader";
-import { LayerCanvasText, LayerChuCounter, LayerDigitCounter, LayerImage, LayerQr, LayerTmpText, LayerUnityText, spriteCropDisplayRect } from "./layers";
+import { spriteCropDisplayRect } from "./geometry";
+import { LayerCanvasText, LayerChuCounter, LayerDigitCounter, LayerImage, LayerQr, LayerTmpText, LayerUnityText } from "./layers";
 import { clampNumber } from "./textRendering";
 import { AssetLayer, CardRecord, ViewMode } from "./types";
 

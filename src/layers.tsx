@@ -1,7 +1,7 @@
 import React from "react";
 import QRCode from "qrcode";
 import { OFFICIAL_ASSET_ROOT, OfficialFontContext, SpriteCrop, TmpFontContext, officialAsset } from "./constants";
-import { unityRect } from "./holo";
+import { unityRect } from "./geometry";
 import { TMP_TEXT_PADDING, TmpHorizontalAlign, TmpTextVariant, TmpVerticalAlign, clearCanvas, layoutUnityText, loadTmpAtlas, reactText, renderCanvasText, renderTmpText, waitForCanvasFont } from "./textRendering";
 import { OfficialFontKey } from "./types";
 
@@ -86,18 +86,6 @@ export function LayerSpriteCrop({
       />
     </div>
   );
-}
-
-export function spriteCropDisplayRect(
-  rect: { x: number; y: number; w: number; h: number },
-  crop: SpriteCrop,
-) {
-  return {
-    x: rect.x - rect.w / 2 + crop.x + crop.w / 2,
-    y: rect.y + rect.h / 2 - crop.y - crop.h / 2,
-    w: crop.w,
-    h: crop.h,
-  };
 }
 
 export function LayerText({

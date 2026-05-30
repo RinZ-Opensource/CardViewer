@@ -1,7 +1,7 @@
 import React from "react";
 import { clampInt, fieldBool, fieldNumber, fieldString, maiCardTypeEffects, maiEffectIconAsset, maiFramePattern, maiRatingPlatePattern, mu3AttributeName, mu3AwakenMarkAsset, mu3HoloBgAsset, mu3HoloFrameBaseAsset, mu3HoloFrameOverlayAsset, mu3NeedsSign, mu3RareSpriteName, mu3SkillAsset, numericField, twoDigits } from "./cardData";
 import { CARD_HEIGHT, CARD_WIDTH, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_HOLO_UI_MASKS, MAI_NAME_BASE_RECT, MAI_PASS_CROPS, MAI_PASS_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, TmpFontContext, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
-import { spriteCropDisplayRect } from "./layers";
+import { spriteCropDisplayRect, withUnityCanvasRect } from "./geometry";
 import { TMP_TEXT_PADDING, TmpHorizontalAlign, TmpTextVariant, TmpVerticalAlign, clampNumber, loadTmpAtlas, rasterizeTmpText } from "./textRendering";
 import { CardRecord, TmpFontMetrics } from "./types";
 
@@ -781,24 +781,15 @@ export function drawMu3TmpTextMask(
   const rawCtx = rawCanvas.getContext("2d", { willReadFrequently: true });
   if (!rawCtx) return;
   rawCtx.imageSmoothingEnabled = true;
-  const left = CARD_WIDTH / 2 + mask.x - mask.w / 2;
-  const top = CARD_HEIGHT / 2 - mask.y - mask.h / 2;
-  const centerX = left + mask.w / 2;
-  const centerY = top + mask.h / 2;
-  rawCtx.save();
-  if (mask.rotation) {
-    rawCtx.translate(centerX, centerY);
-    rawCtx.rotate((-mask.rotation * Math.PI) / 180);
-    rawCtx.translate(-centerX, -centerY);
-  }
-  rawCtx.drawImage(
-    rasterized.maskCanvas,
-    left - TMP_TEXT_PADDING,
-    top - TMP_TEXT_PADDING,
-    mask.w + TMP_TEXT_PADDING * 2,
-    mask.h + TMP_TEXT_PADDING * 2,
-  );
-  rawCtx.restore();
+  withUnityCanvasRect(rawCtx, mask, (left, top, width, height) => {
+    rawCtx.drawImage(
+      rasterized.maskCanvas,
+      left - TMP_TEXT_PADDING,
+      top - TMP_TEXT_PADDING,
+      width + TMP_TEXT_PADDING * 2,
+      height + TMP_TEXT_PADDING * 2,
+    );
+  });
 
   const rawData = rawCtx.getImageData(0, 0, CARD_WIDTH, CARD_HEIGHT);
   const rawMask = binarizeRenderedPixels(rawData);
@@ -808,25 +799,6 @@ export function drawMu3TmpTextMask(
   paintBinaryMask(output, outputMask);
   rawCtx.putImageData(output, 0, 0);
   ctx.drawImage(rawCanvas, 0, 0);
-}
-
-export function withUnityCanvasRect(
-  ctx: CanvasRenderingContext2D,
-  rect: Mu3SvgImage | Mu3SvgRect,
-  draw: (left: number, top: number, width: number, height: number) => void,
-) {
-  const left = CARD_WIDTH / 2 + rect.x - rect.w / 2;
-  const top = CARD_HEIGHT / 2 - rect.y - rect.h / 2;
-  const centerX = left + rect.w / 2;
-  const centerY = top + rect.h / 2;
-  ctx.save();
-  if (rect.rotation) {
-    ctx.translate(centerX, centerY);
-    ctx.rotate((-rect.rotation * Math.PI) / 180);
-    ctx.translate(-centerX, -centerY);
-  }
-  draw(left, top, rect.w, rect.h);
-  ctx.restore();
 }
 
 export function cssImageUrl(url: string) {
@@ -853,29 +825,6 @@ export function holoMaskStyle(maskUrl: string): React.CSSProperties | undefined 
   return {
     WebkitMaskImage: `url("${maskUrl}")`,
     maskImage: `url("${maskUrl}")`,
-  };
-}
-
-export function unityRect(
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  transform: { rotation?: number; scale?: number } = {},
-): React.CSSProperties {
-  const left = CARD_WIDTH / 2 + x - w / 2;
-  const top = CARD_HEIGHT / 2 - y - h / 2;
-  const transforms = [
-    transform.rotation ? `rotate(${-transform.rotation}deg)` : "",
-    transform.scale && transform.scale !== 1 ? `scale(${transform.scale})` : "",
-  ].filter(Boolean);
-  return {
-    left: `${(left / CARD_WIDTH) * 100}%`,
-    top: `${(top / CARD_HEIGHT) * 100}%`,
-    width: `${(w / CARD_WIDTH) * 100}%`,
-    height: `${(h / CARD_HEIGHT) * 100}%`,
-    transform: transforms.length ? transforms.join(" ") : undefined,
-    transformOrigin: "50% 50%",
   };
 }
 
