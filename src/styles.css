@@ -578,6 +578,7 @@ small,
   aspect-ratio: 768 / 1052;
   position: relative;
   transform-style: preserve-3d;
+  will-change: transform;
   cursor: pointer;
   transition: transform 120ms ease-out;
   -webkit-tap-highlight-color: transparent;

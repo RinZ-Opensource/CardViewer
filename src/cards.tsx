@@ -24,6 +24,8 @@ export function PreviewStage({
   const [flipped, setFlipped] = React.useState(false);
   const [flipAnimating, setFlipAnimating] = React.useState(false);
   const flipTimerRef = React.useRef<number | null>(null);
+  const tiltFrameRef = React.useRef<number | null>(null);
+  const pendingTiltRef = React.useRef<{ x: number; y: number } | null>(null);
   const holo = card ? officialHolo(card) : false;
   // Official MU3 and MAI cards paint their holo inline (inside .official-card);
   // the stage overlay only handles the remaining cases (e.g. public mode).
@@ -62,8 +64,31 @@ export function PreviewStage({
     const rect = event.currentTarget.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width - 0.5;
     const y = (event.clientY - rect.top) / rect.height - 0.5;
-    setTilt({ x: y * -CARD_TILT_X_MAX * 2, y: x * CARD_TILT_Y_MAX * 2 });
+    // Coalesce rapid mousemove events into one tilt update per frame so we
+    // don't re-render + repaint the card (and its holo) many times per frame.
+    pendingTiltRef.current = { x: y * -CARD_TILT_X_MAX * 2, y: x * CARD_TILT_Y_MAX * 2 };
+    if (tiltFrameRef.current === null) {
+      tiltFrameRef.current = window.requestAnimationFrame(() => {
+        tiltFrameRef.current = null;
+        if (pendingTiltRef.current) setTilt(pendingTiltRef.current);
+      });
+    }
   }
+
+  function resetTilt() {
+    if (tiltFrameRef.current !== null) {
+      window.cancelAnimationFrame(tiltFrameRef.current);
+      tiltFrameRef.current = null;
+    }
+    pendingTiltRef.current = null;
+    setTilt({ x: 0, y: 0 });
+  }
+
+  React.useEffect(() => {
+    return () => {
+      if (tiltFrameRef.current !== null) window.cancelAnimationFrame(tiltFrameRef.current);
+    };
+  }, []);
 
   function toggleFlip() {
     if (!card) return;
@@ -89,7 +114,7 @@ export function PreviewStage({
   }
 
   return (
-    <section className="preview-stage" onMouseMove={onMove} onMouseLeave={() => setTilt({ x: 0, y: 0 })}>
+    <section className="preview-stage" onMouseMove={onMove} onMouseLeave={resetTilt}>
       <div
         className={`card-preview ${mode} ${flipped ? "flipped" : ""} ${flipAnimating ? "is-flipping" : ""}`}
         role="button"

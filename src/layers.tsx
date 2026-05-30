@@ -41,6 +41,7 @@ export function LayerImage({
       className={["official-layer-img", className].filter(Boolean).join(" ")}
       src={currentSrc}
       alt=""
+      decoding="async"
       onError={onError}
       style={unityRect(x, y, w, h, { rotation, scale })}
     />
