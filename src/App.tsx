@@ -3,13 +3,13 @@ import { toPng } from "html-to-image";
 import { invoke } from "@tauri-apps/api/core";
 import { EditorPanel } from "./EditorPanel";
 import { applyEdits, maiLinkedPrintEdits } from "./cardData";
-import { PreviewStage, assetLayerLoadPriority, selectedAssetSignature, usesPrimaryImageDataUrl, visibleAssetLayers } from "./cards";
-import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT, CARD_WIDTH, DEFAULT_PACKAGE_ROOT, EDIT_STORAGE_KEY, OfficialFontContext, TmpFontContext, USE_OFFICIAL_ASSETS, canInvokeTauri } from "./constants";
-import { loadOfficialFonts, loadOfficialTmpFont } from "./fonts";
-import { THUMBNAIL_BUFFER_ROWS, isStaticAssetPath, readCachedImageDataUrl } from "./imageLoader";
+import { PreviewStage, selectedAssetSignature, usesPrimaryImageDataUrl } from "./cards";
+import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT, CARD_WIDTH, DEFAULT_PACKAGE_ROOT, EDIT_STORAGE_KEY, OfficialFontContext, TmpFontContext, canInvokeTauri } from "./constants";
+import { useCardListViewport, useOfficialFonts, useSelectedAssetDataUrls, useSelectedImageDataUrl, useThumbnailLoader } from "./hooks";
+import { THUMBNAIL_BUFFER_ROWS } from "./imageLoader";
 import { loadStaticScanResult } from "./manifest";
 import { mockScanResult } from "./mockData";
-import { CardEdits, CardRecord, LoadedAssetDataUrls, LoadedImageDataUrl, OfficialFontKey, PrintFieldValue, ScanResult, ScanStats, TmpFontMetrics, UnityFontMetrics, ViewMode } from "./types";
+import { CardEdits, CardRecord, PrintFieldValue, ScanResult, ScanStats, ViewMode } from "./types";
 
 export function App() {
   const [packageRoot, setPackageRoot] = React.useState(DEFAULT_PACKAGE_ROOT);
@@ -18,24 +18,12 @@ export function App() {
   const [query, setQuery] = React.useState("");
   const [gameFilter, setGameFilter] = React.useState("ALL");
   const [viewMode, setViewMode] = React.useState<ViewMode>("3d");
-  const [loadedImageDataUrl, setLoadedImageDataUrl] = React.useState<LoadedImageDataUrl | null>(null);
-  const [loadedAssetDataUrls, setLoadedAssetDataUrls] = React.useState<LoadedAssetDataUrls>({
-    signature: "",
-    urls: {},
-  });
-  const [thumbCache, setThumbCache] = React.useState<Record<string, string>>({});
-  const thumbCacheRef = React.useRef<Record<string, string>>({});
-  const thumbPendingRef = React.useRef<Set<string>>(new Set());
   const autoLoadStartedRef = React.useRef(false);
   const loadSequenceRef = React.useRef(0);
-  const cardListRef = React.useRef<HTMLElement | null>(null);
   const cardCaptureRef = React.useRef<HTMLDivElement | null>(null);
   const [exportingPng, setExportingPng] = React.useState(false);
-  const [cardListViewport, setCardListViewport] = React.useState({ height: 0, scrollTop: 0 });
-  const [officialFonts, setOfficialFonts] = React.useState<
-    Partial<Record<OfficialFontKey, UnityFontMetrics>>
-  >({});
-  const [tmpFont, setTmpFont] = React.useState<TmpFontMetrics | null>(null);
+  const { cardListRef, cardListViewport, updateCardListScroll } = useCardListViewport();
+  const { officialFonts, tmpFont } = useOfficialFonts();
   const [savedEditPath, setSavedEditPath] = React.useState("");
   const [edits, setEdits] = React.useState<Record<string, CardEdits>>(() => {
     const raw = localStorage.getItem(EDIT_STORAGE_KEY);
@@ -60,47 +48,9 @@ export function App() {
   }, [error]);
 
   React.useEffect(() => {
-    thumbCacheRef.current = thumbCache;
-  }, [thumbCache]);
-
-  React.useEffect(() => {
     if (autoLoadStartedRef.current) return;
     autoLoadStartedRef.current = true;
     void scanPackage();
-  }, []);
-
-  React.useEffect(() => {
-    const element = cardListRef.current;
-    if (!element) return;
-
-    const update = () => {
-      setCardListViewport({
-        height: element.clientHeight,
-        scrollTop: element.scrollTop,
-      });
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
-  React.useEffect(() => {
-    if (!USE_OFFICIAL_ASSETS) return;
-    let cancelled = false;
-    loadOfficialFonts()
-      .then((fonts) => {
-        if (!cancelled) setOfficialFonts(fonts);
-      })
-      .catch(() => undefined);
-    loadOfficialTmpFont()
-      .then((font) => {
-        if (!cancelled) setTmpFont(font);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   const cards = scanResult?.cards ?? [];
@@ -121,10 +71,12 @@ export function App() {
     () => selectedAssetSignature(selected, scanResult?.streamingAssets),
     [scanResult?.streamingAssets, selected],
   );
-  const imageDataUrl =
-    loadedImageDataUrl?.path === selectedImagePath ? loadedImageDataUrl.dataUrl : "";
-  const assetDataUrls =
-    loadedAssetDataUrls.signature === selectedAssetsSignature ? loadedAssetDataUrls.urls : {};
+  const imageDataUrl = useSelectedImageDataUrl(selected, selectedImagePath);
+  const assetDataUrls = useSelectedAssetDataUrls(
+    selected,
+    selectedAssetsSignature,
+    scanResult?.streamingAssets,
+  );
 
   const filteredCards = React.useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -180,131 +132,7 @@ export function App() {
     return result;
   }, [filteredCards, visibleEnd, visibleStart]);
   const cardListHeight = filteredCards.length * CARD_ROW_HEIGHT;
-
-  const updateCardListScroll = React.useCallback(() => {
-    const element = cardListRef.current;
-    if (!element) return;
-    setCardListViewport((prev) => {
-      if (prev.scrollTop === element.scrollTop && prev.height === element.clientHeight) return prev;
-      return {
-        height: element.clientHeight,
-        scrollTop: element.scrollTop,
-      };
-    });
-  }, []);
-
-  React.useEffect(() => {
-    if (!selected) {
-      setLoadedImageDataUrl(null);
-      return;
-    }
-    if (!selectedImagePath || (!canInvokeTauri() && !isStaticAssetPath(selectedImagePath))) {
-      setLoadedImageDataUrl(null);
-      return;
-    }
-
-    let cancelled = false;
-    setLoadedImageDataUrl((prev) => (prev?.path === selectedImagePath ? prev : null));
-    readCachedImageDataUrl(selectedImagePath, "high")
-      .then((dataUrl) => {
-        if (!cancelled) setLoadedImageDataUrl({ path: selectedImagePath, dataUrl });
-      })
-      .catch(() => {
-        if (!cancelled) setLoadedImageDataUrl(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedImagePath]);
-
-  React.useEffect(() => {
-    if (!selected) {
-      setLoadedAssetDataUrls({ signature: "", urls: {} });
-      return;
-    }
-
-    let cancelled = false;
-    const layers = visibleAssetLayers(selected, scanResult?.streamingAssets);
-    const readableLayers = layers.filter((layer) => canInvokeTauri() || isStaticAssetPath(layer.path));
-    setLoadedAssetDataUrls((prev) =>
-      prev.signature === selectedAssetsSignature ? prev : { signature: selectedAssetsSignature, urls: {} },
-    );
-    readableLayers.forEach((layer) => {
-      readCachedImageDataUrl(layer.path, assetLayerLoadPriority(layer))
-        .then((dataUrl) => {
-          if (cancelled) return;
-          setLoadedAssetDataUrls((prev) => {
-            if (prev.signature !== selectedAssetsSignature) return prev;
-            if (prev.urls[layer.key] === dataUrl) return prev;
-            return {
-              signature: selectedAssetsSignature,
-              urls: { ...prev.urls, [layer.key]: dataUrl },
-            };
-          });
-        })
-        .catch(() => undefined);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selected?.dataName, selectedAssetsSignature]);
-
-  React.useEffect(() => {
-    const pendingLoads = thumbnailCards
-      .map((card) => {
-        const thumbPath = card.thumbnailPath ?? card.imagePath;
-        if (!thumbPath || thumbCacheRef.current[card.dataName] || thumbPendingRef.current.has(card.dataName)) {
-          return null;
-        }
-        if (!canInvokeTauri() && !isStaticAssetPath(thumbPath)) return null;
-        thumbPendingRef.current.add(card.dataName);
-        return readCachedImageDataUrl(thumbPath)
-          .then((dataUrl) => ({ dataName: card.dataName, dataUrl }))
-          .catch(() => null)
-          .finally(() => {
-            thumbPendingRef.current.delete(card.dataName);
-          });
-      })
-      .filter((load): load is Promise<{ dataName: string; dataUrl: string } | null> => Boolean(load));
-
-    if (!pendingLoads.length) return;
-
-    let cancelled = false;
-    let pendingFrame = 0;
-    let loadedThumbs: Array<{ dataName: string; dataUrl: string }> = [];
-    const flushLoadedThumbs = () => {
-      pendingFrame = 0;
-      const nextEntries = loadedThumbs;
-      loadedThumbs = [];
-      setThumbCache((prev) => {
-        let next = prev;
-        for (const entry of nextEntries) {
-          if (next[entry.dataName]) continue;
-          if (next === prev) next = { ...prev };
-          next[entry.dataName] = entry.dataUrl;
-        }
-        return next;
-      });
-    };
-    const queueLoadedThumb = (entry: { dataName: string; dataUrl: string }) => {
-      loadedThumbs.push(entry);
-      if (!pendingFrame) pendingFrame = window.requestAnimationFrame(flushLoadedThumbs);
-    };
-
-    pendingLoads.forEach((load) => {
-      load.then((entry) => {
-        if (cancelled || !entry) return;
-        queueLoadedThumb(entry);
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      if (pendingFrame) window.cancelAnimationFrame(pendingFrame);
-    };
-  }, [thumbnailCards]);
+  const thumbCache = useThumbnailLoader(thumbnailCards);
 
   async function scanPackage() {
     setError("");

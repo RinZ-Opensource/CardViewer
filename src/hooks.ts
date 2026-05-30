@@ -1,0 +1,223 @@
+import React from "react";
+import { assetLayerLoadPriority, visibleAssetLayers } from "./cards";
+import { USE_OFFICIAL_ASSETS, canInvokeTauri } from "./constants";
+import { loadOfficialFonts, loadOfficialTmpFont } from "./fonts";
+import { isStaticAssetPath, readCachedImageDataUrl } from "./imageLoader";
+import { CardRecord, LoadedAssetDataUrls, LoadedImageDataUrl, OfficialFontKey, TmpFontMetrics, UnityFontMetrics } from "./types";
+
+// Loads the Unity bitmap fonts and the TMP SDF font used by the official card
+// renderers. No-op outside the private/official deployment.
+export function useOfficialFonts() {
+  const [officialFonts, setOfficialFonts] = React.useState<
+    Partial<Record<OfficialFontKey, UnityFontMetrics>>
+  >({});
+  const [tmpFont, setTmpFont] = React.useState<TmpFontMetrics | null>(null);
+
+  React.useEffect(() => {
+    if (!USE_OFFICIAL_ASSETS) return;
+    let cancelled = false;
+    loadOfficialFonts()
+      .then((fonts) => {
+        if (!cancelled) setOfficialFonts(fonts);
+      })
+      .catch(() => undefined);
+    loadOfficialTmpFont()
+      .then((font) => {
+        if (!cancelled) setTmpFont(font);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { officialFonts, tmpFont };
+}
+
+// Tracks the card list's scroll position and height (via ResizeObserver) so the
+// caller can compute the virtual window. Returns the ref to attach to the
+// scroll container plus an onScroll handler.
+export function useCardListViewport() {
+  const cardListRef = React.useRef<HTMLElement | null>(null);
+  const [cardListViewport, setCardListViewport] = React.useState({ height: 0, scrollTop: 0 });
+
+  React.useEffect(() => {
+    const element = cardListRef.current;
+    if (!element) return;
+
+    const update = () => {
+      setCardListViewport({
+        height: element.clientHeight,
+        scrollTop: element.scrollTop,
+      });
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const updateCardListScroll = React.useCallback(() => {
+    const element = cardListRef.current;
+    if (!element) return;
+    setCardListViewport((prev) => {
+      if (prev.scrollTop === element.scrollTop && prev.height === element.clientHeight) return prev;
+      return {
+        height: element.clientHeight,
+        scrollTop: element.scrollTop,
+      };
+    });
+  }, []);
+
+  return { cardListRef, cardListViewport, updateCardListScroll };
+}
+
+// Resolves the selected card's primary image to a data URL (high priority).
+// Returns "" until it is ready or when the path can't be read in this context.
+export function useSelectedImageDataUrl(selected: CardRecord | null, selectedImagePath: string) {
+  const [loadedImageDataUrl, setLoadedImageDataUrl] = React.useState<LoadedImageDataUrl | null>(null);
+
+  React.useEffect(() => {
+    if (!selected) {
+      setLoadedImageDataUrl(null);
+      return;
+    }
+    if (!selectedImagePath || (!canInvokeTauri() && !isStaticAssetPath(selectedImagePath))) {
+      setLoadedImageDataUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadedImageDataUrl((prev) => (prev?.path === selectedImagePath ? prev : null));
+    readCachedImageDataUrl(selectedImagePath, "high")
+      .then((dataUrl) => {
+        if (!cancelled) setLoadedImageDataUrl({ path: selectedImagePath, dataUrl });
+      })
+      .catch(() => {
+        if (!cancelled) setLoadedImageDataUrl(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedImagePath]);
+
+  return loadedImageDataUrl?.path === selectedImagePath ? loadedImageDataUrl.dataUrl : "";
+}
+
+// Resolves the selected card's visible asset layers to data URLs, keyed by
+// layer key. Keeps results only while their signature matches the selection.
+export function useSelectedAssetDataUrls(
+  selected: CardRecord | null,
+  selectedAssetsSignature: string,
+  streamingAssets: string | undefined,
+) {
+  const [loadedAssetDataUrls, setLoadedAssetDataUrls] = React.useState<LoadedAssetDataUrls>({
+    signature: "",
+    urls: {},
+  });
+
+  React.useEffect(() => {
+    if (!selected) {
+      setLoadedAssetDataUrls({ signature: "", urls: {} });
+      return;
+    }
+
+    let cancelled = false;
+    const layers = visibleAssetLayers(selected, streamingAssets);
+    const readableLayers = layers.filter((layer) => canInvokeTauri() || isStaticAssetPath(layer.path));
+    setLoadedAssetDataUrls((prev) =>
+      prev.signature === selectedAssetsSignature ? prev : { signature: selectedAssetsSignature, urls: {} },
+    );
+    readableLayers.forEach((layer) => {
+      readCachedImageDataUrl(layer.path, assetLayerLoadPriority(layer))
+        .then((dataUrl) => {
+          if (cancelled) return;
+          setLoadedAssetDataUrls((prev) => {
+            if (prev.signature !== selectedAssetsSignature) return prev;
+            if (prev.urls[layer.key] === dataUrl) return prev;
+            return {
+              signature: selectedAssetsSignature,
+              urls: { ...prev.urls, [layer.key]: dataUrl },
+            };
+          });
+        })
+        .catch(() => undefined);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.dataName, selectedAssetsSignature]);
+
+  return loadedAssetDataUrls.signature === selectedAssetsSignature ? loadedAssetDataUrls.urls : {};
+}
+
+// Loads thumbnails for the given cards, batching state updates per animation
+// frame and de-duplicating in-flight/cached requests. Returns a dataName->url map.
+export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
+  const [thumbCache, setThumbCache] = React.useState<Record<string, string>>({});
+  const thumbCacheRef = React.useRef<Record<string, string>>({});
+  const thumbPendingRef = React.useRef<Set<string>>(new Set());
+
+  React.useEffect(() => {
+    thumbCacheRef.current = thumbCache;
+  }, [thumbCache]);
+
+  React.useEffect(() => {
+    const pendingLoads = thumbnailCards
+      .map((card) => {
+        const thumbPath = card.thumbnailPath ?? card.imagePath;
+        if (!thumbPath || thumbCacheRef.current[card.dataName] || thumbPendingRef.current.has(card.dataName)) {
+          return null;
+        }
+        if (!canInvokeTauri() && !isStaticAssetPath(thumbPath)) return null;
+        thumbPendingRef.current.add(card.dataName);
+        return readCachedImageDataUrl(thumbPath)
+          .then((dataUrl) => ({ dataName: card.dataName, dataUrl }))
+          .catch(() => null)
+          .finally(() => {
+            thumbPendingRef.current.delete(card.dataName);
+          });
+      })
+      .filter((load): load is Promise<{ dataName: string; dataUrl: string } | null> => Boolean(load));
+
+    if (!pendingLoads.length) return;
+
+    let cancelled = false;
+    let pendingFrame = 0;
+    let loadedThumbs: Array<{ dataName: string; dataUrl: string }> = [];
+    const flushLoadedThumbs = () => {
+      pendingFrame = 0;
+      const nextEntries = loadedThumbs;
+      loadedThumbs = [];
+      setThumbCache((prev) => {
+        let next = prev;
+        for (const entry of nextEntries) {
+          if (next[entry.dataName]) continue;
+          if (next === prev) next = { ...prev };
+          next[entry.dataName] = entry.dataUrl;
+        }
+        return next;
+      });
+    };
+    const queueLoadedThumb = (entry: { dataName: string; dataUrl: string }) => {
+      loadedThumbs.push(entry);
+      if (!pendingFrame) pendingFrame = window.requestAnimationFrame(flushLoadedThumbs);
+    };
+
+    pendingLoads.forEach((load) => {
+      load.then((entry) => {
+        if (cancelled || !entry) return;
+        queueLoadedThumb(entry);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      if (pendingFrame) window.cancelAnimationFrame(pendingFrame);
+    };
+  }, [thumbnailCards]);
+
+  return thumbCache;
+}
