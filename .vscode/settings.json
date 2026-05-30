@@ -1,0 +1,12 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^python -c \"import glob; from PIL import Image; \\[print\\(f'\\{f\\}: \\{Image\\.open\\(f\\)\\.size\\}'\\) for f in glob\\.glob\\('public/official/\\*PassName\\*\\.png'\\)\\]\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -c \"import glob; from PIL import Image; \\[print\\(f'\\{f\\}: \\{Image\\.open\\(f\\)\\.size\\}'\\) for f in glob\\.glob\\('public/\\*\\*/\\*PassName\\*\\.png', recursive=True\\)\\]\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

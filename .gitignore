@@ -1,0 +1,40 @@
+# JavaScript / Vite outputs
+node_modules/
+dist/
+
+# Local analysis and extracted reference material
+.analysis/
+.analysis/package-sample/CardMaker_Data/Managed/*.dll
+
+# Local tooling caches
+.venv/
+.wrangler/
+__pycache__/
+*.py[cod]
+
+# Rust / Tauri outputs
+src-tauri/target/
+
+# Excluded from this repo (mobile is moving to its own repository; docs kept local)
+mobile/
+docs/
+
+# Private generated assets and distributable packs
+private-assets/fonts/fot/*
+!private-assets/fonts/fot/.gitkeep
+private-assets/official/*
+!private-assets/official/.gitkeep
+*.cmpack
+private-assets.zip
+
+# Official game assets and commercial fonts (copyrighted, kept local only)
+public/official/*
+!public/official/.gitkeep
+public/fonts/private/*
+!public/fonts/private/.gitkeep
+
+# Throwaway local scratch files
+*.bak
+sprite_test.py
+holo_compare_output/
+scripts/

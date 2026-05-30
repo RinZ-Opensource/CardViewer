@@ -1,0 +1,37 @@
+{
+  "name": "configarc-card-viewer",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420 --mode private",
+    "dev:private": "vite --host 127.0.0.1 --port 1420 --mode private",
+    "dev:public": "vite --host 127.0.0.1 --port 1420 --mode public",
+    "build": "tsc && vite build --mode private",
+    "build:private": "tsc && vite build --mode private",
+    "build:public": "tsc && vite build --mode public",
+    "preview": "vite preview --host 127.0.0.1 --port 1421",
+    "preview:public": "vite preview --host 127.0.0.1 --port 1421",
+    "export:online": "cargo run --manifest-path src-tauri/Cargo.toml --bin export_online --",
+    "export:mobile-pack": "cargo run --manifest-path src-tauri/Cargo.toml --bin export_mobile_pack --",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.8.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.8.4",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.2",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.4"
+  }
+}
