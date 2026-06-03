@@ -285,9 +285,8 @@ export function maiCardTypeEffects(card: CardRecord) {
 }
 
 export function maiEffectFlags(card: CardRecord) {
-  const raw = fieldString(card, "extendBitParameter");
-  if (raw) return numericField(card, "extendBitParameter", 0);
-  return 0;
+  // numericField already returns 0 for a missing/blank/non-numeric field.
+  return numericField(card, "extendBitParameter", 0);
 }
 
 export function maiRatingPlatePattern(rating: number) {
