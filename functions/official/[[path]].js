@@ -30,10 +30,15 @@ export async function onRequest({ request, env, waitUntil }) {
     const headers = new Headers();
     object.writeHttpMetadata(headers);
     headers.set("etag", object.httpEtag);
-    // Manifests change; images/atlases don't.
+    // Manifests change; images/atlases don't. stale-while-revalidate lets a
+    // revisiting browser paint from the (slightly stale) cached manifest
+    // immediately while it refreshes in the background, instead of blocking on
+    // a revalidation round-trip.
     headers.set(
       "Cache-Control",
-      key.endsWith(".json") ? "public, max-age=60" : "public, max-age=31536000, immutable",
+      key.endsWith(".json")
+        ? "public, max-age=60, stale-while-revalidate=86400"
+        : "public, max-age=31536000, immutable",
     );
     // Ensure JSON carries a correct content-type even if the R2 object lacks
     // one, so Cloudflare applies brotli/gzip and clients parse it correctly.
