@@ -1,5 +1,6 @@
 import React from "react";
 import { OFFICIAL_ASSET_ROOT } from "./constants";
+import { LruMap } from "./lru";
 import { Bounds, TmpFontMetrics, TmpGlyph, UnityFontMetrics } from "./types";
 
 export function renderCanvasText(
@@ -125,8 +126,14 @@ export function clearCanvas(canvas: HTMLCanvasElement) {
   context?.clearRect(0, 0, canvas.width, canvas.height);
 }
 
+// The atlas cache holds one image per font texture (a handful), so it needs no
+// bound. The per-glyph canvas cache is keyed by glyph × size × kind × color and
+// can grow with the variety of rendered text, so cap it with an LRU.
 export const tmpAtlasCache = new Map<string, Promise<HTMLImageElement>>();
-export const tmpGlyphCanvasCache = new Map<string, HTMLCanvasElement>();
+export const TMP_GLYPH_CANVAS_CACHE_MAX = 4096;
+export const tmpGlyphCanvasCache = new LruMap<string, HTMLCanvasElement>({
+  maxEntries: TMP_GLYPH_CANVAS_CACHE_MAX,
+});
 
 export function loadTmpAtlas(font: TmpFontMetrics) {
   const src = `${OFFICIAL_ASSET_ROOT}${font.texture}`;

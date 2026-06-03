@@ -100,6 +100,10 @@ export function useSelectedImageDataUrl(selected: CardRecord | null, selectedIma
     return () => {
       cancelled = true;
     };
+    // `selected` is intentionally not a dependency: the only thing the effect
+    // reads from it (the resolved image path) is `selectedImagePath`, which the
+    // caller derives from `selected` and which becomes "" when it clears. Adding
+    // `selected` would re-run on unrelated edits without changing the result.
   }, [selectedImagePath]);
 
   return loadedImageDataUrl?.path === selectedImagePath ? loadedImageDataUrl.dataUrl : "";
@@ -148,6 +152,11 @@ export function useSelectedAssetDataUrls(
     return () => {
       cancelled = true;
     };
+    // `selected` and `streamingAssets` are intentionally not listed: both feed
+    // into `selectedAssetsSignature` (computed by the caller from exactly those
+    // two), so any layer-affecting change already flips the signature and
+    // re-runs this effect. Depending on them directly would only add redundant
+    // re-runs for fields that don't change the visible layers.
   }, [selected?.dataName, selectedAssetsSignature]);
 
   return loadedAssetDataUrls.signature === selectedAssetsSignature ? loadedAssetDataUrls.urls : {};
@@ -155,10 +164,18 @@ export function useSelectedAssetDataUrls(
 
 // Loads thumbnails for the given cards, batching state updates per animation
 // frame and de-duplicating in-flight/cached requests. Returns a dataName->url map.
+// Keeps at most this many decoded thumbnails in component state. Evicted
+// entries still live in the (LRU-bounded) imageDataUrlCache, so scrolling back
+// re-resolves them instantly. The cap is far larger than any on-screen window,
+// so currently-visible thumbnails are never the ones dropped.
+export const THUMB_CACHE_MAX_ENTRIES = 2048;
+
 export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
   const [thumbCache, setThumbCache] = React.useState<Record<string, string>>({});
   const thumbCacheRef = React.useRef<Record<string, string>>({});
   const thumbPendingRef = React.useRef<Set<string>>(new Set());
+  // Insertion order of cached keys, used to evict oldest-first (FIFO).
+  const thumbOrderRef = React.useRef<string[]>([]);
 
   React.useEffect(() => {
     thumbCacheRef.current = thumbCache;
@@ -193,10 +210,18 @@ export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
       loadedThumbs = [];
       setThumbCache((prev) => {
         let next = prev;
+        const order = thumbOrderRef.current;
         for (const entry of nextEntries) {
           if (next[entry.dataName]) continue;
           if (next === prev) next = { ...prev };
           next[entry.dataName] = entry.dataUrl;
+          order.push(entry.dataName);
+        }
+        if (next === prev) return next;
+        // Evict oldest entries beyond the cap (FIFO).
+        while (order.length > THUMB_CACHE_MAX_ENTRIES) {
+          const oldest = order.shift();
+          if (oldest !== undefined && oldest in next) delete next[oldest];
         }
         return next;
       });

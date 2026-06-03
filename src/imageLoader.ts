@@ -1,10 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
 import { canInvokeTauri } from "./constants";
+import { LruMap } from "./lru";
 
 export const IMAGE_LOAD_CONCURRENCY = 3;
 export const THUMBNAIL_BUFFER_ROWS = 24;
 export type ImageLoadPriority = "high" | "normal";
-export const imageDataUrlCache = new Map<string, string>();
+// Bound the decoded-image cache so browsing thousands of cards can't grow
+// memory without limit. Budget is in base64 chars (~2 bytes each in JS), so
+// ~192M chars ≈ a few hundred MB of card art before the LRU starts evicting.
+export const IMAGE_CACHE_MAX_BYTES = 192 * 1024 * 1024;
+export const IMAGE_CACHE_MAX_ENTRIES = 4096;
+export const imageDataUrlCache = new LruMap<string, string>({
+  maxEntries: IMAGE_CACHE_MAX_ENTRIES,
+  maxBytes: IMAGE_CACHE_MAX_BYTES,
+  sizeOf: (value) => value.length,
+});
 export const imageDataUrlPending = new Map<string, Promise<string>>();
 export let activeImageLoads = 0;
 export const highPriorityImageLoads: Array<() => void> = [];
