@@ -3,7 +3,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     fs,
     hash::{Hash, Hasher},
     io::{Read, Write},
@@ -20,11 +20,70 @@ const MAI_COMPOSITE_SCRIPT: &str =
     include_str!("../../scripts/generate_mai_composite_thumbnails.py");
 const MAI_STATIC_NOT_FOUND_MAP_ID: i32 = 3;
 const MU3_PRINT_AWAKEN_LEVEL0: &str = "1";
-const HOLO_ENABLED: bool = false;
+const HOLO_ENABLED: bool = true;
 const ONLINE_THUMBNAIL_MAX_WIDTH: u32 = 192;
 const ONLINE_THUMBNAIL_MAX_HEIGHT: u32 = 256;
 const ONLINE_THUMBNAIL_QUALITY: u8 = 72;
-static IMAGE_DATA_URL_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+// Decoded image data URLs are cached for the process lifetime. Bound the cache
+// by a byte budget (LRU) so a long session browsing thousands of cards can't
+// grow memory without limit.
+const IMAGE_DATA_URL_CACHE_MAX_BYTES: usize = 256 * 1024 * 1024;
+static IMAGE_DATA_URL_CACHE: OnceLock<Mutex<ImageDataUrlCache>> = OnceLock::new();
+
+// Canonicalized content roots that `read_image_data_url` is allowed to read
+// from. Populated by every scan/export so the IPC image reader can only serve
+// files that live under a directory the user actually pointed the app at —
+// blocking directory-traversal reads of arbitrary files on disk.
+static ALLOWED_CONTENT_ROOTS: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
+
+/// Byte-budgeted LRU cache keyed by file path. The least-recently-used entry is
+/// evicted first once the total size of cached data URLs exceeds the budget.
+struct ImageDataUrlCache {
+    map: HashMap<String, String>,
+    order: VecDeque<String>,
+    bytes: usize,
+    max_bytes: usize,
+}
+
+impl ImageDataUrlCache {
+    fn new(max_bytes: usize) -> Self {
+        Self {
+            map: HashMap::new(),
+            order: VecDeque::new(),
+            bytes: 0,
+            max_bytes,
+        }
+    }
+
+    fn get(&mut self, key: &str) -> Option<String> {
+        let value = self.map.get(key)?.clone();
+        if let Some(pos) = self.order.iter().position(|k| k == key) {
+            if let Some(k) = self.order.remove(pos) {
+                self.order.push_back(k);
+            }
+        }
+        Some(value)
+    }
+
+    fn insert(&mut self, key: String, value: String) {
+        if let Some(old) = self.map.insert(key.clone(), value.clone()) {
+            self.bytes = self.bytes.saturating_sub(old.len());
+            if let Some(pos) = self.order.iter().position(|k| k == &key) {
+                self.order.remove(pos);
+            }
+        }
+        self.bytes += value.len();
+        self.order.push_back(key);
+        while self.bytes > self.max_bytes && self.order.len() > 1 {
+            let Some(oldest) = self.order.pop_front() else {
+                break;
+            };
+            if let Some(removed) = self.map.remove(&oldest) {
+                self.bytes = self.bytes.saturating_sub(removed.len());
+            }
+        }
+    }
+}
 
 mod config;
 mod types;
@@ -301,6 +360,10 @@ pub fn scan_package_impl(package_root: String) -> Result<ScanResult, String> {
     let mut stats = ScanStats::default();
     let mut cards = Vec::new();
     let content_roots = discover_content_roots(&root, &streaming, &mut warnings);
+    // Authorize these roots (and the package root itself) for the IPC image
+    // reader before any card image paths are handed to the frontend.
+    register_allowed_content_roots(&content_roots);
+    register_allowed_content_roots(std::slice::from_ref(&root));
 
     for content_root in &content_roots {
         scan_chu_cards(content_root, &mut cards, &mut stats, &mut warnings);
@@ -381,13 +444,13 @@ fn discover_content_roots(
     let mut seen = HashSet::new();
     push_content_root(&mut roots, &mut seen, streaming);
 
+    // Extra update content roots are purely configuration-driven via
+    // CARDVIEWER_EXTRA_CONTENT_ROOTS (a platform path list). No machine-specific
+    // path is assumed by default.
     if let Some(raw) = std::env::var_os("CARDVIEWER_EXTRA_CONTENT_ROOTS") {
         for path in std::env::split_paths(&raw) {
             discover_content_root_candidate(&path, &mut roots, &mut seen);
         }
-    } else {
-        let default_updates = PathBuf::from(r"G:\SDED\downloads");
-        discover_content_root_candidate(&default_updates, &mut roots, &mut seen);
     }
 
     let package_update_root = package_root.join("downloads");
@@ -472,12 +535,17 @@ pub fn read_image_data_url_impl(path: String) -> Result<String, String> {
     if !path.exists() {
         return Err(format!("Image path does not exist: {}", path.display()));
     }
+    if !path_within_allowed_roots(&path) {
+        return Err(format!(
+            "Refusing to read image outside the scanned content roots: {}",
+            path.display()
+        ));
+    }
     let cache_key = path_string(&path);
     if let Some(cached) = image_data_url_cache()
         .lock()
         .map_err(|err| format!("Failed to lock image cache: {err}"))?
         .get(&cache_key)
-        .cloned()
     {
         return Ok(cached);
     }
@@ -528,8 +596,37 @@ pub fn read_image_data_url_impl(path: String) -> Result<String, String> {
     Ok(data_url)
 }
 
-fn image_data_url_cache() -> &'static Mutex<HashMap<String, String>> {
-    IMAGE_DATA_URL_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+fn image_data_url_cache() -> &'static Mutex<ImageDataUrlCache> {
+    IMAGE_DATA_URL_CACHE.get_or_init(|| Mutex::new(ImageDataUrlCache::new(IMAGE_DATA_URL_CACHE_MAX_BYTES)))
+}
+
+fn allowed_content_roots() -> &'static Mutex<HashSet<PathBuf>> {
+    ALLOWED_CONTENT_ROOTS.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+/// Records the canonicalized form of each discovered content root as a location
+/// the IPC image reader is allowed to serve from. Additive across scans.
+fn register_allowed_content_roots(roots: &[PathBuf]) {
+    let Ok(mut allowed) = allowed_content_roots().lock() else {
+        return;
+    };
+    for root in roots {
+        let canonical = root.canonicalize().unwrap_or_else(|_| root.clone());
+        allowed.insert(canonical);
+    }
+}
+
+/// Returns true when `path` canonicalizes to a location inside one of the
+/// registered content roots. Canonicalizing both sides resolves `..`/symlinks
+/// so a traversal payload can't escape the allowed roots.
+fn path_within_allowed_roots(path: &Path) -> bool {
+    let Ok(canonical) = path.canonicalize() else {
+        return false;
+    };
+    let Ok(allowed) = allowed_content_roots().lock() else {
+        return false;
+    };
+    allowed.iter().any(|root| canonical.starts_with(root))
 }
 
 fn remember_image_data_url(cache_key: String, data_url: &str) -> Result<(), String> {
@@ -2239,12 +2336,15 @@ fn is_web_asset_path(path: &str) -> bool {
 }
 
 fn percent_encode_path_segment(value: &str) -> String {
-    let mut encoded = String::new();
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut encoded = String::with_capacity(value.len());
     for byte in value.bytes() {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
             encoded.push(byte as char);
         } else {
-            encoded.push_str(&format!("%{byte:02X}"));
+            encoded.push('%');
+            encoded.push(HEX[(byte >> 4) as usize] as char);
+            encoded.push(HEX[(byte & 0x0f) as usize] as char);
         }
     }
     encoded
@@ -3745,7 +3845,9 @@ fn read_vfs_name(
 }
 
 fn read_le_i32(bytes: &[u8], offset: usize) -> Result<i32, String> {
-    if offset + 4 > bytes.len() {
+    // checked_add avoids the integer overflow that `offset + 4` would hit for a
+    // near-usize::MAX offset (which would wrap and pass the bounds check).
+    if offset.checked_add(4).map_or(true, |end| end > bytes.len()) {
         return Err(format!("i32 read out of bounds at {offset}"));
     }
     Ok(i32::from_le_bytes([
@@ -3757,7 +3859,7 @@ fn read_le_i32(bytes: &[u8], offset: usize) -> Result<i32, String> {
 }
 
 fn read_le_i64(bytes: &[u8], offset: usize) -> Result<i64, String> {
-    if offset + 8 > bytes.len() {
+    if offset.checked_add(8).map_or(true, |end| end > bytes.len()) {
         return Err(format!("i64 read out of bounds at {offset}"));
     }
     Ok(i64::from_le_bytes([
@@ -3986,6 +4088,58 @@ fn is_unity_asset_bundle(bytes: &[u8]) -> bool {
         || bytes.starts_with(b"UnityRaw")
 }
 
+/// Runs the UnityPy extractor under each candidate Python interpreter until one
+/// succeeds (exit 0 and `is_success` confirms the expected files landed). Shared
+/// by the image-to-cache, image-to-path, and bundle-to-dir extractors so the
+/// interpreter discovery, PYTHONPATH wiring, and error aggregation live in one
+/// place. `kind` is "image" or "bundle" for the failure message.
+fn run_unity_extractor<C, S>(
+    asset_path: &Path,
+    kind: &str,
+    configure: C,
+    is_success: S,
+) -> Result<(), String>
+where
+    C: Fn(&mut Command),
+    S: Fn() -> bool,
+{
+    let unitypy_path = find_unitypy_path();
+    let python_paths = unitypy_path
+        .as_ref()
+        .map(|path| path_string(path))
+        .unwrap_or_default();
+    let mut errors = Vec::new();
+
+    for candidate in python_candidates() {
+        let mut command = Command::new(&candidate);
+        configure(&mut command);
+        if !python_paths.is_empty() {
+            command.env("PYTHONPATH", &python_paths);
+        }
+
+        match command.output() {
+            Ok(output) if output.status.success() && is_success() => return Ok(()),
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let detail = if stderr.is_empty() { stdout } else { stderr };
+                errors.push(format!("{candidate}: {detail}"));
+            }
+            Err(err) => errors.push(format!("{candidate}: {err}")),
+        }
+    }
+
+    Err(format!(
+        "Failed to extract Unity {kind} from {}. UnityPy path: {}. {}",
+        asset_path.display(),
+        unitypy_path
+            .as_ref()
+            .map(|path| path_string(path))
+            .unwrap_or_else(|| "not found".into()),
+        errors.join(" | ")
+    ))
+}
+
 fn extract_unity_image_to_cache(asset_path: &Path) -> Result<PathBuf, String> {
     let cache_dir = app_data_dir().join("asset-cache");
     fs::create_dir_all(&cache_dir)
@@ -3998,43 +4152,15 @@ fn extract_unity_image_to_cache(asset_path: &Path) -> Result<PathBuf, String> {
         return Ok(output_path);
     }
 
-    let unitypy_path = find_unitypy_path();
-    let python_paths = unitypy_path
-        .as_ref()
-        .map(|path| path_string(path))
-        .unwrap_or_default();
-    let mut errors = Vec::new();
-
-    for candidate in python_candidates() {
-        let mut command = Command::new(&candidate);
-        command.arg(&script_path).arg(asset_path).arg(&output_path);
-        if !python_paths.is_empty() {
-            command.env("PYTHONPATH", &python_paths);
-        }
-
-        match command.output() {
-            Ok(output) if output.status.success() && output_path.exists() => {
-                return Ok(output_path)
-            }
-            Ok(output) => {
-                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                let detail = if stderr.is_empty() { stdout } else { stderr };
-                errors.push(format!("{candidate}: {detail}"));
-            }
-            Err(err) => errors.push(format!("{candidate}: {err}")),
-        }
-    }
-
-    Err(format!(
-        "Failed to extract Unity image from {}. UnityPy path: {}. {}",
-        asset_path.display(),
-        unitypy_path
-            .as_ref()
-            .map(|path| path_string(path))
-            .unwrap_or_else(|| "not found".into()),
-        errors.join(" | ")
-    ))
+    run_unity_extractor(
+        asset_path,
+        "image",
+        |command| {
+            command.arg(&script_path).arg(asset_path).arg(&output_path);
+        },
+        || output_path.exists(),
+    )?;
+    Ok(output_path)
 }
 
 fn extract_unity_image_to_path(
@@ -4047,41 +4173,14 @@ fn extract_unity_image_to_path(
         return Ok(());
     }
 
-    let unitypy_path = find_unitypy_path();
-    let python_paths = unitypy_path
-        .as_ref()
-        .map(|path| path_string(path))
-        .unwrap_or_default();
-    let mut errors = Vec::new();
-
-    for candidate in python_candidates() {
-        let mut command = Command::new(&candidate);
-        command.arg(script_path).arg(asset_path).arg(output_path);
-        if !python_paths.is_empty() {
-            command.env("PYTHONPATH", &python_paths);
-        }
-
-        match command.output() {
-            Ok(output) if output.status.success() && output_path.exists() => return Ok(()),
-            Ok(output) => {
-                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                let detail = if stderr.is_empty() { stdout } else { stderr };
-                errors.push(format!("{candidate}: {detail}"));
-            }
-            Err(err) => errors.push(format!("{candidate}: {err}")),
-        }
-    }
-
-    Err(format!(
-        "Failed to extract Unity image from {}. UnityPy path: {}. {}",
-        asset_path.display(),
-        unitypy_path
-            .as_ref()
-            .map(|path| path_string(path))
-            .unwrap_or_else(|| "not found".into()),
-        errors.join(" | ")
-    ))
+    run_unity_extractor(
+        asset_path,
+        "image",
+        |command| {
+            command.arg(script_path).arg(asset_path).arg(output_path);
+        },
+        || output_path.exists(),
+    )
 }
 
 fn extract_unity_bundle_to_mobile_dir(
@@ -4092,54 +4191,21 @@ fn extract_unity_bundle_to_mobile_dir(
     script_path: &Path,
 ) -> Result<(), String> {
     write_bundle_extract_script(script_path)?;
+    let metadata_path = output_dir.join("metadata.json");
 
-    let unitypy_path = find_unitypy_path();
-    let python_paths = unitypy_path
-        .as_ref()
-        .map(|path| path_string(path))
-        .unwrap_or_default();
-    let mut errors = Vec::new();
-
-    for candidate in python_candidates() {
-        let mut command = Command::new(&candidate);
-        command
-            .arg(script_path)
-            .arg(asset_path)
-            .arg(output_dir)
-            .arg(primary_output_path)
-            .arg(primary_archive_path);
-        if !python_paths.is_empty() {
-            command.env("PYTHONPATH", &python_paths);
-        }
-
-        let metadata_path = output_dir.join("metadata.json");
-        match command.output() {
-            Ok(output)
-                if output.status.success()
-                    && primary_output_path.exists()
-                    && metadata_path.exists() =>
-            {
-                return Ok(())
-            }
-            Ok(output) => {
-                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                let detail = if stderr.is_empty() { stdout } else { stderr };
-                errors.push(format!("{candidate}: {detail}"));
-            }
-            Err(err) => errors.push(format!("{candidate}: {err}")),
-        }
-    }
-
-    Err(format!(
-        "Failed to extract Unity bundle from {}. UnityPy path: {}. {}",
-        asset_path.display(),
-        unitypy_path
-            .as_ref()
-            .map(|path| path_string(path))
-            .unwrap_or_else(|| "not found".into()),
-        errors.join(" | ")
-    ))
+    run_unity_extractor(
+        asset_path,
+        "bundle",
+        |command| {
+            command
+                .arg(script_path)
+                .arg(asset_path)
+                .arg(output_dir)
+                .arg(primary_output_path)
+                .arg(primary_archive_path);
+        },
+        || primary_output_path.exists() && metadata_path.exists(),
+    )
 }
 
 fn unity_worker_count() -> usize {
@@ -4420,9 +4486,11 @@ fn path_from_archive_path(path: &str) -> PathBuf {
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        out.push_str(&format!("{byte:02x}"));
+    for &byte in bytes {
+        out.push(HEX[(byte >> 4) as usize] as char);
+        out.push(HEX[(byte & 0x0f) as usize] as char);
     }
     out
 }
@@ -4808,6 +4876,10 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("png_without_extension");
         fs::write(&path, [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]).unwrap();
+
+        // The IPC reader only serves files under a registered content root (as a
+        // real scan would establish before any image is requested).
+        register_allowed_content_roots(std::slice::from_ref(&dir));
 
         let data_url = read_image_data_url_impl(path_string(&path)).unwrap();
         assert!(data_url.starts_with("data:image/png;base64,"));
