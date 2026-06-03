@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 pub(crate) fn block(xml: &str, tag_name: &str) -> Option<String> {
     let open = format!("<{tag_name}>");
     let close = format!("</{tag_name}>");
@@ -64,16 +62,49 @@ pub(crate) fn bool_tag_any(xml: &str, tag_names: &[&str]) -> Option<bool> {
 }
 
 pub(crate) fn decode_xml_text(value: &str) -> String {
-    let mut entities = HashMap::new();
-    entities.insert("&lt;", "<");
-    entities.insert("&gt;", ">");
-    entities.insert("&amp;", "&");
-    entities.insert("&quot;", "\"");
-    entities.insert("&apos;", "'");
-
-    let mut decoded = value.replace("\r\n", "\n");
-    for (from, to) in entities {
-        decoded = decoded.replace(from, to);
+    let normalized = value.replace("\r\n", "\n");
+    if !normalized.contains('&') {
+        return normalized;
     }
+
+    // Single left-to-right pass: emit text verbatim and expand each `&...;`
+    // entity once (so `&amp;lt;` decodes to the literal `&lt;`, not `<`).
+    let mut decoded = String::with_capacity(normalized.len());
+    let mut rest = normalized.as_str();
+    while let Some(amp) = rest.find('&') {
+        decoded.push_str(&rest[..amp]);
+        let after = &rest[amp..];
+        if let Some(semi) = after.find(';') {
+            if let Some(expanded) = decode_xml_entity(&after[..=semi]) {
+                decoded.push_str(&expanded);
+                rest = &after[semi + 1..];
+                continue;
+            }
+        }
+        // Unrecognized `&`: keep it literally and continue scanning after it.
+        decoded.push('&');
+        rest = &after[1..];
+    }
+    decoded.push_str(rest);
     decoded
+}
+
+/// Expands a single XML entity (including the surrounding `&` and `;`), or
+/// returns None if it is not a recognized named or numeric character reference.
+fn decode_xml_entity(entity: &str) -> Option<String> {
+    match entity {
+        "&lt;" => Some("<".to_string()),
+        "&gt;" => Some(">".to_string()),
+        "&amp;" => Some("&".to_string()),
+        "&quot;" => Some("\"".to_string()),
+        "&apos;" => Some("'".to_string()),
+        _ => {
+            let body = entity.strip_prefix("&#")?.strip_suffix(';')?;
+            let code = match body.strip_prefix(['x', 'X']) {
+                Some(hex) => u32::from_str_radix(hex, 16).ok()?,
+                None => body.parse::<u32>().ok()?,
+            };
+            char::from_u32(code).map(|ch| ch.to_string())
+        }
+    }
 }

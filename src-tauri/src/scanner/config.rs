@@ -31,49 +31,36 @@ pub(crate) fn normalize_public_base_url(value: &str) -> String {
     }
 }
 
-pub(crate) fn export_force_enabled() -> bool {
-    std::env::var("CARDVIEWER_EXPORT_FORCE")
+/// Reads a boolean feature flag from an environment variable. Treats
+/// `1`/`true`/`yes`/`on` (case-insensitive, trimmed) as enabled; anything else
+/// (including an unset variable) is disabled.
+fn env_flag(name: &str) -> bool {
+    std::env::var(name)
         .map(|value| {
             let value = value.trim().to_ascii_lowercase();
             matches!(value.as_str(), "1" | "true" | "yes" | "on")
         })
         .unwrap_or(false)
+}
+
+pub(crate) fn export_force_enabled() -> bool {
+    env_flag("CARDVIEWER_EXPORT_FORCE")
 }
 
 pub(crate) fn export_all_assets_enabled() -> bool {
-    std::env::var("CARDVIEWER_EXPORT_ALL_ASSETS")
-        .map(|value| {
-            let value = value.trim().to_ascii_lowercase();
-            matches!(value.as_str(), "1" | "true" | "yes" | "on")
-        })
-        .unwrap_or(false)
+    env_flag("CARDVIEWER_EXPORT_ALL_ASSETS")
 }
 
 pub(crate) fn export_prune_enabled() -> bool {
-    std::env::var("CARDVIEWER_EXPORT_PRUNE")
-        .map(|value| {
-            let value = value.trim().to_ascii_lowercase();
-            matches!(value.as_str(), "1" | "true" | "yes" | "on")
-        })
-        .unwrap_or(false)
+    env_flag("CARDVIEWER_EXPORT_PRUNE")
 }
 
 pub(crate) fn mobile_referenced_only_enabled() -> bool {
-    std::env::var("CARDVIEWER_MOBILE_REFERENCED_ONLY")
-        .map(|value| {
-            let value = value.trim().to_ascii_lowercase();
-            matches!(value.as_str(), "1" | "true" | "yes" | "on")
-        })
-        .unwrap_or(false)
+    env_flag("CARDVIEWER_MOBILE_REFERENCED_ONLY")
 }
 
 pub(crate) fn mobile_skip_raw_enabled() -> bool {
-    std::env::var("CARDVIEWER_MOBILE_SKIP_RAW")
-        .map(|value| {
-            let value = value.trim().to_ascii_lowercase();
-            matches!(value.as_str(), "1" | "true" | "yes" | "on")
-        })
-        .unwrap_or(false)
+    env_flag("CARDVIEWER_MOBILE_SKIP_RAW")
 }
 
 pub(crate) fn mobile_card_limit_per_game() -> Option<usize> {
