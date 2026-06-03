@@ -78,13 +78,15 @@ export function App() {
     scanResult?.streamingAssets,
   );
 
-  const filteredCards = React.useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase();
-    return displayCards.filter((card) => {
+  // Precompute one lowercased haystack per card so typing only re-runs cheap
+  // substring checks instead of rebuilding+lowercasing every card's fields on
+  // each keystroke. Rebuilt only when the cards or their edits change.
+  const searchIndex = React.useMemo(() => {
+    const index = new Map<string, string>();
+    for (const card of displayCards) {
       const merged = applyEdits(card, edits[card.dataName]);
-      const gameMatches = gameFilter === "ALL" || card.game === gameFilter;
-      const queryMatches =
-        normalized.length === 0 ||
+      index.set(
+        card.dataName,
         [
           merged.id,
           merged.dataName,
@@ -95,11 +97,23 @@ export function App() {
           ...merged.printFields.map((field) => field.value),
         ]
           .join(" ")
-          .toLocaleLowerCase()
-          .includes(normalized);
-      return gameMatches && queryMatches;
+          .toLocaleLowerCase(),
+      );
+    }
+    return index;
+  }, [displayCards, edits]);
+  // Defer the query so the search input stays responsive while the (possibly
+  // large) list re-filters in a non-blocking pass.
+  const deferredQuery = React.useDeferredValue(query);
+  const filteredCards = React.useMemo(() => {
+    const normalized = deferredQuery.trim().toLocaleLowerCase();
+    return displayCards.filter((card) => {
+      const gameMatches = gameFilter === "ALL" || card.game === gameFilter;
+      if (!gameMatches) return false;
+      if (normalized.length === 0) return true;
+      return (searchIndex.get(card.dataName) ?? "").includes(normalized);
     });
-  }, [displayCards, edits, gameFilter, query]);
+  }, [displayCards, gameFilter, deferredQuery, searchIndex]);
   const virtualStart = Math.max(
     0,
     Math.floor(cardListViewport.scrollTop / CARD_ROW_HEIGHT) - CARD_LIST_OVERSCAN,
