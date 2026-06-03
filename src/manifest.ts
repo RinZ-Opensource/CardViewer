@@ -76,22 +76,26 @@ export async function loadStaticScanResult(
     : siblingManifestUrl(STATIC_MANIFEST_URL, "cards.index.json");
   try {
     const index = await fetchJson<OnlineManifestIndex>(indexUrl);
-    const firstShard = index.shards[0];
-    if (!firstShard) return scanResultFromIndex(index, []);
+    if (!index.shards.length) return scanResultFromIndex(index, []);
 
-    const first = await fetchJsonWithTimeout<OnlineManifestShard>(
-      resolveManifestHref(firstShard.href, indexUrl),
-    );
-    let cards = first.cards;
-    onPartial?.(scanResultFromIndex(index, cards), cards.length, index.totalCards);
-
-    const remaining = await mapWithConcurrency(
-      index.shards.slice(1),
+    // Fetch every shard concurrently right after the index (no first-then-rest
+    // waterfall), capped/timed by mapWithConcurrency. The first shard still
+    // drives an early partial render as soon as it resolves; result order is
+    // preserved so the merged card order is stable.
+    const shardResults = await mapWithConcurrency(
+      index.shards,
       SHARD_FETCH_CONCURRENCY,
-      (shard) =>
-        fetchJsonWithTimeout<OnlineManifestShard>(resolveManifestHref(shard.href, indexUrl)),
+      async (shard, i) => {
+        const result = await fetchJsonWithTimeout<OnlineManifestShard>(
+          resolveManifestHref(shard.href, indexUrl),
+        );
+        if (i === 0) {
+          onPartial?.(scanResultFromIndex(index, result.cards), result.cards.length, index.totalCards);
+        }
+        return result;
+      },
     );
-    cards = [first, ...remaining].flatMap((shard) => shard.cards);
+    const cards = shardResults.flatMap((shard) => shard.cards);
     return scanResultFromIndex(index, cards);
   } catch {
     return fetchJson<ScanResult>(STATIC_MANIFEST_URL);

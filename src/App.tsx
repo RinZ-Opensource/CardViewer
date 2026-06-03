@@ -344,7 +344,7 @@ export function App() {
                     onClick={() => setSelectedId(card.dataName)}
                   >
                     <span className="thumb-slot">
-                      {thumb ? <img src={thumb} alt="" /> : <span>{card.game}</span>}
+                      {thumb ? <img src={thumb} alt="" decoding="async" /> : <span>{card.game}</span>}
                     </span>
                     <span className="row-main">
                       <strong>{merged.displayName}</strong>

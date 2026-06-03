@@ -411,7 +411,7 @@ export function PublicCardCanvas({
     <div className={`official-card public-card public-card-${card.game.toLowerCase()}`}>
       <div className="public-card-bg" />
       {imageDataUrl ? (
-        <img className="public-card-art" src={imageDataUrl} alt="" />
+        <img className="public-card-art" src={imageDataUrl} alt="" decoding="async" fetchPriority="high" />
       ) : (
         <div className="public-card-emblem">{card.game}</div>
       )}
