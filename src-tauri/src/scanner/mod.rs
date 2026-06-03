@@ -24,6 +24,11 @@ const HOLO_ENABLED: bool = true;
 const ONLINE_THUMBNAIL_MAX_WIDTH: u32 = 192;
 const ONLINE_THUMBNAIL_MAX_HEIGHT: u32 = 256;
 const ONLINE_THUMBNAIL_QUALITY: u8 = 72;
+// Full-size display art (card base / character layers / small variants) is
+// transcoded to lossy WebP; mask/holo layers go lossless to keep their alpha
+// stencil and foil colour exact. method=6 = slowest/best compression (offline).
+const ONLINE_IMAGE_WEBP_QUALITY: u8 = 88;
+const ONLINE_IMAGE_WEBP_METHOD: u8 = 6;
 // Decoded image data URLs are cached for the process lifetime. Bound the cache
 // by a byte budget (LRU) so a long session browsing thousands of cards can't
 // grow memory without limit.
@@ -253,6 +258,19 @@ struct UnityExtractJob {
     output: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ImageTranscodeJob {
+    source: String,
+    output: String,
+    quality: u8,
+    method: u8,
+    lossless: bool,
+    // Full-image transcode never downscales (resize stays false); the thumbnail
+    // path keeps using ThumbnailJob, which the script resizes by default.
+    resize: bool,
+}
+
 enum ExportAssetKind {
     Image,
     Unity,
@@ -322,6 +340,9 @@ struct OnlineAssetExporter {
     reused_thumbnail_count: usize,
     skipped_thumbnail_count: usize,
     unity_jobs: Vec<UnityExtractJob>,
+    image_jobs: Vec<ImageTranscodeJob>,
+    // Unity-extracted PNGs that feed a transcode job and are deleted afterwards.
+    image_intermediates: Vec<PathBuf>,
     warnings: Vec<String>,
 }
 
@@ -722,6 +743,10 @@ where
     // queues asset extractions (e.g. the MAI "_s" thumbnail bundles). Thumbnail
     // generation below reads these files, so they must exist first.
     exporter.flush_unity_jobs(&mut progress);
+    // Transcode every exported image (plus the just-extracted Unity PNGs) to
+    // WebP before thumbnails are generated, since thumbnails are derived from
+    // these outputs.
+    exporter.flush_image_jobs(&mut progress);
     generate_online_thumbnails(&mut scan, &mut exporter, &mut progress);
     scan.streaming_assets = format!("{public_base_url}/assets");
     if export_prune_enabled() {
@@ -976,6 +1001,8 @@ impl OnlineAssetExporter {
             reused_thumbnail_count: 0,
             skipped_thumbnail_count: 0,
             unity_jobs: Vec::new(),
+            image_jobs: Vec::new(),
+            image_intermediates: Vec::new(),
             warnings: Vec::new(),
         }
     }
@@ -1150,7 +1177,7 @@ impl OnlineAssetExporter {
             return Some(url.clone());
         }
 
-        let output_name = match image_export_file_name(&source_path) {
+        let output_name = match webp_export_file_name(&source_path) {
             Ok(name) => name,
             Err(err) => {
                 self.skipped_asset_count += 1;
@@ -1188,24 +1215,39 @@ impl OnlineAssetExporter {
             }
         }
 
-        // Copy plain images inline (cheap), but batch Unity-bundle extraction so
-        // Python/UnityPy is spawned once for the whole run instead of per asset.
+        // Everything is transcoded to WebP. Plain images are queued directly;
+        // Unity bundles are first extracted to an intermediate PNG (batched, so
+        // Python/UnityPy is spawned once for the whole run) which then feeds the
+        // same transcode queue. Both queues are flushed once, after this pass.
+        let lossless = is_lossless_webp_layer(&source_path);
         match classify_export_asset(&source_path) {
             Ok(ExportAssetKind::Image) => {
-                if let Err(err) = fs::copy(&source_path, &output_path) {
-                    self.skipped_asset_count += 1;
-                    self.warnings
-                        .push(format!("Skipped asset {}: failed to copy image: {err}", source_path.display()));
-                    return None;
-                }
-                self.asset_count += 1;
-            }
-            Ok(ExportAssetKind::Unity) => {
-                self.unity_jobs.push(UnityExtractJob {
+                self.image_jobs.push(ImageTranscodeJob {
                     source: path_string(&source_path),
                     output: path_string(&output_path),
+                    quality: ONLINE_IMAGE_WEBP_QUALITY,
+                    method: ONLINE_IMAGE_WEBP_METHOD,
+                    lossless,
+                    resize: false,
                 });
-                // Counted in flush_unity_jobs once extraction actually runs.
+                // Counted in flush_image_jobs once transcoding actually runs.
+            }
+            Ok(ExportAssetKind::Unity) => {
+                let intermediate = output_path.with_extension("png");
+                self.unity_jobs.push(UnityExtractJob {
+                    source: path_string(&source_path),
+                    output: path_string(&intermediate),
+                });
+                self.image_jobs.push(ImageTranscodeJob {
+                    source: path_string(&intermediate),
+                    output: path_string(&output_path),
+                    quality: ONLINE_IMAGE_WEBP_QUALITY,
+                    method: ONLINE_IMAGE_WEBP_METHOD,
+                    lossless,
+                    resize: false,
+                });
+                self.image_intermediates.push(intermediate);
+                // Counted in flush_image_jobs once transcoding actually runs.
             }
             Ok(ExportAssetKind::Unsupported) | Err(_) => {
                 self.skipped_asset_count += 1;
@@ -1297,17 +1339,95 @@ impl OnlineAssetExporter {
             .collect();
         self.warnings.extend(chunk_warnings);
 
-        // Reconcile counts against what actually landed on disk.
+        // Unity outputs are intermediate PNGs that feed the WebP transcode pass,
+        // so the final asset is counted in flush_image_jobs, not here. Warn on a
+        // missing extraction; its transcode job will then be marked skipped.
         for job in &all_jobs {
-            if Path::new(&job.output).exists() {
-                self.asset_count += 1;
-            } else {
-                self.skipped_asset_count += 1;
+            if !Path::new(&job.output).exists() {
                 self.warnings.push(format!(
                     "Skipped asset {}: Unity extraction produced no image",
                     job.source
                 ));
             }
+        }
+    }
+
+    fn flush_image_jobs<F>(&mut self, progress: &mut F)
+    where
+        F: FnMut(String),
+    {
+        let jobs = std::mem::take(&mut self.image_jobs);
+        let intermediates = std::mem::take(&mut self.image_intermediates);
+        if jobs.is_empty() {
+            return;
+        }
+        let total = jobs.len();
+        progress(format!("Transcoding {total} images to WebP"));
+
+        let jobs_path = self
+            .output_root
+            .join(".tools")
+            .join("image_transcode_jobs.json");
+        if let Some(parent) = jobs_path.parent() {
+            if let Err(err) = fs::create_dir_all(parent) {
+                self.warnings
+                    .push(format!("Failed to create image job directory: {err}"));
+            }
+        }
+        if let Err(err) = write_thumbnail_script(&self.thumbnail_script_path) {
+            self.warnings.push(err);
+        }
+        match serde_json::to_string(&jobs) {
+            Ok(body) => {
+                if let Err(err) = fs::write(&jobs_path, body) {
+                    self.warnings
+                        .push(format!("Failed to write image jobs: {err}"));
+                } else {
+                    let mut ran = false;
+                    let mut errors = Vec::new();
+                    for candidate in python_candidates() {
+                        match Command::new(&candidate)
+                            .arg(&self.thumbnail_script_path)
+                            .arg(&jobs_path)
+                            .status()
+                        {
+                            Ok(status) if status.success() => {
+                                ran = true;
+                                break;
+                            }
+                            Ok(status) => errors.push(format!("{candidate}: exited with {status}")),
+                            Err(err) => errors.push(format!("{candidate}: {err}")),
+                        }
+                    }
+                    if !ran {
+                        self.warnings.push(format!(
+                            "Failed to transcode images to WebP. {}",
+                            errors.join(" | ")
+                        ));
+                    }
+                }
+            }
+            Err(err) => self
+                .warnings
+                .push(format!("Failed to serialize image jobs: {err}")),
+        }
+
+        // Reconcile counts against what actually landed on disk.
+        for job in &jobs {
+            if Path::new(&job.output).exists() {
+                self.asset_count += 1;
+            } else {
+                self.skipped_asset_count += 1;
+                self.warnings.push(format!(
+                    "Skipped asset {}: WebP transcode produced no output",
+                    job.source
+                ));
+            }
+        }
+
+        // Drop the Unity-extracted PNG intermediates now that they are transcoded.
+        for png in &intermediates {
+            let _ = fs::remove_file(png);
         }
     }
 
@@ -2247,6 +2367,50 @@ fn image_export_file_name(source_path: &Path) -> Result<String, String> {
     }
 
     Err("unsupported image payload".to_string())
+}
+
+/// Online-export output name: every supported source (plain image or Unity
+/// bundle) becomes `<stem>.webp`, since the online pipeline transcodes all art
+/// to WebP. Kept separate from `image_export_file_name` (which the mobile pack
+/// still uses to preserve original formats).
+fn webp_export_file_name(source_path: &Path) -> Result<String, String> {
+    let file_name = source_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "missing file name".to_string())?;
+    let header = read_file_header(source_path, 16)?;
+    let lower_ext = source_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let is_image = is_image_extension(&lower_ext) || detect_image_mime(&header).is_some();
+    if !is_image && !is_unity_asset_bundle(&header) {
+        return Err("unsupported image payload".to_string());
+    }
+    // For real image files swap the extension; for Unity bundles (no image
+    // extension) keep the full name so distinct bundles don't collide.
+    let base = if is_image_extension(&lower_ext) {
+        source_path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or(file_name)
+    } else {
+        file_name
+    };
+    Ok(format!("{base}.webp"))
+}
+
+/// Mask and holo layers are transcoded losslessly: lossy WebP would risk
+/// degrading the alpha stencil / foil colour, and for these flat images it is
+/// often larger than the source anyway. Everything else uses lossy WebP.
+fn is_lossless_webp_layer(source_path: &Path) -> bool {
+    let name = source_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    name.contains("mask") || name.contains("holo")
 }
 
 fn thumbnail_file_name(source_name: &str) -> String {
@@ -4942,10 +5106,11 @@ mod tests {
             "/static/cards/cards.index.json"
         );
         assert_eq!(result.shard_count, 1);
+        // The online pipeline transcodes the full card art to WebP.
         assert!(output
             .join("assets")
             .join("chu")
-            .join("CHU_card_00001002.png")
+            .join("CHU_card_00001002.webp")
             .exists());
         assert!(output
             .join("assets")
@@ -4958,7 +5123,7 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(output.join("cards.json")).unwrap()).unwrap();
         assert_eq!(
             manifest["cards"][0]["imagePath"],
-            "/static/cards/assets/chu/CHU_card_00001002.png"
+            "/static/cards/assets/chu/CHU_card_00001002.webp"
         );
         assert_eq!(
             manifest["cards"][0]["thumbnailPath"],

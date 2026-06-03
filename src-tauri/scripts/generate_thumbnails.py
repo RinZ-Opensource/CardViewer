@@ -13,14 +13,23 @@ def generate_thumbnail(job):
     max_width = int(job.get("maxWidth") or job.get("max_width") or 192)
     max_height = int(job.get("maxHeight") or job.get("max_height") or 256)
     quality = int(job.get("quality") or 72)
+    # Optional fields used by the full-image WebP transcode pass. Thumbnail jobs
+    # omit them and keep the original behaviour (resize + lossy q72, method 4).
+    resize = job.get("resize", True)
+    lossless = bool(job.get("lossless", False))
+    method = int(job.get("method") or 4)
 
     with Image.open(source) as image:
         image = ImageOps.exif_transpose(image)
         if image.mode not in ("RGB", "RGBA"):
             image = image.convert("RGBA")
-        image.thumbnail((max_width, max_height), Image.Resampling.BICUBIC)
+        if resize:
+            image.thumbnail((max_width, max_height), Image.Resampling.BICUBIC)
         output.parent.mkdir(parents=True, exist_ok=True)
-        image.save(output, "WEBP", quality=quality, method=4)
+        if lossless:
+            image.save(output, "WEBP", lossless=True, method=method)
+        else:
+            image.save(output, "WEBP", quality=quality, method=method)
 
 
 def main() -> int:
