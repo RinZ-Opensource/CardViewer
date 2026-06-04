@@ -2202,6 +2202,9 @@ fn is_mobile_internal_tool_file(staging_root: &Path, file: &Path) -> bool {
 fn rewrite_scan_result_for_online(scan: &mut ScanResult, exporter: &mut OnlineAssetExporter) {
     for card in &mut scan.cards {
         let group = game_asset_group(&card.game);
+        // The online manifest is public and never reads sourceXml; drop the
+        // local build-machine path so it isn't leaked or shipped to clients.
+        card.source_xml.clear();
         card.image_path = rewrite_optional_asset_path(card.image_path.take(), &group, exporter);
         card.thumbnail_path =
             rewrite_optional_asset_path(card.thumbnail_path.take(), &group, exporter);

@@ -37,7 +37,7 @@ export type CardRecord = {
   imagePath: string | null;
   thumbnailPath: string | null;
   assetLayers: AssetLayer[];
-  sourceXml: string;
+  sourceXml?: string;
   editableFields: string[];
   printFields: PrintField[];
   editedPrintFields?: string[];

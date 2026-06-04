@@ -88,6 +88,9 @@ pub struct CardRecord {
     pub image_path: Option<String>,
     pub thumbnail_path: Option<String>,
     pub asset_layers: Vec<AssetLayer>,
+    // Local build-machine path; cleared for the online manifest (privacy + size),
+    // so omit it when empty rather than emitting a useless "".
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub source_xml: String,
     pub editable_fields: Vec<String>,
     pub print_fields: Vec<PrintField>,
