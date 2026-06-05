@@ -1,54 +1,89 @@
 import { applyEdits, randomDigitString } from "./cardData";
 import { CardEdits, CardRecord, PrintField, PrintFieldValue } from "./types";
 
+const PLAYER_FIELD_KEYS = new Set(["userName", "rating", "friendCode"]);
+
+function isPlayerField(field: PrintField) {
+  return PLAYER_FIELD_KEYS.has(field.key);
+}
+
 export function EditorPanel({
   card,
   edits,
   onChange,
+  onPlayerChange,
   onReset,
+  canReset,
 }: {
   card: CardRecord | null;
   edits: CardEdits | undefined;
   onChange: (fieldKey: string, value: PrintFieldValue) => void;
+  onPlayerChange: (fieldKey: string, value: PrintFieldValue) => void;
   onReset: () => void;
+  canReset: boolean;
 }) {
   if (!card) {
     return <aside className="editor-panel empty">No selection</aside>;
   }
 
   const merged = applyEdits(card, edits);
-  const valueFields = merged.printFields.filter((field) => field.fieldType !== "bool" && field.fieldType !== "metadata");
-  const flagFields = merged.printFields.filter((field) => field.fieldType === "bool");
+  const visibleFields = merged.printFields.filter((field) => field.fieldType !== "metadata");
+  const playerFields = visibleFields.filter(isPlayerField);
+  const valueFields = merged.printFields.filter(
+    (field) => !isPlayerField(field) && field.fieldType !== "bool" && field.fieldType !== "metadata",
+  );
+  const flagFields = merged.printFields.filter((field) => !isPlayerField(field) && field.fieldType === "bool");
+
   // Keep the holo toggle at the top of the flags section.
   const holoFlagIndex = flagFields.findIndex((field) => field.key === "holo");
   if (holoFlagIndex > 0) {
     flagFields.unshift(flagFields.splice(holoFlagIndex, 1)[0]);
   }
+
+  const isPlayerDataApplicable = merged.game.toUpperCase() !== "CHU" && playerFields.length > 0;
   const editJson = JSON.stringify(edits ?? {}, null, 2);
 
   return (
     <aside className="editor-panel">
-      <div className="editor-header">
-        <div>
-          <h3>Print Surface</h3>
-        </div>
-        <button className="ghost-button" onClick={onReset} disabled={!edits}>
-          Reset
-        </button>
-      </div>
+      <div className="editor-scroll">
+        <section className="editor-section">
+          <div className="editor-header">
+            <h3>Player Data</h3>
+          </div>
 
-      <div className="form-grid">
-        {valueFields.map((field) => (
-          <PrintFieldControl key={field.key} field={field} onChange={onChange} />
-        ))}
-        {flagFields.length ? (
-          <div className="flag-section">
-            <h4>Visibility / print flags</h4>
-            {flagFields.map((field) => (
+          {isPlayerDataApplicable ? (
+            <div className="form-grid player-data-grid">
+              {playerFields.map((field) => (
+                <PrintFieldControl key={field.key} field={field} onChange={onPlayerChange} />
+              ))}
+            </div>
+          ) : (
+            <p className="section-empty">Not applicable</p>
+          )}
+        </section>
+
+        <section className="editor-section">
+          <div className="editor-header">
+            <h3>Print Surface</h3>
+            <button className="ghost-button" onClick={onReset} disabled={!canReset}>
+              Reset
+            </button>
+          </div>
+
+          <div className="form-grid">
+            {valueFields.map((field) => (
               <PrintFieldControl key={field.key} field={field} onChange={onChange} />
             ))}
+            {flagFields.length ? (
+              <div className="flag-section">
+                <h4>Visibility / print flags</h4>
+                {flagFields.map((field) => (
+                  <PrintFieldControl key={field.key} field={field} onChange={onChange} />
+                ))}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </section>
       </div>
 
       <details className="edit-json">
@@ -140,4 +175,3 @@ export function PrintFieldControl({
     </label>
   );
 }
-
