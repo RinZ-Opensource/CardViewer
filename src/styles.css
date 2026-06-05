@@ -614,7 +614,7 @@ small,
 }
 
 .card-preview {
-  width: min(44vh, 420px);
+  width: min(55vh, 520px);
   aspect-ratio: 768 / 1052;
   position: relative;
   transform-style: preserve-3d;
