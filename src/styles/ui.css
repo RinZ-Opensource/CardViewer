@@ -1,0 +1,500 @@
+/* Printed-card text overlay (.print-*), preview placeholder / meta overlays,
+   the editor panel, and all responsive @media overrides (kept last so they win
+   over the base rules by source order, exactly as in the original file). */
+
+.print-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 38px 30px 34px;
+  color: #fff;
+  pointer-events: none;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+  transform: translateZ(18px);
+}
+
+.print-layer.mai {
+  padding-top: 46px;
+}
+
+.print-layer.mu3 {
+  padding-bottom: 38px;
+}
+
+.print-top,
+.print-bottom {
+  min-width: 0;
+}
+
+.print-top.split,
+.qr-line,
+.print-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.print-title,
+.print-subtitle,
+.print-body,
+.print-serial,
+.friend-code,
+.qr-line span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.print-title {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.print-subtitle {
+  margin-bottom: 7px;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.print-subtitle.small {
+  font-size: 13px;
+}
+
+.print-body {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.print-bottom {
+  padding: 12px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, rgba(9, 14, 18, 0.18), rgba(9, 14, 18, 0.74));
+}
+
+.print-serial,
+.friend-code,
+.qr-line {
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.print-stat-row {
+  margin-top: 10px;
+}
+
+.print-stat-row span,
+.rating-pill,
+.qr-mark {
+  display: inline-grid;
+  place-items: center;
+  min-width: 42px;
+  min-height: 30px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #162022;
+  text-shadow: none;
+}
+
+.print-stat-row strong {
+  display: block;
+  font-size: 13px;
+}
+
+.rating-pill {
+  min-width: 54px;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.qr-mark {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.preview-placeholder {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  height: 100%;
+  padding: 28px;
+  text-align: center;
+  color: #f8f1e8;
+  background:
+    linear-gradient(145deg, rgba(20, 107, 100, 0.82), rgba(22, 26, 29, 0.94)),
+    repeating-linear-gradient(45deg, transparent 0 12px, rgba(255, 255, 255, 0.08) 12px 13px);
+}
+
+.preview-placeholder strong {
+  font-size: 46px;
+  letter-spacing: 0;
+}
+
+.preview-placeholder span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 16px;
+}
+
+.preview-meta {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  gap: 8px;
+}
+
+.preview-meta span {
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: var(--ui-meta-bg);
+  border: 1px solid var(--ui-meta-border);
+  backdrop-filter: blur(10px);
+}
+
+.editor-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor-panel.empty {
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  color: var(--ui-text-muted);
+}
+
+.editor-scroll {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.editor-section {
+  min-width: 0;
+  padding: 16px;
+}
+
+.editor-header p {
+  max-width: 310px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+  align-items: start;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 2px 6px;
+}
+
+.editor-section .form-grid {
+  overflow: visible;
+  padding: 16px 0 0;
+}
+
+.player-data-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.section-empty {
+  padding-top: 12px;
+}
+
+.control {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.control.wide {
+  grid-column: 1 / -1;
+}
+
+.flag-section {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  align-items: start;
+  gap: 10px 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ui-border-soft);
+}
+
+.toggle-control {
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  min-height: 32px;
+  padding: 7px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  background: var(--ui-toggle-bg);
+}
+
+.toggle-control input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ui-accent);
+}
+
+.edit-json {
+  margin-top: 12px;
+  border-top: 1px solid var(--ui-divider);
+  padding-top: 10px;
+}
+
+.edit-json summary {
+  cursor: pointer;
+}
+
+.edit-json pre {
+  max-height: 170px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 7px;
+  background: #292d2f;
+  color: #f5eee5;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 1180px) {
+  body {
+    overflow: auto;
+  }
+
+  .app-shell {
+    grid-template-columns: 340px minmax(0, 1fr);
+    min-height: 100vh;
+  }
+
+  .preview-and-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-panel {
+    min-height: 420px;
+  }
+}
+
+@media (max-width: 900px) {
+  body {
+    min-width: 0;
+    overflow: auto;
+  }
+
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    height: auto;
+  }
+
+  .workspace {
+    order: 1;
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .sidebar {
+    order: 2;
+    display: grid;
+    grid-template-rows: auto minmax(260px, 42dvh);
+    gap: 12px;
+    padding: 0 14px 14px;
+    border-right: 0;
+    background: transparent;
+  }
+
+  .preview-toolbar,
+  .editor-header {
+    align-items: center;
+  }
+
+  .preview-toolbar {
+    gap: 10px;
+  }
+
+  .preview-toolbar h2 {
+    max-width: 52vw;
+    font-size: 18px;
+    line-height: 1.18;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .preview-toolbar p {
+    max-width: 52vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .segment {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .segment button {
+    min-width: 58px;
+  }
+
+  .preview-and-editor {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .preview-stage {
+    min-height: 500px;
+    height: min(76dvh, 720px);
+  }
+
+  .card-preview {
+    width: min(76vw, 350px, 58dvh);
+  }
+
+  .preview-meta {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .preview-meta span {
+    padding: 6px 8px;
+  }
+
+  .editor-panel {
+    min-height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .editor-scroll {
+    overflow: visible;
+  }
+
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: none;
+    overflow: visible;
+  }
+
+  .flag-section {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .card-list {
+    min-height: 260px;
+    height: 42dvh;
+  }
+}
+
+@media (max-width: 560px) {
+  .workspace {
+    padding: 10px;
+  }
+
+  .sidebar {
+    grid-template-rows: auto minmax(260px, 46dvh);
+    padding: 0 10px 12px;
+  }
+
+  .filters,
+  .editor-panel.empty,
+  .editor-section {
+    border-radius: 7px;
+  }
+
+  .preview-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  .preview-toolbar .segment.compact {
+    width: auto;
+    margin-right: 0;
+    justify-self: start;
+    transform: none;
+    flex: 0 0 auto;
+  }
+
+  .preview-toolbar .segment.compact button {
+    min-width: 0;
+    padding: 0 9px;
+  }
+
+  .preview-toolbar h2,
+  .preview-toolbar p {
+    max-width: none;
+  }
+
+  .preview-stage {
+    min-height: min(620px, calc(100dvh - 86px));
+    height: min(90dvh, 760px);
+  }
+
+  .card-preview {
+    width: min(88vw, 340px, 64dvh);
+  }
+
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding-top: 12px;
+  }
+
+  .editor-panel.empty,
+  .editor-section {
+    padding: 12px;
+  }
+
+  .card-row {
+    grid-template-columns: 42px minmax(0, 1fr) 8px;
+    gap: 9px;
+    min-height: 72px;
+  }
+
+  .thumb-slot {
+    width: 42px;
+    height: 59px;
+  }
+
+  .edit-json pre {
+    max-height: 120px;
+  }
+}
