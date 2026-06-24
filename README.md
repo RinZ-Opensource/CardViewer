@@ -1,9 +1,9 @@
 # ConfigArc CardViewer
 
-A local card viewer and exporter for CardMaker resources, built with React, Vite, and Tauri.
+A local card viewer for CardMaker resources, built with React, Vite, and Tauri.
 
 It renders cards for multiple games (CHU / MAI / MU3) with a 3D tilt preview and a
-holographic foil effect, and can export data for online and mobile previews.
+holographic foil effect.
 
 ## Deployment modes
 
@@ -27,10 +27,6 @@ npm run build:private      # production build, private mode
 npm run build:public       # production build, public mode
 npm run tauri:dev          # run inside the Tauri desktop shell
 npm run tauri:build        # build the desktop app
-
-# Exporters (require a CardMaker package path)
-npm run export:online -- "I:\package"
-npm run export:mobile-pack -- "I:\package"
 ```
 
 ## License
