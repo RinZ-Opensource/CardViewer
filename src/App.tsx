@@ -2,6 +2,7 @@ import React from "react";
 import { toPng } from "html-to-image";
 import { invoke } from "@tauri-apps/api/core";
 import { EditorPanel } from "./EditorPanel";
+import { ThemeToggle } from "./ThemeToggle";
 import { applyEdits, fieldString, maiLinkedPrintEdits, mu3RarityKind } from "./cardData";
 import { PreviewStage, selectedAssetSignature, usesPrimaryImageDataUrl } from "./cards";
 import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT, CARD_WIDTH, DEFAULT_PACKAGE_ROOT, EDIT_STORAGE_KEY, OfficialFontContext, TmpFontContext, canInvokeTauri } from "./constants";
@@ -650,6 +651,7 @@ export function App() {
             <p>{selected ? `${selected.game} / ${selected.dataName}` : "Scan a package"}</p>
           </div>
           <div className="preview-actions">
+            <ThemeToggle />
             <div className="segment compact">
               <button className={viewMode === "2d" ? "active" : ""} onClick={() => setViewMode("2d")}>
                 2D
