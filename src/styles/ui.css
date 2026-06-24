@@ -297,8 +297,21 @@
     min-height: 100vh;
   }
 
+  /* Stack the preview above the editor and let that region scroll on its own,
+     so the card keeps a real (viewport-height-based) size instead of being
+     crushed by the editor's min-height inside the fixed 100vh workspace. */
   .preview-and-editor {
     grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .preview-stage {
+    height: min(72dvh, 720px);
+    min-height: 360px;
+  }
+
+  .card-preview {
+    width: min(48dvh, 520px);
   }
 
   .editor-panel {
