@@ -105,6 +105,35 @@
   --ui-edited-dot: #db7d52;
 }
 
+/* Theme-switch crossfade (driven from src/theme.ts). The View Transitions API
+   crossfades the whole page; the .theme-anim fallback gives browsers without it
+   a brief colour fade on the chrome. Card art is unchanged between themes, so it
+   does not visibly animate. Both are disabled under prefers-reduced-motion. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.28s;
+  animation-timing-function: ease;
+}
+
+html.theme-anim,
+html.theme-anim *,
+html.theme-anim *::before,
+html.theme-anim *::after {
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease,
+    border-color 0.25s ease,
+    fill 0.25s ease,
+    box-shadow 0.25s ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
+
 @font-face {
   font-family: "CardViewer Zen Kaku";
   src: url("/fonts/zen/ZenKakuGothicNew-Regular.ttf") format("truetype");

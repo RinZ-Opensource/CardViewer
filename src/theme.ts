@@ -45,11 +45,52 @@ export function applyResolvedTheme(preference: ThemePreference): void {
   document.documentElement.dataset.theme = resolveTheme(preference);
 }
 
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+// Apply the theme with a crossfade: the View Transitions API when available (the
+// whole page crossfades between light and dark), otherwise a brief colour
+// transition on the chrome via the .theme-anim class. Switches instantly when the
+// user prefers reduced motion.
+export function applyThemeAnimated(preference: ThemePreference): void {
+  if (prefersReducedMotion()) {
+    applyResolvedTheme(preference);
+    return;
+  }
+
+  const start = (
+    document as Document & { startViewTransition?: (cb: () => void) => unknown }
+  ).startViewTransition;
+  if (typeof start === "function") {
+    start.call(document, () => applyResolvedTheme(preference));
+    return;
+  }
+
+  // Fallback for browsers without the View Transitions API: enable colour
+  // transitions on the chrome for the duration of this switch only.
+  const root = document.documentElement;
+  root.classList.add("theme-anim");
+  void root.offsetWidth; // register the transition before the values change
+  applyResolvedTheme(preference);
+  window.setTimeout(() => root.classList.remove("theme-anim"), 300);
+}
+
 export function useThemePreference(): [ThemePreference, (next: ThemePreference) => void] {
   const [preference, setPreference] = React.useState<ThemePreference>(readThemePreference);
+  const initialApply = React.useRef(true);
 
   React.useEffect(() => {
-    applyResolvedTheme(preference);
+    if (initialApply.current) {
+      initialApply.current = false;
+      applyResolvedTheme(preference); // no crossfade on first mount
+    } else {
+      applyThemeAnimated(preference); // crossfade on user toggle
+    }
     try {
       localStorage.setItem(THEME_STORAGE_KEY, preference);
     } catch {
@@ -62,7 +103,7 @@ export function useThemePreference(): [ThemePreference, (next: ThemePreference) 
     if (preference !== "system") return;
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
     const media = window.matchMedia(DARK_QUERY);
-    const onChange = () => applyResolvedTheme("system");
+    const onChange = () => applyThemeAnimated("system");
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);
   }, [preference]);
