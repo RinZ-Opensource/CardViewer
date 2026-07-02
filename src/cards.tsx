@@ -1,6 +1,6 @@
 import React from "react";
-import { Mu3LimitBreakStars, clampInt, fieldBool, fieldNumber, fieldString, formatDisplaySerial, formatMaiEndDate, maiCardTypeEffects, maiCharaChoice, maiEffectIconAsset, maiFrameAssets, maiOfficialHolo, maiRatingBaseAsset, mu3AttackValue, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3FrameAsset, mu3NeedsSign, mu3RareSpriteName, mu3RarityKind, mu3ShowMainFrame, mu3SkillAsset, numericField, officialHolo, qrSource, twoDigits } from "./cardData";
-import { CANVAS_FONT_SEGA_MARU_DB, CARD_TILT_X_MAX, CARD_TILT_Y_MAX, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
+import { clampInt, fieldBool, fieldNumber, fieldString, formatDisplaySerial, formatMaiEndDate, maiCardTypeEffects, maiCharaChoice, maiEffectIconAsset, maiFrameAssets, maiOfficialHolo, maiRatingBaseAsset, mu3AttackValue, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3FrameAsset, mu3MaxOwnCount, mu3NeedsSign, mu3RareSpriteName, mu3RarityKind, mu3ShowMainFrame, mu3SkillAsset, numericField, officialHolo, qrSource, twoDigits } from "./cardData";
+import { CANVAS_FONT_SEGA_MARU_DB, CARD_TILT_X_MAX, CARD_TILT_Y_MAX, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, MU3_LIMIT_BREAK_STAR_POSITIONS, MU3_LIMIT_BREAK_STAR_Y, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
 import { HoloShaderLayer } from "./holo";
 import { ImageLoadPriority, isStaticAssetPath } from "./imageLoader";
 import { LayerCanvasText, LayerChuCounter, LayerDigitCounter, LayerImage, LayerQr, LayerTmpText, LayerUnityText } from "./layers";
@@ -571,6 +571,25 @@ export function MaiOfficialCard({
         <HoloShaderLayer card={card} assetDataUrls={assetDataUrls} lightStyle={lightStyle} inline />
       ) : null}
     </div>
+  );
+}
+
+export function Mu3LimitBreakStars({ card }: { card: CardRecord }) {
+  const maxStars = mu3MaxOwnCount(card);
+  const activeStars = clampInt(numericField(card, "ownCount", 0), 0, maxStars);
+  return (
+    <>
+      {MU3_LIMIT_BREAK_STAR_POSITIONS.slice(0, maxStars).map((x, index) => (
+        <LayerImage
+          src={officialAsset(index < activeStars ? "UI_Card_star_01" : "UI_Card_star_00")}
+          x={x}
+          y={MU3_LIMIT_BREAK_STAR_Y}
+          w={50}
+          h={50}
+          key={index}
+        />
+      ))}
+    </>
   );
 }
 

@@ -1,6 +1,6 @@
-import { HOLO_ENABLED, MAI_FRAME_ASSETS, MAI_PASS_CROPS, MAI_PASS_RECT, MU3_LEVEL_LIMITS, MU3_LIMIT_BREAK_STAR_POSITIONS, MU3_LIMIT_BREAK_STAR_Y, officialAsset } from "./constants";
+import { HOLO_ENABLED, MAI_FRAME_ASSETS, MAI_PASS_CROPS, MAI_PASS_RECT, MU3_LEVEL_LIMITS } from "./constants";
 import { spriteCropDisplayRect } from "./geometry";
-import { LayerImage, QrSource } from "./layers";
+import { QrSource } from "./layers";
 import { CardEdits, CardRecord, PrintField, PrintFieldValue } from "./types";
 
 export function randomDigitString(length: number) {
@@ -349,25 +349,6 @@ export function maiFrameAssets(card: CardRecord) {
 
 export function maiRatingBaseAsset(card: CardRecord) {
   return `UI_CMA_Rating_Base_${twoDigits(maiRatingPlatePattern(fieldNumber(card, "rating", 0)))}`;
-}
-
-export function Mu3LimitBreakStars({ card }: { card: CardRecord }) {
-  const maxStars = mu3MaxOwnCount(card);
-  const activeStars = clampInt(numericField(card, "ownCount", 0), 0, maxStars);
-  return (
-    <>
-      {MU3_LIMIT_BREAK_STAR_POSITIONS.slice(0, maxStars).map((x, index) => (
-        <LayerImage
-          src={officialAsset(index < activeStars ? "UI_Card_star_01" : "UI_Card_star_00")}
-          x={x}
-          y={MU3_LIMIT_BREAK_STAR_Y}
-          w={50}
-          h={50}
-          key={index}
-        />
-      ))}
-    </>
-  );
 }
 
 export function mu3AttackValue(card: CardRecord) {
