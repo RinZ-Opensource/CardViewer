@@ -1,9 +1,11 @@
 import React from "react";
 import { assetLayerLoadPriority, visibleAssetLayers } from "./cards";
-import { USE_OFFICIAL_ASSETS, canInvokeTauri } from "./constants";
+import { maiLinkedPrintEdits } from "./cardData";
+import { PLAYER_EDIT_KEYS, SHARED_PLAYER_EDITS_KEY, sharedPlayerEdits } from "./cardEdits";
+import { EDIT_STORAGE_KEY, USE_OFFICIAL_ASSETS, canInvokeTauri } from "./constants";
 import { loadOfficialFonts, loadOfficialTmpFont } from "./fonts";
 import { isStaticAssetPath, readCachedImageDataUrl } from "./imageLoader";
-import { CardRecord, LoadedAssetDataUrls, LoadedImageDataUrl, OfficialFontKey, TmpFontMetrics, UnityFontMetrics } from "./types";
+import { CardEdits, CardRecord, LoadedAssetDataUrls, LoadedImageDataUrl, OfficialFontKey, PrintFieldValue, TmpFontMetrics, UnityFontMetrics } from "./types";
 
 // Loads the Unity bitmap fonts and the TMP SDF font used by the official card
 // renderers. No-op outside the private/official deployment.
@@ -32,6 +34,73 @@ export function useOfficialFonts() {
   }, []);
 
   return { officialFonts, tmpFont };
+}
+
+// Owns the persisted print-edit state and the mutations against it. Per-card
+// edits are keyed by dataName; player-data edits (name / rating / friend code)
+// are shared across cards under a single key.
+export function useCardEdits() {
+  const [edits, setEdits] = React.useState<Record<string, CardEdits>>(() => {
+    const raw = localStorage.getItem(EDIT_STORAGE_KEY);
+    if (!raw) return {};
+    try {
+      return JSON.parse(raw) as Record<string, CardEdits>;
+    } catch {
+      return {};
+    }
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(edits));
+  }, [edits]);
+
+  const updateCardField = React.useCallback((card: CardRecord, fieldKey: string, value: PrintFieldValue) => {
+    setEdits((prev) => ({
+      ...prev,
+      [card.dataName]: {
+        ...prev[card.dataName],
+        ...maiLinkedPrintEdits(card, fieldKey, value),
+      },
+    }));
+  }, []);
+
+  const updatePlayerField = React.useCallback((fieldKey: string, value: PrintFieldValue) => {
+    if (!PLAYER_EDIT_KEYS.has(fieldKey)) return;
+    setEdits((prev) => {
+      const next: Record<string, CardEdits> = {
+        ...prev,
+        [SHARED_PLAYER_EDITS_KEY]: {
+          ...sharedPlayerEdits(prev),
+          [fieldKey]: value,
+        },
+      };
+
+      // A player field now lives under the shared key, so drop any stale
+      // per-card copy (and the card entry if it becomes empty).
+      for (const [key, cardEdits] of Object.entries(prev)) {
+        if (key === SHARED_PLAYER_EDITS_KEY || cardEdits[fieldKey] === undefined) continue;
+        const cleaned = { ...cardEdits };
+        delete cleaned[fieldKey];
+        if (Object.keys(cleaned).length === 0) {
+          delete next[key];
+        } else {
+          next[key] = cleaned;
+        }
+      }
+
+      return next;
+    });
+  }, []);
+
+  const resetCardEdits = React.useCallback((card: CardRecord) => {
+    setEdits((prev) => {
+      const next = { ...prev };
+      delete next[card.dataName];
+      return next;
+    });
+  }, []);
+
+  return { edits, updateCardField, updatePlayerField, resetCardEdits };
 }
 
 // Tracks the card list's scroll position and height (via ResizeObserver) so the

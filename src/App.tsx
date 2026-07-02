@@ -3,16 +3,16 @@ import { toPng } from "html-to-image";
 import { invoke } from "@tauri-apps/api/core";
 import { EditorPanel } from "./EditorPanel";
 import { ThemeToggle } from "./ThemeToggle";
-import { applyEdits, maiLinkedPrintEdits } from "./cardData";
-import { effectiveCardEdits, PLAYER_EDIT_KEYS, sharedPlayerEdits, SHARED_PLAYER_EDITS_KEY } from "./cardEdits";
+import { applyEdits } from "./cardData";
+import { effectiveCardEdits } from "./cardEdits";
 import { buildFilterConfig, cardMatchesFilters, uniqueOptions } from "./cardFilters";
 import { PreviewStage, selectedAssetSignature, usesPrimaryImageDataUrl } from "./cards";
-import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT, CARD_WIDTH, DEFAULT_PACKAGE_ROOT, EDIT_STORAGE_KEY, OfficialFontContext, TmpFontContext, canInvokeTauri } from "./constants";
-import { useCardListViewport, useOfficialFonts, useSelectedAssetDataUrls, useSelectedImageDataUrl, useThumbnailLoader } from "./hooks";
+import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT, CARD_WIDTH, DEFAULT_PACKAGE_ROOT, OfficialFontContext, TmpFontContext, canInvokeTauri } from "./constants";
+import { useCardEdits, useCardListViewport, useOfficialFonts, useSelectedAssetDataUrls, useSelectedImageDataUrl, useThumbnailLoader } from "./hooks";
 import { THUMBNAIL_BUFFER_ROWS } from "./imageLoader";
 import { loadStaticScanResult } from "./manifest";
 import { mockScanResult } from "./mockData";
-import { CardEdits, CardRecord, PrintFieldValue, ScanResult, ViewMode } from "./types";
+import { CardRecord, ScanResult, ViewMode } from "./types";
 
 export function App() {
   const [packageRoot, setPackageRoot] = React.useState(DEFAULT_PACKAGE_ROOT);
@@ -27,21 +27,9 @@ export function App() {
   const [exportingPng, setExportingPng] = React.useState(false);
   const { cardListRef, cardListViewport, updateCardListScroll } = useCardListViewport();
   const { officialFonts, tmpFont } = useOfficialFonts();
-  const [edits, setEdits] = React.useState<Record<string, CardEdits>>(() => {
-    const raw = localStorage.getItem(EDIT_STORAGE_KEY);
-    if (!raw) return {};
-    try {
-      return JSON.parse(raw) as Record<string, CardEdits>;
-    } catch {
-      return {};
-    }
-  });
+  const { edits, updateCardField, updatePlayerField, resetCardEdits } = useCardEdits();
   const [status, setStatus] = React.useState("Ready");
   const [error, setError] = React.useState("");
-
-  React.useEffect(() => {
-    localStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(edits));
-  }, [edits]);
 
   React.useEffect(() => {
     if (!error) return;
@@ -260,52 +248,6 @@ export function App() {
     }
   }
 
-  function updateSelected(fieldKey: string, value: PrintFieldValue) {
-    if (!selected) return;
-    setEdits((prev) => ({
-      ...prev,
-      [selected.dataName]: {
-        ...prev[selected.dataName],
-        ...maiLinkedPrintEdits(selected, fieldKey, value),
-      },
-    }));
-  }
-
-  function updatePlayerData(fieldKey: string, value: PrintFieldValue) {
-    if (!selected || !PLAYER_EDIT_KEYS.has(fieldKey)) return;
-    setEdits((prev) => {
-      const next: Record<string, CardEdits> = {
-        ...prev,
-        [SHARED_PLAYER_EDITS_KEY]: {
-          ...sharedPlayerEdits(prev),
-          [fieldKey]: value,
-        },
-      };
-
-      for (const [key, cardEdits] of Object.entries(prev)) {
-        if (key === SHARED_PLAYER_EDITS_KEY || cardEdits[fieldKey] === undefined) continue;
-        const cleaned = { ...cardEdits };
-        delete cleaned[fieldKey];
-        if (Object.keys(cleaned).length === 0) {
-          delete next[key];
-        } else {
-          next[key] = cleaned;
-        }
-      }
-
-      return next;
-    });
-  }
-
-  function resetSelectedEdits() {
-    if (!selected) return;
-    setEdits((prev) => {
-      const next = { ...prev };
-      delete next[selected.dataName];
-      return next;
-    });
-  }
-
   async function exportCardPng() {
     // Capture .card-face (not just .official-card) so the holo is included for
     // every game: MU3 paints it inside the card, MAI overlays it on top.
@@ -467,9 +409,9 @@ export function App() {
           <EditorPanel
             card={selectedBase}
             edits={selectedEdits}
-            onChange={updateSelected}
-            onPlayerChange={updatePlayerData}
-            onReset={resetSelectedEdits}
+            onChange={(fieldKey, value) => { if (selected) updateCardField(selected, fieldKey, value); }}
+            onPlayerChange={(fieldKey, value) => { if (selected) updatePlayerField(fieldKey, value); }}
+            onReset={() => { if (selected) resetCardEdits(selected); }}
             canReset={Boolean(selectedCardEdits && Object.keys(selectedCardEdits).length > 0)}
           />
         </div>
