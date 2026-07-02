@@ -136,6 +136,21 @@ export type HoloCssMaskOptions = {
   invertApplicationArea?: boolean;
 };
 
+// Named inputs for the holo mask builder. Grouping them (instead of ~10
+// positional args) keeps call sites self-documenting and removes the transpose
+// risk between the identically-typed signMask/signClear/exclude image arrays.
+export type HoloMaskInput = {
+  rootImages: Mu3SvgImage[];
+  frontImages: Mu3SvgImage[];
+  frontRects: Mu3SvgRect[];
+  signMaskImages?: Mu3SvgImage[];
+  signClearImages?: Mu3SvgImage[];
+  frontTextMasks?: Mu3TmpTextMask[];
+  excludeImages?: Mu3SvgImage[];
+  tmpFont?: TmpFontMetrics | null;
+  options?: HoloCssMaskOptions;
+};
+
 export function pushMu3TmpTextMask(masks: Mu3TmpTextMask[], mask: Mu3TmpTextMask) {
   if (!mask.text) return;
   masks.push({
@@ -231,10 +246,15 @@ export function MaiOfficialHoloLayer({
   }
 
   const hasHoloMaskSource = rootImages.length > 0 || frontImages.length > 0 || frontRects.length > 0;
-  const cssMaskUrl = useOfficialHoloMask(rootImages, frontImages, frontRects, hasHoloMaskSource, {
-    fallbackAllowWhenSparse: false,
-    invertApplicationArea: true,
-  });
+  const cssMaskUrl = useOfficialHoloMask(
+    {
+      rootImages,
+      frontImages,
+      frontRects,
+      options: { fallbackAllowWhenSparse: false, invertApplicationArea: true },
+    },
+    hasHoloMaskSource,
+  );
   if (!hasHoloMaskSource) {
     return null;
   }
@@ -363,16 +383,18 @@ export function Mu3OfficialHoloLayer({
     frontTextMasks.length > 0 ||
     signMaskImages.length > 0;
   const cssMaskUrl = useOfficialHoloMask(
-    rootImages,
-    frontImages,
-    frontRects,
+    {
+      rootImages,
+      frontImages,
+      frontRects,
+      signMaskImages,
+      signClearImages,
+      frontTextMasks,
+      excludeImages,
+      tmpFont,
+      options: { invertApplicationArea: true },
+    },
     hasHoloMaskSource,
-    { invertApplicationArea: true },
-    signMaskImages,
-    signClearImages,
-    frontTextMasks,
-    tmpFont,
-    excludeImages,
   );
   if (!hasHoloMaskSource) {
     return null;
@@ -381,18 +403,18 @@ export function Mu3OfficialHoloLayer({
   return <HoloMaterialLayer layerClassName={layerClassName} lightStyle={lightStyle} game={card.game} maskUrl={cssMaskUrl} />;
 }
 
-export function useOfficialHoloMask(
-  rootImages: Mu3SvgImage[],
-  frontImages: Mu3SvgImage[],
-  frontRects: Mu3SvgRect[],
-  enabled: boolean,
-  options: HoloCssMaskOptions = {},
-  signMaskImages: Mu3SvgImage[] = [],
-  signClearImages: Mu3SvgImage[] = [],
-  frontTextMasks: Mu3TmpTextMask[] = [],
-  tmpFont: TmpFontMetrics | null = null,
-  excludeImages: Mu3SvgImage[] = [],
-) {
+export function useOfficialHoloMask(input: HoloMaskInput, enabled: boolean) {
+  const {
+    rootImages,
+    frontImages,
+    frontRects,
+    signMaskImages = [],
+    signClearImages = [],
+    frontTextMasks = [],
+    excludeImages = [],
+    tmpFont = null,
+    options = {},
+  } = input;
   const maskKey = JSON.stringify({
     enabled,
     fallbackAllowWhenSparse: options.fallbackAllowWhenSparse ?? true,
@@ -434,7 +456,7 @@ export function useOfficialHoloMask(
     }
     // Keep the previous mask visible while the new one renders so toggling
     // visibility/print flags doesn't flash the holo off for a frame.
-    renderOfficialHoloMask(rootImages, frontImages, frontRects, options, signMaskImages, signClearImages, frontTextMasks, tmpFont, excludeImages)
+    renderOfficialHoloMask(input)
       .then((url) => {
         if (!cancelled) setMaskUrl(url);
       })
@@ -449,17 +471,18 @@ export function useOfficialHoloMask(
   return maskUrl;
 }
 
-export async function renderOfficialHoloMask(
-  rootImages: Mu3SvgImage[],
-  frontImages: Mu3SvgImage[],
-  frontRects: Mu3SvgRect[],
-  options: HoloCssMaskOptions = {},
-  signMaskImages: Mu3SvgImage[] = [],
-  signClearImages: Mu3SvgImage[] = [],
-  frontTextMasks: Mu3TmpTextMask[] = [],
-  tmpFont: TmpFontMetrics | null = null,
-  excludeImages: Mu3SvgImage[] = [],
-) {
+export async function renderOfficialHoloMask(input: HoloMaskInput) {
+  const {
+    rootImages,
+    frontImages,
+    frontRects,
+    signMaskImages = [],
+    signClearImages = [],
+    frontTextMasks = [],
+    excludeImages = [],
+    tmpFont = null,
+    options = {},
+  } = input;
   const canvas = document.createElement("canvas");
   canvas.width = CARD_WIDTH;
   canvas.height = CARD_HEIGHT;
