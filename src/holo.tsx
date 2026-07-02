@@ -1,6 +1,6 @@
 import React from "react";
 import { clampInt, fieldBool, fieldNumber, maiCardTypeEffects, maiEffectIconAsset, maiFrameAssets, maiRatingBaseAsset, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3HoloBgAsset, mu3HoloFrameBaseAsset, mu3HoloFrameOverlayAsset, mu3NeedsSign, mu3RareSpriteName, mu3SkillAsset, numericField, twoDigits } from "./cardData";
-import { CARD_HEIGHT, CARD_WIDTH, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_HOLO_UI_MASKS, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, TmpFontContext, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
+import { CARD_HEIGHT, CARD_WIDTH, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_HOLO_UI_MASKS, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MU3_ATTRIBUTE_RECT, MU3_AWAKEN_MARK_RECT, MU3_CMN_ICON_RECT, MU3_DIGITAL_MARK_RECT, MU3_GRADE_RECT, MU3_MAX_LABEL_RECT, MU3_QR_BASE_RECT, MU3_RARE_SPRITE_RECT, MU3_RIGHTS_PLATE_RECT, MU3_RIGHTS_RECT, MU3_SKILL_BASE_RECT, MU3_USER_NAME_BASE_RECT, TmpFontContext, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
 import { withUnityCanvasRect } from "./geometry";
 import { TMP_TEXT_PADDING, TmpHorizontalAlign, TmpTextVariant, TmpVerticalAlign, clampNumber, loadTmpAtlas, rasterizeTmpText } from "./textRendering";
 import { CardRecord, TmpFontMetrics } from "./types";
@@ -318,21 +318,21 @@ export function Mu3OfficialHoloLayer({
     }
   }
   if (!fieldBool(card, "hideAttrRarity")) {
-    frontImages.push({ href: officialAsset(`UI_Card_Attribute_${twoDigits(attr)}_${mu3AttributeName(attr)}`), x: -297, y: 439, w: 130, h: 130 });
-    frontImages.push({ href: officialAsset(mu3RareSpriteName(card)), x: -161.4, y: 442.3, w: 208, h: 118 });
+    frontImages.push({ href: officialAsset(`UI_Card_Attribute_${twoDigits(attr)}_${mu3AttributeName(attr)}`), ...MU3_ATTRIBUTE_RECT });
+    frontImages.push({ href: officialAsset(mu3RareSpriteName(card)), ...MU3_RARE_SPRITE_RECT });
   }
   if (fieldBool(card, "digitalOnly")) {
-    frontImages.push({ href: officialAsset("UI_Card_DigitalMark_00"), x: 239.2, y: 477.4, w: 294, h: 102 });
+    frontImages.push({ href: officialAsset("UI_Card_DigitalMark_00"), ...MU3_DIGITAL_MARK_RECT });
   }
   if (!fieldBool(card, "hideGrade") && assetDataUrls.mu3Grade) {
-    frontImages.push({ href: assetDataUrls.mu3Grade, x: 295, y: 455, w: 94, h: 142 });
+    frontImages.push({ href: assetDataUrls.mu3Grade, ...MU3_GRADE_RECT });
   }
   if (!fieldBool(card, "hideSkill")) {
-    frontImages.push({ href: officialAsset(mu3SkillAsset(card)), x: -40.3, y: -367.7, w: 628, h: 108 });
+    frontImages.push({ href: officialAsset(mu3SkillAsset(card)), ...MU3_SKILL_BASE_RECT });
     frontRects.push({ x: -36.3, y: -381.9, w: 444, h: 66 });
   }
   if (!fieldBool(card, "hideAttackLimit")) {
-    frontImages.push({ href: officialAsset("UI_Card_max_00"), x: -291, y: -228.6, w: 108, h: 34 });
+    frontImages.push({ href: officialAsset("UI_Card_max_00"), ...MU3_MAX_LABEL_RECT });
     frontRects.push({ x: -291, y: -276.6, w: 132, h: 112 });
     frontRects.push({ x: -26, y: -290.1, w: 398, h: 52 });
   }
@@ -340,7 +340,7 @@ export function Mu3OfficialHoloLayer({
     frontImages.push({ href: officialAsset(mu3AwakenMarkAsset(card)), ...MU3_AWAKEN_MARK_RECT });
   }
   if (!fieldBool(card, "hideUserName")) {
-    frontImages.push({ href: officialAsset("UI_Card_UserName_00"), x: 278, y: -291.8, w: 212, h: 56 });
+    frontImages.push({ href: officialAsset("UI_Card_UserName_00"), ...MU3_USER_NAME_BASE_RECT });
     frontRects.push({ x: 267.1, y: -300.6, w: 206, h: 28 });
   }
   if (!fieldBool(card, "hideName")) {
@@ -351,7 +351,7 @@ export function Mu3OfficialHoloLayer({
       pushMu3TmpTextMask(frontTextMasks, { text: mu3CharacterName, fontSize: 43, variant: "main", autoSize: true, minFontSize: 24, x: 50, y: -197, w: 523.8, h: 26, rotation: 6 });
       pushMu3TmpTextMask(frontTextMasks, { text: mu3IpName, fontSize: 14.6, variant: "shadow", autoSize: true, minFontSize: 12, x: 111.6, y: -232.1, w: 411.6, h: 19.7, rotation: 6 });
       pushMu3TmpTextMask(frontTextMasks, { text: mu3IpName, fontSize: 14.6, variant: "main", autoSize: true, minFontSize: 12, x: 110.6, y: -230.9, w: 411.6, h: 19.7, rotation: 6 });
-      frontImages.push({ href: officialAsset("UI_Card_CMN_3D_Icon_00"), x: 262.8, y: -224.3, w: 146, h: 38, rotation: 6 });
+      frontImages.push({ href: officialAsset("UI_Card_CMN_3D_Icon_00"), ...MU3_CMN_ICON_RECT });
     } else {
       pushMu3TmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "shadow", characterSpacing: -0.06, x: 41.5, y: -185.3, w: 550, h: 26.2, rotation: 6 });
       pushMu3TmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "main", characterSpacing: -0.06, x: 38.6, y: -183.9, w: 550, h: 26.2, rotation: 6 });
@@ -360,14 +360,14 @@ export function Mu3OfficialHoloLayer({
     }
   }
   if (!fieldBool(card, "hideQRCode")) {
-    frontImages.push({ href: officialAsset("UI_Card_qr_base_00"), x: 251.8, y: -396.1, w: 157, h: 158 });
+    frontImages.push({ href: officialAsset("UI_Card_qr_base_00"), ...MU3_QR_BASE_RECT });
     frontRects.push({ x: 249.4, y: -392.3, w: 128, h: 128 });
   }
-  frontImages.push({ href: officialAsset("UI_Card_rightsplate_00"), x: 0, y: -502, w: 768, h: 48 });
+  frontImages.push({ href: officialAsset("UI_Card_rightsplate_00"), ...MU3_RIGHTS_PLATE_RECT });
   frontRects.push({ x: -135, y: -495.9, w: 326, h: 30 });
   frontRects.push({ x: 132, y: -495.9, w: 326, h: 30 });
   if (assetDataUrls.mu3Rights && rightsId > 0) {
-    frontImages.push({ href: assetDataUrls.mu3Rights, x: -85, y: -447, w: 520, h: 64 });
+    frontImages.push({ href: assetDataUrls.mu3Rights, ...MU3_RIGHTS_RECT });
   }
   if (showSign && assetDataUrls.mu3SignMask) {
     signMaskImages.push({ href: assetDataUrls.mu3SignMask, x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "alpha" });
