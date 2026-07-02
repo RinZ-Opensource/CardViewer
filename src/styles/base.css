@@ -296,7 +296,7 @@ p,
 small,
 .field-label,
 .control span,
-.stats-grid span,
+.preview-status,
 .preview-meta,
 .edit-json summary {
   color: var(--ui-text-muted);
@@ -397,42 +397,6 @@ small,
 .control select:focus {
   border-color: var(--ui-accent);
   box-shadow: 0 0 0 3px var(--ui-accent-ring);
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.stats-grid div {
-  min-width: 0;
-  padding: 9px;
-  border-radius: 7px;
-  background: var(--ui-tile-bg);
-}
-
-.stats-grid strong {
-  display: block;
-  font-size: 17px;
-  color: var(--ui-text-strong);
-}
-
-.error-line,
-.saved-line {
-  margin-top: 12px;
-  font-size: 12px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.error-line {
-  color: var(--ui-danger);
-}
-
-.saved-line {
-  color: var(--ui-accent);
 }
 
 .error-toast {

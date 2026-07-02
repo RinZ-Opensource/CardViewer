@@ -37,12 +37,6 @@ html[data-deployment-mode="private"] {
   --font-sega-maru-db: "CardViewer SegaMaruDB", "CardViewer Zen Maru", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-tmp-humming: "CardViewer Humming", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-official-number: "CardViewer NewRodin", "Impact", "Arial Black", sans-serif;
-}
-html[data-deployment-mode="private"] .holo-rainbow {
-  background:
-    url("/official/UI_Card_Horo_Rainbow_Hard.png") 0 0 / 128px 128px repeat,
-    linear-gradient(115deg, rgba(255, 35, 87, 0.72), rgba(255, 220, 68, 0.68), rgba(35, 235, 165, 0.68), rgba(50, 170, 255, 0.72), rgba(190, 80, 255, 0.72), rgba(255, 35, 87, 0.72));
-  background-size: 128px 128px, 180% 180%;
 }`;
   document.head.append(style);
 }

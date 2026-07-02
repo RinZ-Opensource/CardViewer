@@ -1,9 +1,15 @@
 import React from "react";
-import { clampInt, fieldBool, fieldNumber, fieldString, maiCardTypeEffects, maiEffectIconAsset, maiFrameAssets, maiRatingBaseAsset, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3HoloBgAsset, mu3HoloFrameBaseAsset, mu3HoloFrameOverlayAsset, mu3NeedsSign, mu3RareSpriteName, mu3SkillAsset, numericField, twoDigits } from "./cardData";
+import { clampInt, fieldBool, fieldNumber, maiCardTypeEffects, maiEffectIconAsset, maiFrameAssets, maiRatingBaseAsset, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3HoloBgAsset, mu3HoloFrameBaseAsset, mu3HoloFrameOverlayAsset, mu3NeedsSign, mu3RareSpriteName, mu3SkillAsset, numericField, twoDigits } from "./cardData";
 import { CARD_HEIGHT, CARD_WIDTH, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_HOLO_UI_MASKS, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, TmpFontContext, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
 import { withUnityCanvasRect } from "./geometry";
 import { TMP_TEXT_PADDING, TmpHorizontalAlign, TmpTextVariant, TmpVerticalAlign, clampNumber, loadTmpAtlas, rasterizeTmpText } from "./textRendering";
 import { CardRecord, TmpFontMetrics } from "./types";
+
+// Alpha below this (0-255) is treated as fully transparent when deriving masks.
+const MASK_ALPHA_EPSILON = 8;
+// Grow the front-element mask outward by this many 1px passes so the foil is
+// reliably cleared around printed art/text edges.
+const FRONT_MASK_DILATION = 7;
 
 export function HoloShaderLayer({
   card,
@@ -270,20 +276,13 @@ export function Mu3OfficialHoloLayer({
     rootImages.push({ href: assetDataUrls.mu3Holo, x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
   }
   if (!assetDataUrls.mu3Holo) {
-    const holoBg = mu3HoloBgAsset(card, attr);
+    const holoBg = mu3HoloBgAsset(card);
     const holoFrameBase = mu3HoloFrameBaseAsset(card);
     const holoFrameOverlay = mu3HoloFrameOverlayAsset(card);
     if (holoBg) {
-      // The extracted UI_Card_Horo_BG_* foil textures sit ~12px left / 3px up of the
-      // printed UI_Card_BG_* art (a systematic registration offset, identical across
-      // rarities). Nudge the holo BG right+down so the foil "ONGEKI" logo and line-art
-      // line up with the printed background. (+x = right, -y = down in this coord space.)
-      //
-      // Backfill first: an un-nudged full-frame copy paints the whole card, so the 12px
-      // left / 3px bottom margin that the nudge would otherwise leave uncovered (showing
-      // up as a bare vertical strip) is filled with edge foil instead. The opaque nudged
-      // copy then overwrites the interior, so only the extreme card edge keeps the
-      // un-nudged pattern.
+      // The extracted Horo_BG_* foil sits ~12px left / 3px up of the printed BG.
+      // Paint an un-nudged full-frame copy first (fills the edge the nudge would
+      // leave bare), then an opaque nudged copy to register the interior.
       rootImages.push({ href: officialAsset(holoBg), x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
       rootImages.push({ href: officialAsset(holoBg), x: 12, y: -3, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
     }
@@ -564,7 +563,7 @@ export async function renderOfficialHoloMask(
   for (let pixel = 0; pixel < frontMask.length; pixel += 1) {
     if (frontTextMask[pixel] > 127) frontMask[pixel] = 255;
   }
-  const dilatedFrontMask = dilateBinaryMask(frontMask, CARD_WIDTH, CARD_HEIGHT, 7);
+  const dilatedFrontMask = dilateBinaryMask(frontMask, CARD_WIDTH, CARD_HEIGHT, FRONT_MASK_DILATION);
   const out = ctx.createImageData(CARD_WIDTH, CARD_HEIGHT);
   for (let pixel = 0, index = 0; pixel < dilatedFrontMask.length; pixel += 1, index += 4) {
     const rootAdds = rootData.data[index] > 127;
@@ -682,7 +681,7 @@ export function normalizeMu3MaskData(data: Uint8ClampedArray, mode: HoloRootMask
     for (let index = 0; index < data.length; index += 4) {
       const alpha = data[index + 3];
       const red = data[index];
-      const maskAlpha = alpha > 8 && red > 127 ? 255 : 0;
+      const maskAlpha = alpha > MASK_ALPHA_EPSILON && red > 127 ? 255 : 0;
       data[index] = maskAlpha;
       data[index + 1] = maskAlpha;
       data[index + 2] = maskAlpha;
@@ -702,13 +701,16 @@ export function normalizeMu3MaskData(data: Uint8ClampedArray, mode: HoloRootMask
     return;
   }
 
+  // "light-or-alpha" / "dark-or-alpha": decide per-image whether to key the mask
+  // off luminance (keep only bright, or only dark, pixels) or fall back to plain
+  // alpha, based on how much of the image is covered and how light/dark it is.
   let alphaPixels = 0;
   let lightPixels = 0;
   let darkPixels = 0;
   const totalPixels = data.length / 4;
   for (let index = 0; index < data.length; index += 4) {
     const alpha = data[index + 3];
-    if (alpha <= 8) continue;
+    if (alpha <= MASK_ALPHA_EPSILON) continue;
     alphaPixels += 1;
     const luminance = 0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2];
     if (luminance >= 128) lightPixels += 1;

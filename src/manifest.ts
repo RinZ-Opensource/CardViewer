@@ -97,7 +97,10 @@ export async function loadStaticScanResult(
     );
     const cards = shardResults.flatMap((shard) => shard.cards);
     return scanResultFromIndex(index, cards);
-  } catch {
+  } catch (err) {
+    // Fall back to a single legacy (non-sharded) manifest, but surface the
+    // original error so real failures aren't silently masked by the fallback.
+    console.warn("Sharded manifest load failed; trying legacy manifest", err);
     return fetchJson<ScanResult>(STATIC_MANIFEST_URL);
   }
 }

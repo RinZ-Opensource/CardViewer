@@ -1,5 +1,5 @@
 import React from "react";
-import { Mu3LimitBreakStars, clampInt, fieldBool, fieldNumber, fieldString, formatDisplaySerial, formatMaiEndDate, maiCardTypeEffects, maiEffectIconAsset, maiFrameAssets, maiOfficialHolo, maiRatingBaseAsset, mu3AttackValue, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3FrameAsset, mu3NeedsSign, mu3RareSpriteName, mu3RarityKind, mu3ShowMainFrame, mu3SkillAsset, numericField, officialHolo, qrSource, twoDigits } from "./cardData";
+import { Mu3LimitBreakStars, clampInt, fieldBool, fieldNumber, fieldString, formatDisplaySerial, formatMaiEndDate, maiCardTypeEffects, maiCharaChoice, maiEffectIconAsset, maiFrameAssets, maiOfficialHolo, maiRatingBaseAsset, mu3AttackValue, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3FrameAsset, mu3NeedsSign, mu3RareSpriteName, mu3RarityKind, mu3ShowMainFrame, mu3SkillAsset, numericField, officialHolo, qrSource, twoDigits } from "./cardData";
 import { CANVAS_FONT_SEGA_MARU_DB, CARD_TILT_X_MAX, CARD_TILT_Y_MAX, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
 import { HoloShaderLayer } from "./holo";
 import { ImageLoadPriority, isStaticAssetPath } from "./imageLoader";
@@ -261,17 +261,9 @@ export function visibleAssetLayers(card: CardRecord | null, streamingAssets?: st
 }
 
 export function maiFallbackAssetLayer(layer: AssetLayer): AssetLayer {
-  const fallbackKey =
-    layer.key === "maiBase"
-      ? "maiBaseFallback"
-      : layer.key === "maiChara"
-        ? "maiCharaFallback"
-        : layer.key === "maiMask"
-          ? "maiMaskFallback"
-          : `${layer.key}Fallback`;
   return {
     ...layer,
-    key: fallbackKey,
+    key: `${layer.key}Fallback`,
     label: `${layer.label} fallback`,
   };
 }
@@ -329,36 +321,6 @@ export function dynamicMaiAssetLayers(card: CardRecord, streamingAssets: string)
     });
   }
   return layers;
-}
-
-export type MaiCharaChoice = {
-  id: number;
-  mapId: number;
-  uniqueId: number;
-  name: string;
-};
-
-export function maiCharaChoice(card: CardRecord, charaId: number): MaiCharaChoice | null {
-  return parseMaiCharaChoices(fieldString(card, "charaChoices")).find((choice) => choice.id === charaId) ?? null;
-}
-
-export function parseMaiCharaChoices(value: string): MaiCharaChoice[] {
-  return value
-    .split(/\r?\n/)
-    .map((line) => {
-      const [idText, mapText, uniqueText, ...nameParts] = line.split("|");
-      const id = Number(idText);
-      const mapId = Number(mapText);
-      const uniqueId = Number(uniqueText);
-      if (!Number.isFinite(id) || !Number.isFinite(mapId) || !Number.isFinite(uniqueId)) return null;
-      return {
-        id,
-        mapId,
-        uniqueId,
-        name: nameParts.join("|") || String(id),
-      };
-    })
-    .filter((choice): choice is MaiCharaChoice => choice !== null);
 }
 
 export function OfficialCardCanvas({

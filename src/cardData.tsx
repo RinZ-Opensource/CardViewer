@@ -1,4 +1,3 @@
-import { maiCharaChoice } from "./cards";
 import { HOLO_ENABLED, MAI_FRAME_ASSETS, MAI_PASS_CROPS, MAI_PASS_RECT, MU3_LEVEL_LIMITS, MU3_LIMIT_BREAK_STAR_POSITIONS, MU3_LIMIT_BREAK_STAR_Y, officialAsset } from "./constants";
 import { spriteCropDisplayRect } from "./geometry";
 import { LayerImage, QrSource } from "./layers";
@@ -35,6 +34,36 @@ export function applyEdits(card: CardRecord, edits?: CardEdits): CardRecord {
     editedPrintFields,
     displayName: printedName || card.displayName,
   };
+}
+
+export type MaiCharaChoice = {
+  id: number;
+  mapId: number;
+  uniqueId: number;
+  name: string;
+};
+
+export function maiCharaChoice(card: CardRecord, charaId: number): MaiCharaChoice | null {
+  return parseMaiCharaChoices(fieldString(card, "charaChoices")).find((choice) => choice.id === charaId) ?? null;
+}
+
+export function parseMaiCharaChoices(value: string): MaiCharaChoice[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => {
+      const [idText, mapText, uniqueText, ...nameParts] = line.split("|");
+      const id = Number(idText);
+      const mapId = Number(mapText);
+      const uniqueId = Number(uniqueText);
+      if (!Number.isFinite(id) || !Number.isFinite(mapId) || !Number.isFinite(uniqueId)) return null;
+      return {
+        id,
+        mapId,
+        uniqueId,
+        name: nameParts.join("|") || String(id),
+      };
+    })
+    .filter((choice): choice is MaiCharaChoice => choice !== null);
 }
 
 export function maiLinkedPrintEdits(card: CardRecord, fieldKey: string, value: PrintFieldValue): CardEdits {
@@ -128,7 +157,6 @@ export function officialHolo(card: CardRecord) {
   if (!HOLO_ENABLED) return false;
   if (card.game === "CHU") return false;
   if (card.game === "MAI") return maiOfficialHolo(card);
-  if (card.game === "MU3") return fieldBool(card, "holo");
   return fieldBool(card, "holo");
 }
 
@@ -181,12 +209,19 @@ export function qrSource(card: CardRecord, fallback: string): QrSource {
   return [card.game, card.dataName, fieldString(card, "serialId"), fallback].filter(Boolean).join("|");
 }
 
+// Per-game QR payload constants: the in-game game id baked into each card's QR
+// record and the RC4 key that scrambles it.
+const MAI_QR_GAME_ID = 5915972;
+const MU3_QR_GAME_ID = 5522500;
+const MAI_QR_RC4_KEY = [144, 95, 51, 167, 195, 243, 253, 226, 84, 194, 239, 80, 177, 205, 41, 78];
+const MU3_QR_RC4_KEY = [38, 34, 177, 150, 54, 114, 151, 245, 80, 162, 229, 42, 75, 224, 55, 156];
+
 export function maiQrBytes(card: CardRecord) {
   const cardId = numericField(card, "cardId", numericText(card.id, NaN));
   const charaId = numericField(card, "charaId", 0);
   if (!Number.isFinite(cardId) || !Number.isFinite(charaId)) return null;
-  const bytes = createQrBytes(cardId, charaId, 5915972);
-  return rc4(bytes, [144, 95, 51, 167, 195, 243, 253, 226, 84, 194, 239, 80, 177, 205, 41, 78]);
+  const bytes = createQrBytes(cardId, charaId, MAI_QR_GAME_ID);
+  return rc4(bytes, MAI_QR_RC4_KEY);
 }
 
 export function mu3QrBytes(card: CardRecord) {
@@ -196,10 +231,12 @@ export function mu3QrBytes(card: CardRecord) {
     numericText(fieldString(card, "cardNo") || card.id || card.dataName, NaN),
   );
   if (!Number.isFinite(cardId)) return null;
-  const bytes = createQrBytes(cardId, 0, 5522500);
-  return rc4(bytes, [38, 34, 177, 150, 54, 114, 151, 245, 80, 162, 229, 42, 75, 224, 55, 156]);
+  const bytes = createQrBytes(cardId, 0, MU3_QR_GAME_ID);
+  return rc4(bytes, MU3_QR_RC4_KEY);
 }
 
+// 14-byte QR record: [0..3] zero, [4..6] cardId (LE24), [7..10] serial (LE32),
+// [11..13] gameId (LE24).
 export function createQrBytes(cardId: number, serial: number, gameId: number) {
   const bytes = new Uint8Array(14);
   writeLe32(bytes, 0, 0);
@@ -498,7 +535,7 @@ export function mu3HoloFrameOverlayAsset(card: CardRecord) {
   }
 }
 
-export function mu3HoloBgAsset(card: CardRecord, attr: number) {
+export function mu3HoloBgAsset(card: CardRecord) {
   switch (mu3RarityKind(card)) {
     case "N":
       return "UI_Card_Horo_BG_N_00";

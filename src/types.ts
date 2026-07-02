@@ -19,9 +19,11 @@ export type AssetLayer = {
   path: string;
 };
 
+export type CardGame = "CHU" | "MAI" | "MU3";
+
 export type CardRecord = {
   id: string;
-  game: string;
+  game: CardGame;
   recordType: string;
   dataName: string;
   displayName: string;

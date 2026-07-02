@@ -135,21 +135,18 @@ function firstCardField(card: CardRecord, keys: string[]) {
   return "";
 }
 
+// Card frame tiers by in-game typeId (5 is unused / has no distinct frame).
+const MAI_TYPE_NAMES: Record<string, string> = {
+  "2": "Bronze",
+  "3": "Silver",
+  "4": "Gold",
+  "6": "Freedom",
+};
+
 function maiTypeName(typeId: string) {
-  switch (typeId.trim()) {
-    case "2":
-      return "Bronze";
-    case "3":
-      return "Silver";
-    case "4":
-      return "Gold";
-    case "6":
-      return "Freedom";
-    case "":
-      return "";
-    default:
-      return `Type ${typeId.trim()}`;
-  }
+  const id = typeId.trim();
+  if (!id) return "";
+  return MAI_TYPE_NAMES[id] ?? `Type ${id}`;
 }
 
 function normalizedVersion(value: string) {

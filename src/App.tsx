@@ -12,7 +12,7 @@ import { useCardListViewport, useOfficialFonts, useSelectedAssetDataUrls, useSel
 import { THUMBNAIL_BUFFER_ROWS } from "./imageLoader";
 import { loadStaticScanResult } from "./manifest";
 import { mockScanResult } from "./mockData";
-import { CardEdits, CardRecord, PrintFieldValue, ScanResult, ScanStats, ViewMode } from "./types";
+import { CardEdits, CardRecord, PrintFieldValue, ScanResult, ViewMode } from "./types";
 
 export function App() {
   const [packageRoot, setPackageRoot] = React.useState(DEFAULT_PACKAGE_ROOT);
@@ -27,7 +27,6 @@ export function App() {
   const [exportingPng, setExportingPng] = React.useState(false);
   const { cardListRef, cardListViewport, updateCardListScroll } = useCardListViewport();
   const { officialFonts, tmpFont } = useOfficialFonts();
-  const [savedEditPath, setSavedEditPath] = React.useState("");
   const [edits, setEdits] = React.useState<Record<string, CardEdits>>(() => {
     const raw = localStorage.getItem(EDIT_STORAGE_KEY);
     if (!raw) return {};
@@ -261,41 +260,6 @@ export function App() {
     }
   }
 
-  async function saveEdits() {
-    setError("");
-    const editCount = Object.keys(edits).length;
-    if (editCount === 0) {
-      setStatus("No print edits to save");
-      return;
-    }
-
-    if (!canInvokeTauri()) {
-      const blob = new Blob([JSON.stringify({ packageRoot, edits }, null, 2)], {
-        type: "application/json",
-      });
-      const href = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = href;
-      anchor.download = "cardviewer-print-edits.json";
-      anchor.click();
-      URL.revokeObjectURL(href);
-      setStatus(`Exported ${editCount} edited records`);
-      return;
-    }
-
-    try {
-      const path = await invoke<string>("save_edit_session", {
-        packageRoot: scanResult?.packageRoot ?? packageRoot,
-        editsJson: JSON.stringify(edits, null, 2),
-      });
-      setSavedEditPath(path);
-      setStatus(`Saved ${editCount} edited print records`);
-    } catch (err) {
-      setError(String(err));
-      setStatus("Save failed");
-    }
-  }
-
   function updateSelected(fieldKey: string, value: PrintFieldValue) {
     if (!selected) return;
     setEdits((prev) => ({
@@ -477,6 +441,7 @@ export function App() {
           <div>
             <h2>{selected?.displayName ?? "No card selected"}</h2>
             <p>{selected ? `${selected.game} / ${selected.dataName}` : "Scan a package"}</p>
+            {status ? <p className="preview-status">{status}</p> : null}
           </div>
           <div className="preview-actions">
             <ThemeToggle />
@@ -544,27 +509,5 @@ export function App() {
       </main>
       </TmpFontContext.Provider>
     </OfficialFontContext.Provider>
-  );
-}
-
-export function StatsStrip({ stats }: { stats: ScanStats }) {
-  return (
-    <div className="stats-grid">
-      <Stat label="CHU" value={stats.chuCards} />
-      <Stat label="MAI Cards" value={stats.maiCards} />
-      <Stat label="MAI Types" value={stats.maiCardTypes} />
-      <Stat label="MU3 Cards" value={stats.mu3AssetCards} />
-      <Stat label="PNG" value={stats.pngAssets} />
-      <Stat label="UnityFS" value={stats.unityBundles} />
-    </div>
-  );
-}
-
-export function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <strong>{value.toLocaleString()}</strong>
-      <span>{label}</span>
-    </div>
   );
 }

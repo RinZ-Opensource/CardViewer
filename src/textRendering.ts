@@ -3,6 +3,23 @@ import { OFFICIAL_ASSET_ROOT } from "./constants";
 import { LruMap } from "./lru";
 import { Bounds, TmpFontMetrics, TmpGlyph, UnityFontMetrics } from "./types";
 
+// Cap the canvas backing-store scale: 1x floor for crispness, 2.5x ceiling to
+// bound memory/CPU on hi-DPI displays; assume 2x during SSR (no window).
+const CANVAS_MIN_DPR = 1;
+const CANVAS_MAX_DPR = 2.5;
+const SSR_DPR = 2;
+
+export function getPixelRatio() {
+  return typeof window === "undefined"
+    ? SSR_DPR
+    : Math.max(CANVAS_MIN_DPR, Math.min(CANVAS_MAX_DPR, window.devicePixelRatio || 1));
+}
+
+// Fallback glyph codepoints when a character is missing from the atlas:
+// U+25A1 white square, then '?'.
+const MISSING_GLYPH_CODEPOINT = "9633";
+const QUESTION_MARK_CODEPOINT = "63";
+
 export function renderCanvasText(
   canvas: HTMLCanvasElement,
   text: string,
@@ -19,8 +36,7 @@ export function renderCanvasText(
     characterSpacing: number;
   },
 ) {
-  const pixelRatio =
-    typeof window === "undefined" ? 2 : Math.max(1, Math.min(2.5, window.devicePixelRatio || 1));
+  const pixelRatio = getPixelRatio();
   const canvasWidth = Math.max(1, Math.ceil(options.w * pixelRatio));
   const canvasHeight = Math.max(1, Math.ceil(options.h * pixelRatio));
   if (canvas.width !== canvasWidth) canvas.width = canvasWidth;
@@ -101,6 +117,16 @@ export type TmpHorizontalAlign = "left" | "center" | "right";
 export type TmpVerticalAlign = "top" | "middle" | "bottom";
 export const TMP_TEXT_PADDING = 36;
 
+// Face / outline tints (RGB) per variant, mirroring the in-game TMP material.
+const TMP_FACE_COLOR: Record<TmpTextVariant, number[]> = {
+  main: [255, 255, 255],
+  shadow: [38, 146, 192],
+};
+const TMP_OUTLINE_COLOR: Record<TmpTextVariant, number[]> = {
+  main: [37, 146, 193],
+  shadow: [30, 128, 178],
+};
+
 export type TmpTextRenderOptions = {
   w: number;
   h: number;
@@ -179,8 +205,7 @@ export function rasterizeTmpText(
   text: string,
   options: TmpTextRenderOptions,
 ): RasterizedTextLayer | null {
-  const pixelRatio =
-    typeof window === "undefined" ? 2 : Math.max(1, Math.min(2.5, window.devicePixelRatio || 1));
+  const pixelRatio = getPixelRatio();
   const logicalWidth = options.w + options.padding * 2;
   const logicalHeight = options.h + options.padding * 2;
   const canvasWidth = Math.max(1, Math.ceil(logicalWidth * pixelRatio));
@@ -217,8 +242,8 @@ export function rasterizeTmpText(
       : options.verticalAlign === "middle"
         ? options.padding + (options.h - totalHeight) / 2
         : options.padding + options.h - totalHeight;
-  const mainColor = options.variant === "main" ? [255, 255, 255] : [38, 146, 192];
-  const outlineColor = options.variant === "main" ? [37, 146, 193] : [30, 128, 178];
+  const mainColor = TMP_FACE_COLOR[options.variant];
+  const outlineColor = TMP_OUTLINE_COLOR[options.variant];
   lines.forEach((line, lineIndex) => {
     const lineWidth = measureTmpLine(font, line, effectiveSize, options.characterSpacing);
     const originX =
@@ -416,10 +441,17 @@ export function canvasAlphaBounds(
   };
 }
 
+// Per-layer SDF coverage: `edge` is the ~50% coverage distance sample (0-255),
+// `softness` the antialiasing half-width around it.
+const SDF_THRESHOLDS: Record<"face" | "outline" | "underlay", { edge: number; softness: number }> = {
+  face: { edge: 152, softness: 22 },
+  outline: { edge: 88, softness: 34 },
+  underlay: { edge: 74, softness: 42 },
+};
+
 export function tmpSdfAlpha(value: number, kind: "face" | "outline" | "underlay") {
-  if (kind === "face") return smoothAlpha(value, 152, 22);
-  if (kind === "outline") return smoothAlpha(value, 88, 34);
-  return smoothAlpha(value, 74, 42);
+  const { edge, softness } = SDF_THRESHOLDS[kind];
+  return smoothAlpha(value, edge, softness);
 }
 
 export function smoothAlpha(value: number, edge: number, softness: number) {
@@ -449,7 +481,7 @@ export function measureTmpLine(
 
 export function tmpGlyph(font: TmpFontMetrics, char: string) {
   const code = char.codePointAt(0) ?? 0;
-  return font.glyphs[String(code)] ?? font.glyphs["9633"] ?? font.glyphs["63"];
+  return font.glyphs[String(code)] ?? font.glyphs[MISSING_GLYPH_CODEPOINT] ?? font.glyphs[QUESTION_MARK_CODEPOINT];
 }
 
 export function reactText(children: React.ReactNode) {
@@ -554,6 +586,6 @@ export function layoutUnityText(
 
 export function unityGlyph(font: UnityFontMetrics, char: string) {
   const code = char.codePointAt(0) ?? 0;
-  return font.chars[String(code)] ?? font.chars["9633"] ?? font.chars["63"];
+  return font.chars[String(code)] ?? font.chars[MISSING_GLYPH_CODEPOINT] ?? font.chars[QUESTION_MARK_CODEPOINT];
 }
 
