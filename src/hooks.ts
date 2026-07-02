@@ -1,11 +1,14 @@
 import React from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { assetLayerLoadPriority, visibleAssetLayers } from "./cards";
 import { maiLinkedPrintEdits } from "./cardData";
 import { PLAYER_EDIT_KEYS, SHARED_PLAYER_EDITS_KEY, sharedPlayerEdits } from "./cardEdits";
-import { EDIT_STORAGE_KEY, USE_OFFICIAL_ASSETS, canInvokeTauri } from "./constants";
+import { DEFAULT_PACKAGE_ROOT, EDIT_STORAGE_KEY, USE_OFFICIAL_ASSETS, canInvokeTauri } from "./constants";
 import { loadOfficialFonts, loadOfficialTmpFont } from "./fonts";
 import { isStaticAssetPath, readCachedImageDataUrl } from "./imageLoader";
-import { CardEdits, CardRecord, LoadedAssetDataUrls, LoadedImageDataUrl, OfficialFontKey, PrintFieldValue, TmpFontMetrics, UnityFontMetrics } from "./types";
+import { loadStaticScanResult } from "./manifest";
+import { mockScanResult } from "./mockData";
+import { CardEdits, CardRecord, LoadedAssetDataUrls, LoadedImageDataUrl, OfficialFontKey, PrintFieldValue, ScanResult, TmpFontMetrics, UnityFontMetrics } from "./types";
 
 // Loads the Unity bitmap fonts and the TMP SDF font used by the official card
 // renderers. No-op outside the private/official deployment.
@@ -34,6 +37,86 @@ export function useOfficialFonts() {
   }, []);
 
   return { officialFonts, tmpFont };
+}
+
+// Loads the card scan once on mount: exported static manifest first, then a
+// mock dataset in the browser, then the Tauri package scan as a fallback.
+// `setSelectedId` is threaded in so a completed load can seed the selection.
+export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction<string>>) {
+  const [scanResult, setScanResult] = React.useState<ScanResult | null>(null);
+  const [packageRoot, setPackageRoot] = React.useState(DEFAULT_PACKAGE_ROOT);
+  const [status, setStatus] = React.useState("Ready");
+  const [error, setError] = React.useState("");
+  const autoLoadStartedRef = React.useRef(false);
+  const loadSequenceRef = React.useRef(0);
+
+  React.useEffect(() => {
+    if (!error) return;
+    const timer = window.setTimeout(() => setError(""), 5000);
+    return () => window.clearTimeout(timer);
+  }, [error]);
+
+  React.useEffect(() => {
+    if (autoLoadStartedRef.current) return;
+    autoLoadStartedRef.current = true;
+
+    const scanPackage = async () => {
+      setError("");
+      const tauriAvailable = canInvokeTauri();
+      const loadId = loadSequenceRef.current + 1;
+      loadSequenceRef.current = loadId;
+      const isCurrentLoad = () => loadSequenceRef.current === loadId;
+      const applyScanResult = (result: ScanResult) => {
+        const nextDisplayCards = result.cards.filter((card) => card.recordType === "Card");
+        setScanResult(result);
+        setPackageRoot(result.packageRoot || packageRoot);
+        setSelectedId((current) =>
+          nextDisplayCards.some((card) => card.dataName === current)
+            ? current
+            : nextDisplayCards[0]?.dataName ?? "",
+        );
+      };
+
+      try {
+        setStatus("Loading exported manifest");
+        try {
+          const result = await loadStaticScanResult((partial, loadedCards, totalCards) => {
+            if (!isCurrentLoad()) return;
+            applyScanResult(partial);
+            setStatus(
+              `Loaded ${loadedCards.toLocaleString()} of ${totalCards.toLocaleString()} exported records`,
+            );
+          });
+          if (!isCurrentLoad()) return;
+          applyScanResult(result);
+          setStatus(`Loaded ${result.cards.length.toLocaleString()} exported records`);
+          return;
+        } catch {
+          if (!tauriAvailable) {
+            const result = mockScanResult(packageRoot);
+            if (!isCurrentLoad()) return;
+            applyScanResult(result);
+            setStatus("Browser preview data loaded");
+            return;
+          }
+          setStatus("Manifest unavailable; scanning package");
+        }
+
+        const result = await invoke<ScanResult>("scan_package", { packageRoot });
+        if (!isCurrentLoad()) return;
+        applyScanResult(result);
+        setStatus(`Loaded ${result.cards.length.toLocaleString()} records`);
+      } catch (err) {
+        if (!isCurrentLoad()) return;
+        setError(String(err));
+        setStatus("Scan failed");
+      }
+    };
+
+    void scanPackage();
+  }, [packageRoot, setSelectedId]);
+
+  return { scanResult, status, error, setError };
 }
 
 // Owns the persisted print-edit state and the mutations against it. Per-card

@@ -1,47 +1,27 @@
 import React from "react";
 import { toPng } from "html-to-image";
-import { invoke } from "@tauri-apps/api/core";
 import { EditorPanel } from "./EditorPanel";
 import { ThemeToggle } from "./ThemeToggle";
 import { applyEdits } from "./cardData";
 import { effectiveCardEdits } from "./cardEdits";
 import { buildFilterConfig, cardMatchesFilters, uniqueOptions } from "./cardFilters";
 import { PreviewStage, selectedAssetSignature, usesPrimaryImageDataUrl } from "./cards";
-import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT, CARD_WIDTH, DEFAULT_PACKAGE_ROOT, OfficialFontContext, TmpFontContext, canInvokeTauri } from "./constants";
-import { useCardEdits, useCardListViewport, useOfficialFonts, useSelectedAssetDataUrls, useSelectedImageDataUrl, useThumbnailLoader } from "./hooks";
+import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT, CARD_WIDTH, OfficialFontContext, TmpFontContext } from "./constants";
+import { useCardEdits, useCardListViewport, useOfficialFonts, useScanResult, useSelectedAssetDataUrls, useSelectedImageDataUrl, useThumbnailLoader } from "./hooks";
 import { THUMBNAIL_BUFFER_ROWS } from "./imageLoader";
-import { loadStaticScanResult } from "./manifest";
-import { mockScanResult } from "./mockData";
-import { CardRecord, ScanResult, ViewMode } from "./types";
+import { CardRecord, ViewMode } from "./types";
 
 export function App() {
-  const [packageRoot, setPackageRoot] = React.useState(DEFAULT_PACKAGE_ROOT);
-  const [scanResult, setScanResult] = React.useState<ScanResult | null>(null);
   const [selectedId, setSelectedId] = React.useState<string>("");
   const [query, setQuery] = React.useState("");
   const [cardFilters, setCardFilters] = React.useState<Record<string, string>>({});
   const [viewMode, setViewMode] = React.useState<ViewMode>("3d");
-  const autoLoadStartedRef = React.useRef(false);
-  const loadSequenceRef = React.useRef(0);
   const cardCaptureRef = React.useRef<HTMLDivElement | null>(null);
   const [exportingPng, setExportingPng] = React.useState(false);
   const { cardListRef, cardListViewport, updateCardListScroll } = useCardListViewport();
   const { officialFonts, tmpFont } = useOfficialFonts();
   const { edits, updateCardField, updatePlayerField, resetCardEdits } = useCardEdits();
-  const [status, setStatus] = React.useState("Ready");
-  const [error, setError] = React.useState("");
-
-  React.useEffect(() => {
-    if (!error) return;
-    const timer = window.setTimeout(() => setError(""), 5000);
-    return () => window.clearTimeout(timer);
-  }, [error]);
-
-  React.useEffect(() => {
-    if (autoLoadStartedRef.current) return;
-    autoLoadStartedRef.current = true;
-    void scanPackage();
-  }, []);
+  const { scanResult, status, error, setError } = useScanResult(setSelectedId);
 
   const cards = scanResult?.cards ?? [];
   const displayCards = React.useMemo(
@@ -194,59 +174,6 @@ export function App() {
   }, [filteredCards, visibleEnd, visibleStart]);
   const cardListHeight = filteredCards.length * CARD_ROW_HEIGHT;
   const thumbCache = useThumbnailLoader(thumbnailCards);
-
-  async function scanPackage() {
-    setError("");
-    const tauriAvailable = canInvokeTauri();
-    const loadId = loadSequenceRef.current + 1;
-    loadSequenceRef.current = loadId;
-    const isCurrentLoad = () => loadSequenceRef.current === loadId;
-    const applyScanResult = (result: ScanResult) => {
-      const nextDisplayCards = result.cards.filter((card) => card.recordType === "Card");
-      setScanResult(result);
-      setPackageRoot(result.packageRoot || packageRoot);
-      setSelectedId((current) =>
-        nextDisplayCards.some((card) => card.dataName === current)
-          ? current
-          : nextDisplayCards[0]?.dataName ?? "",
-      );
-    };
-
-    try {
-      setStatus("Loading exported manifest");
-      try {
-        const result = await loadStaticScanResult((partial, loadedCards, totalCards) => {
-          if (!isCurrentLoad()) return;
-          applyScanResult(partial);
-          setStatus(
-            `Loaded ${loadedCards.toLocaleString()} of ${totalCards.toLocaleString()} exported records`,
-          );
-        });
-        if (!isCurrentLoad()) return;
-        applyScanResult(result);
-        setStatus(`Loaded ${result.cards.length.toLocaleString()} exported records`);
-        return;
-      } catch {
-        if (!tauriAvailable) {
-          const result = mockScanResult(packageRoot);
-          if (!isCurrentLoad()) return;
-          applyScanResult(result);
-          setStatus("Browser preview data loaded");
-          return;
-        }
-        setStatus("Manifest unavailable; scanning package");
-      }
-
-      const result = await invoke<ScanResult>("scan_package", { packageRoot });
-      if (!isCurrentLoad()) return;
-      applyScanResult(result);
-      setStatus(`Loaded ${result.cards.length.toLocaleString()} records`);
-    } catch (err) {
-      if (!isCurrentLoad()) return;
-      setError(String(err));
-      setStatus("Scan failed");
-    }
-  }
 
   async function exportCardPng() {
     // Capture .card-face (not just .official-card) so the holo is included for
