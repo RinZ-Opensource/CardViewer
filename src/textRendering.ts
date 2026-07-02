@@ -20,6 +20,19 @@ export function getPixelRatio() {
 const MISSING_GLYPH_CODEPOINT = "9633";
 const QUESTION_MARK_CODEPOINT = "63";
 
+// Unity TextAnchor grid: alignment 0-8 = vertical*3 + horizontal, each axis
+// 0=start, 1=center, 2=end.
+function decodeUnityAnchor(alignment: number) {
+  return { horizontal: alignment % 3, vertical: Math.floor(alignment / 3) };
+}
+
+// Offset of `content` within `container` for anchor pos 0=start/1=center/2=end.
+function alignOffset(pos: number, container: number, content: number) {
+  if (pos === 1) return (container - content) / 2;
+  if (pos === 2) return container - content;
+  return 0;
+}
+
 export function renderCanvasText(
   canvas: HTMLCanvasElement,
   text: string,
@@ -54,16 +67,14 @@ export function renderCanvasText(
   const lines = text.split(/\r?\n/);
   const lineHeight = options.fontSize * options.lineSpacing;
   const totalHeight = lineHeight * Math.max(1, lines.length);
-  const vertical = Math.floor(options.alignment / 3);
-  const horizontal = options.alignment % 3;
-  const top = vertical === 0 ? 0 : vertical === 1 ? (options.h - totalHeight) / 2 : options.h - totalHeight;
+  const { horizontal, vertical } = decodeUnityAnchor(options.alignment);
+  const top = alignOffset(vertical, options.h, totalHeight);
 
   lines.forEach((line, lineIndex) => {
     const lineWidth = Math.max(1, measureCanvasLine(context, line, options.characterSpacing));
     const fitScale = options.fitHorizontal ? Math.min(1, options.w / lineWidth) : 1;
     const drawWidth = lineWidth * fitScale;
-    const left =
-      horizontal === 0 ? 0 : horizontal === 1 ? (options.w - drawWidth) / 2 : options.w - drawWidth;
+    const left = alignOffset(horizontal, options.w, drawWidth);
     context.save();
     context.translate(left, top + lineIndex * lineHeight);
     context.scale(fitScale, 1);
@@ -116,6 +127,11 @@ export type TmpTextVariant = "main" | "shadow";
 export type TmpHorizontalAlign = "left" | "center" | "right";
 export type TmpVerticalAlign = "top" | "middle" | "bottom";
 export const TMP_TEXT_PADDING = 36;
+
+// Map TMP's string aligns onto the same 0=start / 1=center / 2=end index the
+// Unity anchor helpers use, so all three text pipelines share alignOffset.
+const TMP_H_INDEX: Record<TmpHorizontalAlign, number> = { left: 0, center: 1, right: 2 };
+const TMP_V_INDEX: Record<TmpVerticalAlign, number> = { top: 0, middle: 1, bottom: 2 };
 
 // Face / outline tints (RGB) per variant, mirroring the in-game TMP material.
 const TMP_FACE_COLOR: Record<TmpTextVariant, number[]> = {
@@ -236,22 +252,12 @@ export function rasterizeTmpText(
   const fontScale = effectiveSize / font.fontInfo.PointSize;
   const lineHeight = font.fontInfo.LineHeight * fontScale;
   const totalHeight = lineHeight * Math.max(1, lines.length);
-  const top =
-    options.verticalAlign === "top"
-      ? options.padding
-      : options.verticalAlign === "middle"
-        ? options.padding + (options.h - totalHeight) / 2
-        : options.padding + options.h - totalHeight;
+  const top = options.padding + alignOffset(TMP_V_INDEX[options.verticalAlign], options.h, totalHeight);
   const mainColor = TMP_FACE_COLOR[options.variant];
   const outlineColor = TMP_OUTLINE_COLOR[options.variant];
   lines.forEach((line, lineIndex) => {
     const lineWidth = measureTmpLine(font, line, effectiveSize, options.characterSpacing);
-    const originX =
-      options.horizontalAlign === "left"
-        ? options.padding
-        : options.horizontalAlign === "center"
-          ? options.padding + (options.w - lineWidth) / 2
-          : options.padding + options.w - lineWidth;
+    const originX = options.padding + alignOffset(TMP_H_INDEX[options.horizontalAlign], options.w, lineWidth);
     const baseline = top + lineIndex * lineHeight + font.fontInfo.Ascender * fontScale;
     const sharedRun = {
       dpr: pixelRatio,
@@ -521,10 +527,8 @@ export function layoutUnityText(
   const fitScaleX = fitHorizontal ? Math.min(1, rectWidth / maxWidth) : 1;
   const lineHeight = font.lineSpacing * scale * lineSpacing;
   const totalHeight = lineHeight * Math.max(1, lines.length);
-  const vertical = Math.floor(alignment / 3);
-  const horizontal = alignment % 3;
-  const topBase =
-    vertical === 0 ? 0 : vertical === 1 ? (rectHeight - totalHeight) / 2 : rectHeight - totalHeight;
+  const { horizontal, vertical } = decodeUnityAnchor(alignment);
+  const topBase = alignOffset(vertical, rectHeight, totalHeight);
   const output: Array<{
     key: string;
     style: React.CSSProperties;
@@ -537,8 +541,7 @@ export function layoutUnityText(
 
   laidOutLines.forEach((line, lineIndex) => {
     const lineWidth = line.width * fitScaleX;
-    const lineLeft =
-      horizontal === 0 ? 0 : horizontal === 1 ? (rectWidth - lineWidth) / 2 : rectWidth - lineWidth;
+    const lineLeft = alignOffset(horizontal, rectWidth, lineWidth);
     let cursor = 0;
 
     line.chars.forEach((char, charIndex) => {
