@@ -1,6 +1,6 @@
 import React from "react";
 import { clampInt, fieldBool, fieldNumber, fieldString, formatDisplaySerial, formatMaiEndDate, maiCardTypeEffects, maiCharaChoice, maiEffectIconAsset, maiFrameAssets, maiOfficialHolo, maiRatingBaseAsset, mu3AttackValue, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3FrameAsset, mu3MaxOwnCount, mu3NeedsSign, mu3RareSpriteName, mu3RarityKind, mu3ShowMainFrame, mu3SkillAsset, numericField, officialHolo, qrSource, twoDigits } from "./cardData";
-import { CANVAS_FONT_SEGA_MARU_DB, CARD_TILT_X_MAX, CARD_TILT_Y_MAX, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MU3_ATTRIBUTE_RECT, MU3_AWAKEN_MARK_RECT, MU3_CMN_ICON_RECT, MU3_DIGITAL_MARK_RECT, MU3_GRADE_RECT, MU3_LIMIT_BREAK_STAR_POSITIONS, MU3_LIMIT_BREAK_STAR_Y, MU3_MAX_LABEL_RECT, MU3_QR_BASE_RECT, MU3_RARE_SPRITE_RECT, MU3_RIGHTS_PLATE_RECT, MU3_RIGHTS_RECT, MU3_SKILL_BASE_RECT, MU3_USER_NAME_BASE_RECT, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
+import { CANVAS_FONT_SEGA_MARU_DB, CARD_TILT_X_MAX, CARD_TILT_Y_MAX, MAI_CHARA_NAME_RECT, MAI_EFFECT_ICON_RECT, MAI_END_DATE_RECT, MAI_FRIEND_CODE_BASE_RECT, MAI_MASTER_ICON_RECT, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MAI_PLAYER_NAME_BASE_RECT, MAI_QR_CODE_BASE_RECT, MAI_RATING_BASE_RECT, MAI_RATING_ICON_RECT, MAI_SERIAL_CODE_BASE_RECT, MU3_ATTRIBUTE_RECT, MU3_AWAKEN_MARK_RECT, MU3_CMN_ICON_RECT, MU3_DIGITAL_MARK_RECT, MU3_GRADE_RECT, MU3_LIMIT_BREAK_STAR_POSITIONS, MU3_LIMIT_BREAK_STAR_Y, MU3_MAX_LABEL_RECT, MU3_QR_BASE_RECT, MU3_RARE_SPRITE_RECT, MU3_RIGHTS_PLATE_RECT, MU3_RIGHTS_RECT, MU3_SKILL_BASE_RECT, MU3_USER_NAME_BASE_RECT, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
 import { HoloShaderLayer } from "./holo";
 import { ImageLoadPriority, isStaticAssetPath } from "./imageLoader";
 import { LayerCanvasText, LayerChuCounter, LayerDigitCounter, LayerImage, LayerQr, LayerTmpText, LayerUnityText } from "./layers";
@@ -502,17 +502,17 @@ export function MaiOfficialCard({
         <LayerImage src={officialAsset(passAsset)} {...passRect} />
       ) : null}
       {effectIconAsset && !hideCardIcon ? (
-        <LayerImage src={officialAsset(effectIconAsset)} x={-303} y={-403} w={112} h={112} />
+        <LayerImage src={officialAsset(effectIconAsset)} {...MAI_EFFECT_ICON_RECT} />
       ) : null}
       {effects.master && !hideCardIcon ? (
-        <LayerImage src={officialAsset("UI_CMA_Icon_Master_00")} x={-193.2} y={-403} w={112} h={112} />
+        <LayerImage src={officialAsset("UI_CMA_Icon_Master_00")} {...MAI_MASTER_ICON_RECT} />
       ) : null}
       {effects.ratingMusic && !hideCardIcon ? (
-        <LayerImage src={officialAsset("UI_CMA_Icon_Rating_00")} x={-84} y={-403} w={112} h={112} />
+        <LayerImage src={officialAsset("UI_CMA_Icon_Rating_00")} {...MAI_RATING_ICON_RECT} />
       ) : null}
       {!hidePlayerName ? (
         <>
-          <LayerImage src={officialAsset("UI_CMA_PlayerName_Base_00")} x={211} y={397} w={276} h={48} />
+          <LayerImage src={officialAsset("UI_CMA_PlayerName_Base_00")} {...MAI_PLAYER_NAME_BASE_RECT} />
           <LayerUnityText className="official-title mai-player" fontKey="maru32" fontSize={29} alignment={0} color="#000000" fitHorizontal characterSpacing={10} horizontalScale={0.9} x={180.4} y={387} w={181.2} h={50}>
             {fieldString(card, "userName") || "PLAYER"}
           </LayerUnityText>
@@ -520,7 +520,7 @@ export function MaiOfficialCard({
       ) : null}
       {!hideFriendCode ? (
         <>
-          <LayerImage src={officialAsset("UI_CMA_FriendCode_Base_00")} x={211} y={360.8} w={276} h={40} />
+          <LayerImage src={officialAsset("UI_CMA_FriendCode_Base_00")} {...MAI_FRIEND_CODE_BASE_RECT} />
           {hasFriendCode ? (
             <LayerUnityText className="official-code mai-friend" fontKey="maru32" fontSize={16} alignment={4} color="#000000" fitHorizontal characterSpacing={1} fixedGlyphTop x={245.8} y={359.4} w={192} h={23.7}>
               {fieldString(card, "friendCode")}
@@ -534,7 +534,7 @@ export function MaiOfficialCard({
       ) : null}
       {!hideRating ? (
         <>
-          <LayerImage src={officialAsset(ratingBase)} x={212.4} y={456.9} w={280} h={76} />
+          <LayerImage src={officialAsset(ratingBase)} {...MAI_RATING_BASE_RECT} />
           <LayerDigitCounter
             className="official-rating mai-rating-counter"
             value={fieldString(card, "rating") || "0"}
@@ -556,14 +556,14 @@ export function MaiOfficialCard({
       ) : null}
       {!hideSerialAndQR ? (
         <>
-          <LayerImage src={officialAsset("UI_CMA_SerialCode_Base_00")} x={0} y={-486.5} w={490} h={32} />
+          <LayerImage src={officialAsset("UI_CMA_SerialCode_Base_00")} {...MAI_SERIAL_CODE_BASE_RECT} />
           <LayerUnityText className="official-serial mai-serial" fontKey="kaku16" fontSize={16} alignment={1} fitHorizontal characterSpacing={-1} x={-100.9} y={-488.7} w={266} h={18}>
             {formatDisplaySerial(serial)}
           </LayerUnityText>
           <LayerUnityText className="official-serial mai-version" fontKey="kaku16" fontSize={16} alignment={0} fitHorizontal characterSpacing={-1} x={171.3} y={-488.7} w={266} h={18}>
             {fieldString(card, "verCharaId") || card.id}
           </LayerUnityText>
-          <LayerImage src={officialAsset("UI_CMA_QRCode_Base_00")} x={249.7} y={-394.7} w={164} h={164} />
+          <LayerImage src={officialAsset("UI_CMA_QRCode_Base_00")} {...MAI_QR_CODE_BASE_RECT} />
           <LayerQr source={qrSource(card, serial)} x={249.7} y={-394.7} w={113} h={113} />
         </>
       ) : null}

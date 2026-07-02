@@ -1,6 +1,6 @@
 import React from "react";
 import { clampInt, fieldBool, fieldNumber, maiCardTypeEffects, maiEffectIconAsset, maiFrameAssets, maiRatingBaseAsset, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3HoloBgAsset, mu3HoloFrameBaseAsset, mu3HoloFrameOverlayAsset, mu3NeedsSign, mu3RareSpriteName, mu3SkillAsset, numericField, twoDigits } from "./cardData";
-import { CARD_HEIGHT, CARD_WIDTH, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_HOLO_UI_MASKS, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MU3_ATTRIBUTE_RECT, MU3_AWAKEN_MARK_RECT, MU3_CMN_ICON_RECT, MU3_DIGITAL_MARK_RECT, MU3_GRADE_RECT, MU3_MAX_LABEL_RECT, MU3_QR_BASE_RECT, MU3_RARE_SPRITE_RECT, MU3_RIGHTS_PLATE_RECT, MU3_RIGHTS_RECT, MU3_SKILL_BASE_RECT, MU3_USER_NAME_BASE_RECT, TmpFontContext, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
+import { CARD_HEIGHT, CARD_WIDTH, MAI_CHARA_NAME_RECT, MAI_EFFECT_ICON_RECT, MAI_END_DATE_RECT, MAI_FRIEND_CODE_BASE_RECT, MAI_HOLO_UI_MASKS, MAI_MASTER_ICON_RECT, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MAI_PLAYER_NAME_BASE_RECT, MAI_QR_CODE_BASE_RECT, MAI_RATING_BASE_RECT, MAI_RATING_ICON_RECT, MAI_SERIAL_CODE_BASE_RECT, MU3_ATTRIBUTE_RECT, MU3_AWAKEN_MARK_RECT, MU3_CMN_ICON_RECT, MU3_DIGITAL_MARK_RECT, MU3_GRADE_RECT, MU3_MAX_LABEL_RECT, MU3_QR_BASE_RECT, MU3_RARE_SPRITE_RECT, MU3_RIGHTS_PLATE_RECT, MU3_RIGHTS_RECT, MU3_SKILL_BASE_RECT, MU3_USER_NAME_BASE_RECT, TmpFontContext, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
 import { withUnityCanvasRect } from "./geometry";
 import { TMP_TEXT_PADDING, TmpHorizontalAlign, TmpTextVariant, TmpVerticalAlign, clampNumber, loadTmpAtlas, rasterizeTmpText } from "./textRendering";
 import { CardRecord, TmpFontMetrics } from "./types";
@@ -213,20 +213,20 @@ export function MaiOfficialHoloLayer({
     frontRects.push({ ...MAI_END_DATE_RECT });
   }
   if (effectIconAsset && !hideCardIcon) {
-    frontImages.push({ href: officialAsset(effectIconAsset), x: -303, y: -403, w: 112, h: 112 });
+    frontImages.push({ href: officialAsset(effectIconAsset), ...MAI_EFFECT_ICON_RECT });
   }
   if (effects.master && !hideCardIcon) {
-    frontImages.push({ href: officialAsset("UI_CMA_Icon_Master_00"), x: -193.2, y: -403, w: 112, h: 112 });
+    frontImages.push({ href: officialAsset("UI_CMA_Icon_Master_00"), ...MAI_MASTER_ICON_RECT });
   }
   if (effects.ratingMusic && !hideCardIcon) {
-    frontImages.push({ href: officialAsset("UI_CMA_Icon_Rating_00"), x: -84, y: -403, w: 112, h: 112 });
+    frontImages.push({ href: officialAsset("UI_CMA_Icon_Rating_00"), ...MAI_RATING_ICON_RECT });
   }
   if (!hidePlayerName) {
-    frontImages.push({ href: officialAsset("UI_CMA_PlayerName_Base_00"), x: 211, y: 397, w: 276, h: 48 });
+    frontImages.push({ href: officialAsset("UI_CMA_PlayerName_Base_00"), ...MAI_PLAYER_NAME_BASE_RECT });
     frontRects.push({ x: 180.4, y: 387, w: 181.2, h: 50 });
   }
   if (!hideFriendCode) {
-    frontImages.push({ href: officialAsset("UI_CMA_FriendCode_Base_00"), x: 211, y: 360.8, w: 276, h: 40 });
+    frontImages.push({ href: officialAsset("UI_CMA_FriendCode_Base_00"), ...MAI_FRIEND_CODE_BASE_RECT });
     frontRects.push(
       hasFriendCode
         ? { x: 245.8, y: 359.4, w: 192, h: 23.7 }
@@ -234,12 +234,12 @@ export function MaiOfficialHoloLayer({
     );
   }
   if (!hideRating) {
-    frontImages.push({ href: officialAsset(ratingBase), x: 212.4, y: 456.9, w: 280, h: 76 });
+    frontImages.push({ href: officialAsset(ratingBase), ...MAI_RATING_BASE_RECT });
     frontRects.push({ x: 333, y: 457, w: 138, h: 94 });
   }
   if (!hideSerialAndQR) {
-    frontImages.push({ href: officialAsset("UI_CMA_SerialCode_Base_00"), x: 0, y: -486.5, w: 490, h: 32 });
-    frontImages.push({ href: officialAsset("UI_CMA_QRCode_Base_00"), x: 249.7, y: -394.7, w: 164, h: 164 });
+    frontImages.push({ href: officialAsset("UI_CMA_SerialCode_Base_00"), ...MAI_SERIAL_CODE_BASE_RECT });
+    frontImages.push({ href: officialAsset("UI_CMA_QRCode_Base_00"), ...MAI_QR_CODE_BASE_RECT });
     frontRects.push({ x: -100.9, y: -488.7, w: 266, h: 18 });
     frontRects.push({ x: 171.3, y: -488.7, w: 266, h: 18 });
     frontRects.push({ x: 249.7, y: -394.7, w: 113, h: 113 });

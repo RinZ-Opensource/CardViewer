@@ -63,6 +63,15 @@ export const MAI_NAME_BASE_RECT = { x: -231, y: -308, w: 304, h: 82 } as const;
 export const MAI_PERIOD_LABEL_RECT = { x: -297.6, y: -314.4, w: 100.9, h: 25 } as const;
 export const MAI_CHARA_NAME_RECT = { x: -243.5, y: -281.4, w: 225.1, h: 25 } as const;
 export const MAI_END_DATE_RECT = { x: -169.9, y: -318.5, w: 131.2, h: 18.9 } as const;
+// Shared MAI card layer rects, used by both the visual card and the holo mask.
+export const MAI_EFFECT_ICON_RECT = { x: -303, y: -403, w: 112, h: 112 } as const;
+export const MAI_MASTER_ICON_RECT = { x: -193.2, y: -403, w: 112, h: 112 } as const;
+export const MAI_RATING_ICON_RECT = { x: -84, y: -403, w: 112, h: 112 } as const;
+export const MAI_PLAYER_NAME_BASE_RECT = { x: 211, y: 397, w: 276, h: 48 } as const;
+export const MAI_FRIEND_CODE_BASE_RECT = { x: 211, y: 360.8, w: 276, h: 40 } as const;
+export const MAI_RATING_BASE_RECT = { x: 212.4, y: 456.9, w: 280, h: 76 } as const;
+export const MAI_SERIAL_CODE_BASE_RECT = { x: 0, y: -486.5, w: 490, h: 32 } as const;
+export const MAI_QR_CODE_BASE_RECT = { x: 249.7, y: -394.7, w: 164, h: 164 } as const;
 export const MAI_HOLO_MASK_CODE_RECT = { x: 43.5, y: -407.5, w: 583, h: 197 } as const;
 export const MAI_HOLO_MASK_PLAYER_DATA_RECT = { x: 212.4, y: 434, w: 285, h: 127 } as const;
 export const MAI_HOLO_MASK_TEXT_BASE_RECT = { x: 350, y: 245, w: 70, h: 362 } as const;
