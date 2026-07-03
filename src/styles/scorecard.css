@@ -77,7 +77,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: auto;
+  overflow: hidden;
   min-height: 0;
 }
 
@@ -89,12 +89,11 @@
   flex: 0 0 auto;
 }
 
-.scorecard-stage {
-  overflow: hidden;
-}
-
 /* ---------------------------------------------------------------------------
- * maimai DX music-select detail card (design space: 284x464 sprite px)
+ * maimai DX music-select detail card
+ * Design space: 284x464 = MusicChainCard.prefab UI_Main. All coordinates below
+ * are converted from the prefab's RectTransforms (center-origin, +y up ->
+ * CSS top-left): left = cx + 142 - w/2, top = 227 - cy - h/2.
  * ------------------------------------------------------------------------- */
 
 .mai-scorecard {
@@ -104,7 +103,8 @@
   font-kerning: none;
 }
 
-.mai-scorecard img {
+.mai-scorecard img,
+.mai-scorecard .msc-box {
   user-select: none;
   -webkit-user-drag: none;
 }
@@ -116,21 +116,117 @@
   height: 464px;
 }
 
-.msc-type-plate {
+/* --- white-section backplates ---
+ * Prefab stacks navy Box_01 with the light Box_03 "blank" on top for the
+ * achievement/rank slots, so the visible plates there are the light ones;
+ * the DX-score strip keeps the navy Box_01/Box_02. Sprites are stretched
+ * (they are tiny rounded rects; corner distortion is negligible). */
+
+.msc-box {
   position: absolute;
-  left: 20px;
-  top: 33px;
-  width: 106px;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+.msc-box-achievement {
+  left: 23px;
+  top: 365.1px;
+  width: 104px;
+  height: 26px;
+  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_03.png");
+}
+
+.msc-box-rank {
+  left: 123px;
+  top: 365.1px;
+  width: 58px;
+  height: 26px;
+  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_03.png");
+}
+
+.msc-box-dxscore {
+  left: 22px;
+  top: 386.5px;
+  width: 160px;
+  height: 25px;
+  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_01.png");
+}
+
+/* Notched denominator plate (UI_MSS_MBase_Box_02) — shape matters, stretch it */
+.msc-box-dxscore-max {
+  left: 97px;
+  top: 387px;
+  width: 85px;
+  height: 36px;
+  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_02.png");
+}
+
+.msc-designer-label {
+  position: absolute;
+  left: 20.5px;
+  top: 405px;
+  width: 96px;
+  height: 16px;
+}
+
+.msc-dxscore-label {
+  position: absolute;
+  left: 32.6px;
+  top: 391px;
+  width: 70.4px;
+  height: 16px;
+}
+
+/* --- bookmark tabs (DX bump left / Standard bump right) --- */
+
+.msc-tab {
+  position: absolute;
+  left: 0;
+  width: 284px;
+  height: 68px;
+}
+
+.msc-tab-back {
+  top: 1.9px;
+}
+
+.msc-tab-front {
+  top: 2.9px;
+}
+
+.msc-pill {
+  position: absolute;
+  width: 116px;
+}
+
+.msc-pill.at-left {
+  left: 24px;
+}
+
+.msc-pill.at-right {
+  left: 144px;
+}
+
+.msc-pill-front {
+  top: 16.9px;
+}
+
+.msc-pill-back {
+  top: 24.9px;
+  filter: brightness(0.765);
 }
 
 .msc-jacket {
   position: absolute;
-  left: 43px;
-  top: 76px;
-  width: 198px;
-  height: 198px;
+  left: 42px;
+  top: 75px;
+  width: 200px;
+  height: 200px;
   object-fit: cover;
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.85));
 }
+
+/* --- difficulty banner + level --- */
 
 .msc-diff-banner {
   position: absolute;
@@ -139,19 +235,12 @@
   width: 240px;
 }
 
-.msc-lv-row {
+.msc-lv-base {
   position: absolute;
-  right: 26px;
-  top: 272px;
-  height: 34px;
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-}
-
-.msc-lv-label {
-  height: 14px;
-  margin-bottom: 4px;
+  left: 143px;
+  top: 234px;
+  width: 124px;
+  height: 76px;
 }
 
 .sprite-digits {
@@ -164,156 +253,209 @@
   background-repeat: no-repeat;
 }
 
-.msc-title {
+.msc-lv-glyph {
   position: absolute;
-  left: 28px;
-  width: 228px;
-  top: 305px;
-  height: 31px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
-  font-size: 15px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: visible;
+  left: 169.8px;
+  top: 258px;
 }
 
-.msc-artist {
+.msc-lv-value {
   position: absolute;
-  left: 28px;
-  width: 228px;
-  top: 336px;
+  left: 188px;
+  top: 253.5px;
+  width: 120px;
+  justify-content: center;
+}
+
+/* --- title / artist --- */
+
+.msc-title {
+  position: absolute;
+  left: 22px;
+  top: 307.5px;
+  width: 240px;
   height: 25px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
-  font-size: 10.5px;
+  font-family: var(--font-mai-rodin-eb, "Arial Black", sans-serif);
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.msc-artist {
+  position: absolute;
+  left: 22px;
+  top: 340.4px;
+  width: 240px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--font-sega-maru-db, "Yu Gothic", sans-serif);
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.msc-achievement {
+/* --- achievement row (NewRodin EB gold, flat, on the navy box) --- */
+
+.msc-ach {
   position: absolute;
-  left: 26px;
-  top: 369px;
-  display: flex;
-  align-items: flex-end;
+  top: 368px;
+  height: 20px;
+  line-height: 20px;
+  font-family: var(--font-mai-rodin-eb, "Arial Black", sans-serif);
+  font-size: 13px;
+  font-weight: 800;
+  color: #f2c805;
 }
 
-.msc-achievement-unit {
-  margin-left: 3px;
-  margin-bottom: 1px;
-  font-family: var(--font-mai-rodin, "Arial Black", sans-serif);
-  font-size: 17px;
-  font-weight: 800;
-  color: #ffc226;
-  -webkit-text-stroke: 1.1px #b3401d;
-  paint-order: stroke fill;
+.msc-ach-int {
+  left: 0;
+  width: 59px;
+  text-align: right;
+}
+
+.msc-ach-dec {
+  left: 59px;
+}
+
+.msc-ach-pct {
+  left: 104px;
+  width: 20px;
+  text-align: center;
 }
 
 .msc-rank {
   position: absolute;
-  right: 84px;
-  top: 375px;
-  height: 20px;
+  left: 128px;
+  top: 368.4px;
+  height: 19.2px;
 }
 
-.msc-badges {
+/* --- badge medals --- */
+
+.msc-medal {
   position: absolute;
-  right: 13px;
-  top: 366px;
-  display: flex;
-  gap: 2px;
+  width: 53px;
+  height: 53px;
 }
 
-.msc-badges img {
-  width: 35px;
-  height: 35px;
+.msc-medal-combo {
+  left: 173.5px;
+  top: 360.5px;
 }
 
-.msc-dxscore {
+.msc-medal-sync {
+  left: 214.5px;
+  top: 360.5px;
+}
+
+.msc-medal-blank {
   position: absolute;
-  left: 26px;
-  top: 401px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  width: 48px;
+  height: 48px;
 }
 
-.msc-dxscore-label {
-  height: 12px;
+.msc-medal-combo-blank {
+  left: 177px;
+  top: 364px;
 }
 
-.msc-dxscore-value {
-  font-family: var(--font-mai-rodin, "Arial Black", sans-serif);
-  font-size: 13px;
-  font-weight: 700;
+.msc-medal-sync-blank {
+  left: 218px;
+  top: 364px;
+}
+
+/* --- DX score row (MaruGothic DB white on the navy boxes) --- */
+
+.msc-dx-value,
+.msc-dx-slash,
+.msc-dx-max {
+  position: absolute;
   color: #fff;
-  -webkit-text-stroke: 1.1px #16386b;
-  paint-order: stroke fill;
-  letter-spacing: 0.02em;
+  font-family: var(--font-sega-maru-db, "Yu Gothic", sans-serif);
+  font-weight: 700;
 }
 
-.msc-dxscore-max {
-  font-size: 11px;
+.msc-dx-value {
+  right: 145px;
+  top: 391.5px;
+  font-size: 12px;
+  line-height: 15px;
 }
 
-.msc-designer-row {
-  position: absolute;
-  left: 26px;
-  top: 417px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.msc-dx-slash {
+  left: 139px;
+  width: 8px;
+  top: 392.5px;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
 }
 
-.msc-designer-label {
-  height: 9px;
+.msc-dx-max {
+  right: 107px;
+  top: 392.5px;
+  font-size: 10px;
+  line-height: 14px;
 }
+
+/* --- DX star pips: 5 always, earned orange / unearned blue-gray --- */
 
 .msc-stars {
+  position: absolute;
+  left: 124px;
+  top: 405px;
   display: flex;
   gap: 1px;
 }
 
-.msc-stars img {
+.msc-star-pip {
   width: 12px;
   height: 12px;
+  background-color: #8a9dd3;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
 }
 
-.msc-footer {
-  position: absolute;
-  left: 26px;
-  right: 22px;
-  top: 426px;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+.msc-star-pip.earned {
+  background-color: #f8b534;
 }
+
+/* --- designer / BPM footer --- */
 
 .msc-designer-name {
-  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
-  font-size: 9.5px;
+  position: absolute;
+  left: 26px;
+  top: 419px;
+  height: 15px;
+  line-height: 15px;
+  font-family: var(--font-sega-maru-db, "Yu Gothic", sans-serif);
+  font-size: 12px;
   font-weight: 700;
-  color: #fff;
-  -webkit-text-stroke: 0.9px #16386b;
-  paint-order: stroke fill;
+  color: #113f80;
   white-space: nowrap;
-  transform-origin: left;
 }
 
 .msc-bpm {
-  font-family: var(--font-mai-rodin, "Arial Black", sans-serif);
-  font-size: 9.5px;
+  position: absolute;
+  left: 195px;
+  top: 419px;
+  height: 15px;
+  line-height: 15px;
+  font-family: var(--font-sega-maru-db, "Yu Gothic", sans-serif);
+  font-size: 12px;
   font-weight: 700;
-  color: #fff;
-  -webkit-text-stroke: 0.9px #16386b;
-  paint-order: stroke fill;
+  color: #353535;
 }
 
 .scorecard-empty {

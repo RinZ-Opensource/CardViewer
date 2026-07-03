@@ -10,7 +10,7 @@ export function maiJacket(songId: number) {
   return `${MAI_SCORECARD_ROOT}/jackets/jacket_${songId}.png`;
 }
 
-/** Sprite-name suffix per difficulty, shared by MBase / LvBase / banner text. */
+/** Sprite-name suffix per difficulty, shared by MBase / Tab / banner text / LvBase. */
 export const MAI_DIFF_SUFFIX: Record<MaiDifficulty, string> = {
   basic: "BSC",
   advanced: "ADV",
@@ -60,12 +60,14 @@ export const MAI_SYNC_SPRITE: Record<Exclude<MaiSyncBadge, "none">, string> = {
   fsdp: "UI_MSS_MBase_Icon_FSDp",
 };
 
-/** DX star sprite tier: 1-2 stars bronze, 3-4 silver, 5 gold. */
-export function maiStarSprite(starCount: number) {
-  if (starCount >= 5) return "UI_MSS_DXScore_Star_03";
-  if (starCount >= 3) return "UI_MSS_DXScore_Star_02";
-  return "UI_MSS_DXScore_Star_01";
-}
+/**
+ * DX-score star pip colors from MusicChainCard's _starColors:
+ * earned = orange, unearned = blue-gray. Pips use the star silhouette as a
+ * CSS mask so both states come from one sprite.
+ */
+export const MAI_STAR_EARNED = "#f8b534";
+export const MAI_STAR_UNEARNED = "#8a9dd3";
+export const MAI_STAR_SPRITE = "UI_MSS_DXScore_Star_02";
 
 interface DigitSheet {
   /** Sheet grid cell size in native sprite px. */
@@ -76,7 +78,11 @@ interface DigitSheet {
   glyphs: Record<string, [number, number]>;
 }
 
-/** UI_NUM_MLevel_XX: 192x240, 4x4 grid of 48x60 cells. */
+/**
+ * UI_NUM_MLevel_XX: 192x240, 4x4 grid of 48x60 cells — the source texture of
+ * the UI_CMN_MusicLevel_* sprites the game feeds to SpriteCounter.
+ * "L" maps to the "Lv" glyph cell.
+ */
 export const MAI_LEVEL_DIGITS: DigitSheet = {
   cellWidth: 48,
   cellHeight: 60,
@@ -86,20 +92,6 @@ export const MAI_LEVEL_DIGITS: DigitSheet = {
     "0": [0, 0], "1": [1, 0], "2": [2, 0], "3": [3, 0],
     "4": [0, 1], "5": [1, 1], "6": [2, 1], "7": [3, 1],
     "8": [0, 2], "9": [1, 2], "+": [2, 2], "-": [3, 2],
-    ",": [0, 3], ".": [1, 3],
-  },
-};
-
-/** UI_NUM_Score_0001111_Gold: 296x392, 4x4 grid of 74x98 cells. */
-export const MAI_SCORE_DIGITS: DigitSheet = {
-  cellWidth: 74,
-  cellHeight: 98,
-  columns: 4,
-  rows: 4,
-  glyphs: {
-    "0": [0, 0], "1": [1, 0], "2": [2, 0], "3": [3, 0],
-    "4": [0, 1], "5": [1, 1], "6": [2, 1], "7": [3, 1],
-    "8": [0, 2], "9": [1, 2], "+": [2, 2], "-": [3, 2],
-    ",": [0, 3], ".": [1, 3],
+    ",": [0, 3], ".": [1, 3], "L": [2, 3],
   },
 };

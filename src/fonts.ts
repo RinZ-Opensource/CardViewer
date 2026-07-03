@@ -53,6 +53,7 @@ html[data-deployment-mode="private"] {
   --font-official-number: "CardViewer NewRodin", "Impact", "Arial Black", sans-serif;
   --font-mai-kaku: "CardViewer SegaKakuDB", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-mai-rodin: "CardViewer NewRodinDB", "CardViewer NewRodin", "Arial Black", sans-serif;
+  --font-mai-rodin-eb: "CardViewer NewRodin", "Arial Black", sans-serif;
 }`;
   document.head.append(style);
 }
