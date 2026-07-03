@@ -11,6 +11,21 @@ const MASK_ALPHA_EPSILON = 8;
 // reliably cleared around printed art/text edges.
 const FRONT_MASK_DILATION = 7;
 
+// Tuning for the luminance-keyed mask modes ("light-or-alpha"/"dark-or-alpha").
+// Per-image coverage gates decide whether to key off luminance at all; the
+// chosen ramp then maps luminance (0-255) to mask alpha via clamp((edge±lum)/span).
+const MASK_LUMINANCE = {
+  lightPivot: 128, // luminance at/above which a pixel counts as "light"
+  darkPivot: 144, // luminance at/below which a pixel counts as "dark"
+  coverageGate: 0.72, // min alpha coverage before luminance keying applies
+  darkModeCoverageGate: 0.42, // looser gate for the explicit dark-or-alpha mode
+  lightBand: { min: 0.01, max: 0.96 }, // light-coverage band selecting the light ramp
+  darkBand: { min: 0.005, max: 0.98 }, // dark-coverage band selecting the dark ramp
+  darkRamp: { edge: 212, span: 168 },
+  lightRamp: { edge: 24, span: 200 },
+  brightRamp: { edge: 232, span: 200 },
+};
+
 export function HoloShaderLayer({
   card,
   assetDataUrls,
@@ -723,27 +738,28 @@ function normalizeMaskData(data: Uint8ClampedArray, mode: HoloRootMaskMode) {
     if (alpha <= MASK_ALPHA_EPSILON) continue;
     alphaPixels += 1;
     const luminance = 0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2];
-    if (luminance >= 128) lightPixels += 1;
-    if (luminance <= 144) darkPixels += 1;
+    if (luminance >= MASK_LUMINANCE.lightPivot) lightPixels += 1;
+    if (luminance <= MASK_LUMINANCE.darkPivot) darkPixels += 1;
   }
 
   const alphaCoverage = alphaPixels / totalPixels;
   const lightCoverage = alphaPixels > 0 ? lightPixels / alphaPixels : 0;
   const darkCoverage = alphaPixels > 0 ? darkPixels / alphaPixels : 0;
-  const useLightLuminance = alphaCoverage > 0.72 && lightCoverage > 0.01 && lightCoverage < 0.96;
-  const useDarkLuminance = alphaCoverage > 0.72 && lightCoverage >= 0.96;
-  const preferDarkLuminance = mode === "dark-or-alpha" && alphaCoverage > 0.42 && darkCoverage > 0.005 && darkCoverage < 0.98;
+  const useLightLuminance = alphaCoverage > MASK_LUMINANCE.coverageGate && lightCoverage > MASK_LUMINANCE.lightBand.min && lightCoverage < MASK_LUMINANCE.lightBand.max;
+  const useDarkLuminance = alphaCoverage > MASK_LUMINANCE.coverageGate && lightCoverage >= MASK_LUMINANCE.lightBand.max;
+  const preferDarkLuminance = mode === "dark-or-alpha" && alphaCoverage > MASK_LUMINANCE.darkModeCoverageGate && darkCoverage > MASK_LUMINANCE.darkBand.min && darkCoverage < MASK_LUMINANCE.darkBand.max;
 
+  const { darkRamp, lightRamp, brightRamp } = MASK_LUMINANCE;
   for (let index = 0; index < data.length; index += 4) {
     const alpha = data[index + 3];
     const luminance = 0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2];
     let maskAlpha = alpha;
     if (preferDarkLuminance) {
-      maskAlpha = alpha * clampNumber((212 - luminance) / 168, 0, 1);
+      maskAlpha = alpha * clampNumber((darkRamp.edge - luminance) / darkRamp.span, 0, 1);
     } else if (useLightLuminance) {
-      maskAlpha = alpha * clampNumber((luminance - 24) / 200, 0, 1);
+      maskAlpha = alpha * clampNumber((luminance - lightRamp.edge) / lightRamp.span, 0, 1);
     } else if (useDarkLuminance) {
-      maskAlpha = alpha * clampNumber((232 - luminance) / 200, 0, 1);
+      maskAlpha = alpha * clampNumber((brightRamp.edge - luminance) / brightRamp.span, 0, 1);
     }
     data[index] = maskAlpha;
     data[index + 1] = maskAlpha;
