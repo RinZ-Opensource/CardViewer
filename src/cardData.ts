@@ -15,6 +15,9 @@ export function randomDigitString(length: number) {
   return Array.from(digits, (value) => String(value % 10)).join("");
 }
 
+// Print-field keys checked, in order, to derive a card's display name.
+const DISPLAY_NAME_FIELD_KEYS = ["characterName", "charaName", "userName"];
+
 export function applyEdits(card: CardRecord, edits?: CardEdits): CardRecord {
   if (!edits) return card;
   const editedPrintFields = Object.keys(edits);
@@ -23,11 +26,7 @@ export function applyEdits(card: CardRecord, edits?: CardEdits): CardRecord {
     if (value === undefined) return field;
     return { ...field, value: String(value) };
   });
-  const printedName = firstPrintedValue(printFields, [
-    "characterName",
-    "charaName",
-    "userName",
-  ]);
+  const printedName = firstPrintedValue(printFields, DISPLAY_NAME_FIELD_KEYS);
   return {
     ...card,
     printFields,
