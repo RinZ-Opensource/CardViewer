@@ -168,9 +168,8 @@ export function clearCanvas(canvas: HTMLCanvasElement) {
   context?.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-// The atlas cache holds one image per font texture (a handful), so it needs no
-// bound. The per-glyph canvas cache is keyed by glyph × size × kind × color and
-// can grow with the variety of rendered text, so cap it with an LRU.
+// The atlas cache holds one image per font texture (unbounded is fine). The
+// per-glyph canvas cache can grow with text variety, so bound it with an LRU.
 export const tmpAtlasCache = new Map<string, Promise<HTMLImageElement>>();
 export const TMP_GLYPH_CANVAS_CACHE_MAX = 4096;
 export const tmpGlyphCanvasCache = new LruMap<string, HTMLCanvasElement>({

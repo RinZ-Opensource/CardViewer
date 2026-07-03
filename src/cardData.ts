@@ -321,7 +321,6 @@ export function maiCardTypeEffects(card: CardRecord) {
 }
 
 export function maiEffectFlags(card: CardRecord) {
-  // numericField already returns 0 for a missing/blank/non-numeric field.
   return numericField(card, "extendBitParameter", 0);
 }
 
@@ -428,9 +427,8 @@ export function mu3RarityKind(card: CardRecord) {
   return "N";
 }
 
-// Title-block names, derived identically by the visual card and the holo mask.
-// `characterName` is the common-model name; `baseCharacterName` is used by the
-// non-common card and the asset card.
+// Title-block names (shared by the visual card and the holo mask): characterName
+// is the common-model name, baseCharacterName the non-common / asset-card name.
 export function mu3CardNames(card: CardRecord) {
   const fallback = fieldString(card, "characterName") || card.displayName;
   return {

@@ -196,9 +196,8 @@ export function cardLightStyle(tilt: { x: number; y: number }, mode: ViewMode): 
   const rightEdge = clampNumber(0.18 - tilt.y / 85, 0.04, 0.48);
   const shiftX = clampNumber((bgX - 50) * 0.78, -14, 14);
   const shiftY = clampNumber((bgY - 50) * 0.58, -12, 12);
-  // Drive a strong, angle-dependent hue sweep for the holographic foil.
-  // Horizontal tilt does most of the work; vertical adds a secondary shift so
-  // the spectrum visibly travels as the card is moved in any direction.
+  // Angle-dependent hue sweep for the foil: horizontal tilt dominates, vertical
+  // adds a secondary shift so the spectrum travels as the card moves.
   const holoHue = clampNumber((pointerX - 50) * 3.4 + (pointerY - 50) * 1.5, -210, 210);
   const spectrumAngle = clampNumber(108 + (pointerX - 50) * 0.7 - (pointerY - 50) * 0.5, 70, 150);
 

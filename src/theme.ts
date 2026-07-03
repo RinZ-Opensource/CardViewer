@@ -1,14 +1,9 @@
 import React from "react";
 
-// Light / dark / follow-system theme handling for the app chrome.
-//
-// The *preference* (light | dark | system) is persisted; the *resolved* theme
-// (always a concrete light | dark) is written to <html data-theme>, which the
-// CSS in styles.css keys off. Resolving "system" in JS means the stylesheet
-// only needs a single :root[data-theme="dark"] block — no duplicated
-// prefers-color-scheme media query. The same storage key and resolution logic
-// are mirrored, intentionally minimally, in public/theme-init.js so the initial
-// theme is applied before first paint (no flash). Keep the two in sync.
+// Light / dark / follow-system theme for the app chrome. The preference is
+// persisted; the resolved theme (concrete light|dark) is written to
+// <html data-theme> for the CSS. The same logic is mirrored in
+// public/theme-init.js to apply it before first paint — keep the two in sync.
 
 export type ThemePreference = "light" | "dark" | "system";
 
@@ -53,10 +48,8 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-// Apply the theme with a crossfade: the View Transitions API when available (the
-// whole page crossfades between light and dark), otherwise a brief colour
-// transition on the chrome via the .theme-anim class. Switches instantly when the
-// user prefers reduced motion.
+// Apply the theme with a crossfade: View Transitions API when available, else a
+// brief .theme-anim colour transition; instant when reduced-motion is preferred.
 export function applyThemeAnimated(preference: ThemePreference): void {
   if (prefersReducedMotion()) {
     applyResolvedTheme(preference);

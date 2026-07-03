@@ -151,9 +151,8 @@ export type HoloCssMaskOptions = {
   invertApplicationArea?: boolean;
 };
 
-// Named inputs for the holo mask builder. Grouping them (instead of ~10
-// positional args) keeps call sites self-documenting and removes the transpose
-// risk between the identically-typed signMask/signClear/exclude image arrays.
+// Named inputs for the holo mask builder — grouping them (vs ~10 positional args)
+// self-documents call sites and removes the signMask/signClear transpose risk.
 export type HoloMaskInput = {
   rootImages: HoloMaskImage[];
   frontImages: HoloMaskImage[];
@@ -449,10 +448,8 @@ export function useOfficialHoloMask(input: HoloMaskInput, enabled: boolean) {
     tmpFont = null,
     options = {},
   } = input;
-  // Serialize the raw mask inputs directly so any field added to HoloMaskImage /
-  // HoloTmpTextMask automatically participates in the memo key (no hand-kept
-  // field list to fall out of sync and leave a stale mask). tmpFont is reduced
-  // to a small identity tuple since its glyph table is too large to stringify.
+  // Serialize the raw inputs so any new mask field auto-participates in the memo
+  // key (no hand-kept list to drift). tmpFont reduced to an identity tuple.
   const maskKey = JSON.stringify({
     enabled,
     options,
@@ -745,9 +742,8 @@ function normalizeMaskData(data: Uint8ClampedArray, mode: HoloRootMaskMode) {
     return;
   }
 
-  // "light-or-alpha" / "dark-or-alpha": decide per-image whether to key the mask
-  // off luminance (keep only bright, or only dark, pixels) or fall back to plain
-  // alpha, based on how much of the image is covered and how light/dark it is.
+  // "light-or-alpha" / "dark-or-alpha": key off luminance (bright- or dark-only)
+  // when coverage warrants, else fall back to plain alpha. See MASK_LUMINANCE.
   let alphaPixels = 0;
   let lightPixels = 0;
   let darkPixels = 0;

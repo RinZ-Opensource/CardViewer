@@ -53,9 +53,8 @@ export function App() {
     scanResult?.streamingAssets,
   );
 
-  // Precompute one lowercased haystack per card so typing only re-runs cheap
-  // substring checks instead of rebuilding+lowercasing every card's fields on
-  // each keystroke. Rebuilt only when the cards or their edits change.
+  // One lowercased haystack per card, so typing only re-runs cheap substring
+  // checks; rebuilt only when the cards or their edits change.
   const searchIndex = React.useMemo(() => {
     const index = new Map<string, string>();
     for (const card of displayCards) {

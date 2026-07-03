@@ -1,6 +1,5 @@
-/* Printed-card text overlay (.print-*), preview placeholder / meta overlays,
-   the editor panel, and all responsive @media overrides (kept last so they win
-   over the base rules by source order, exactly as in the original file). */
+/* Printed-card text overlay (.print-*), preview/meta overlays, the editor panel,
+   and the responsive @media overrides (kept last so they win by source order). */
 
 .print-layer {
   position: absolute;

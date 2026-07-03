@@ -10,8 +10,7 @@ import { loadStaticScanResult } from "./manifest";
 import { mockScanResult } from "./mockData";
 import { CardEdits, CardRecord, LoadedAssetDataUrls, LoadedImageDataUrl, OfficialFontKey, PrintFieldValue, ScanResult, TmpFontMetrics, UnityFontMetrics } from "./types";
 
-// Loads the Unity bitmap fonts and the TMP SDF font used by the official card
-// renderers. No-op outside the private/official deployment.
+// Loads the official Unity + TMP fonts; no-op outside the private deployment.
 export function useOfficialFonts() {
   const [officialFonts, setOfficialFonts] = React.useState<
     Partial<Record<OfficialFontKey, UnityFontMetrics>>
@@ -186,9 +185,8 @@ export function useCardEdits() {
   return { edits, updateCardField, updatePlayerField, resetCardEdits };
 }
 
-// Tracks the card list's scroll position and height (via ResizeObserver) so the
-// caller can compute the virtual window. Returns the ref to attach to the
-// scroll container plus an onScroll handler.
+// Tracks the card list's scroll position and height (via ResizeObserver) for the
+// caller's virtual-window math.
 export function useCardListViewport() {
   const cardListRef = React.useRef<HTMLElement | null>(null);
   const [cardListViewport, setCardListViewport] = React.useState({ height: 0, scrollTop: 0 });
@@ -252,10 +250,8 @@ export function useSelectedImageDataUrl(selected: CardRecord | null, selectedIma
     return () => {
       cancelled = true;
     };
-    // `selected` is intentionally not a dependency: the only thing the effect
-    // reads from it (the resolved image path) is `selectedImagePath`, which the
-    // caller derives from `selected` and which becomes "" when it clears. Adding
-    // `selected` would re-run on unrelated edits without changing the result.
+    // `selected` intentionally omitted: the effect only reads selectedImagePath
+    // (derived from it by the caller), so depending on it adds redundant re-runs.
   }, [selectedImagePath]);
 
   return loadedImageDataUrl?.path === selectedImagePath ? loadedImageDataUrl.dataUrl : "";
@@ -304,24 +300,19 @@ export function useSelectedAssetDataUrls(
     return () => {
       cancelled = true;
     };
-    // `selected` and `streamingAssets` are intentionally not listed: both feed
-    // into `selectedAssetsSignature` (computed by the caller from exactly those
-    // two), so any layer-affecting change already flips the signature and
-    // re-runs this effect. Depending on them directly would only add redundant
-    // re-runs for fields that don't change the visible layers.
+    // `selected` / `streamingAssets` intentionally omitted: both feed
+    // selectedAssetsSignature, so any layer-affecting change already re-runs this.
   }, [selected?.dataName, selectedAssetsSignature]);
 
   return loadedAssetDataUrls.signature === selectedAssetsSignature ? loadedAssetDataUrls.urls : {};
 }
 
-// Loads thumbnails for the given cards, batching state updates per animation
-// frame and de-duplicating in-flight/cached requests. Returns a dataName->url map.
-// Keeps at most this many decoded thumbnails in component state. Evicted
-// entries still live in the (LRU-bounded) imageDataUrlCache, so scrolling back
-// re-resolves them instantly. The cap is far larger than any on-screen window,
-// so currently-visible thumbnails are never the ones dropped.
+// Max decoded thumbnails kept in component state (FIFO); evicted entries remain
+// in the LRU imageDataUrlCache, so scrolling back re-resolves instantly.
 export const THUMB_CACHE_MAX_ENTRIES = 2048;
 
+// Loads thumbnails for the given cards, batching state updates per frame and
+// de-duplicating in-flight/cached requests.
 export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
   const [thumbCache, setThumbCache] = React.useState<Record<string, string>>({});
   const thumbCacheRef = React.useRef<Record<string, string>>({});
