@@ -16,11 +16,15 @@ export const imageDataUrlCache = new LruMap<string, string>({
   sizeOf: (value) => value.length,
 });
 export const imageDataUrlPending = new Map<string, Promise<string>>();
-export let activeImageLoads = 0;
-export const highPriorityImageLoads: Array<() => void> = [];
-export const queuedImageLoads: Array<() => void> = [];
 
-export function scheduleImageLoad<T>(
+// Concurrency scheduler state, private to this module: at most
+// IMAGE_LOAD_CONCURRENCY loads run at once; the rest wait in a high-priority or
+// normal queue and are drained as slots free up.
+let activeImageLoads = 0;
+const highPriorityImageLoads: Array<() => void> = [];
+const queuedImageLoads: Array<() => void> = [];
+
+function scheduleImageLoad<T>(
   task: () => Promise<T>,
   priority: ImageLoadPriority = "normal",
 ): Promise<T> {
@@ -47,7 +51,7 @@ export function scheduleImageLoad<T>(
   });
 }
 
-export function runNextImageLoad() {
+function runNextImageLoad() {
   const next = highPriorityImageLoads.shift() ?? queuedImageLoads.shift();
   next?.();
 }
