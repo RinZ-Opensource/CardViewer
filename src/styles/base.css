@@ -31,6 +31,10 @@
      src/theme.ts (runtime).
      ============================================================ */
   color-scheme: light;
+  /* Layout tokens (not theme-dependent): shared control height and radii. */
+  --control-h: 34px;
+  --radius-sm: 7px;
+  --radius-md: 8px;
   --ui-bg: #eef2f4;
   --ui-shell-bg: linear-gradient(90deg, #eef6f5 0%, #eef2f4 36%, #f5f3ef 100%);
   --ui-stage-bg: linear-gradient(135deg, #f7faf9 0%, #e3ecec 52%, #f7f3ee 100%);
@@ -235,7 +239,7 @@ button {
 .editor-panel.empty,
 .editor-section {
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--ui-surface);
 }
 
@@ -307,8 +311,8 @@ small,
 .primary-button,
 .ghost-button,
 .segment button {
-  min-height: 34px;
-  border-radius: 7px;
+  min-height: var(--control-h);
+  border-radius: var(--radius-sm);
   padding: 0 14px;
   white-space: nowrap;
 }
@@ -369,7 +373,7 @@ small,
 .control select {
   width: 100%;
   border: 1px solid var(--ui-input-border);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--ui-surface);
   color: var(--ui-text);
   outline: none;
@@ -521,10 +525,10 @@ small,
 .filter-control select {
   width: 100%;
   min-width: 0;
-  height: 34px;
+  height: var(--control-h);
   padding: 0 9px;
   border: 1px solid var(--ui-input-border);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--ui-surface);
   color: var(--ui-text);
   outline: none;
@@ -541,7 +545,7 @@ small,
   gap: 4px;
   margin-top: 10px;
   padding: 4px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--ui-ghost-bg);
 }
 
@@ -592,7 +596,7 @@ small,
   width: 100%;
   padding: 8px 10px 8px 8px;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--ui-surface);
   color: var(--ui-text);
   text-align: left;
@@ -669,11 +673,11 @@ small,
 .theme-toggle {
   display: inline-grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  min-height: 34px;
+  width: var(--control-h);
+  height: var(--control-h);
+  min-height: var(--control-h);
   flex: none;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--ui-ghost-bg);
   color: var(--ui-text-heading);
 }
@@ -701,7 +705,7 @@ small,
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--ui-stage-bg);
   perspective: 900px;
 }

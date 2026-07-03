@@ -1,6 +1,11 @@
 /* Card rendering: the preview container and the faithful reproduction of the
    official / maimai / CHUNITHM / public card faces. Intentionally NOT themed. */
 
+:root {
+  /* maimai printed-ink brown, reused across the name / period / friend labels. */
+  --card-mai-brown: #5a3900;
+}
+
 .card-preview {
   width: min(55vh, 520px);
   aspect-ratio: 768 / 1052;
@@ -296,7 +301,7 @@
 }
 
 .mai-friend-empty {
-  color: #5a3900;
+  color: var(--card-mai-brown);
   font-family: var(--font-sega-maru);
   font-size: 10px;
   font-weight: 800;
@@ -315,7 +320,7 @@
 .mai-period {
   align-items: flex-start;
   justify-content: center;
-  color: #5a3900;
+  color: var(--card-mai-brown);
   font-size: 11px;
   text-align: center;
 }
@@ -329,7 +334,7 @@
 .mai-chara,
 .mai-period-label,
 .mai-period {
-  color: #5a3900;
+  color: var(--card-mai-brown);
 }
 
 .official-qr {
