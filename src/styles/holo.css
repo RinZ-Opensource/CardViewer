@@ -21,12 +21,7 @@
   transform: none;
 }
 
-.holo-layer img,
-.holo-mask-pass,
-.holo-color-mask,
-.holo-material-mask,
-.holo-rainbow,
-.holo-fixed-light {
+.holo-layer img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -39,32 +34,6 @@
   --holo-light-y: 22%;
 }
 
-.holo-mask-pass {
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-}
-
-.holo-color-mask {
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-mode: luminance;
-  mask-mode: luminance;
-}
-
-.holo-material-mask {
-  opacity: 1;
-  mix-blend-mode: color-dodge;
-}
-
-.default-holo-mask {
-  -webkit-mask-image: url("/official/UI_Card_Horo_CharaMask_00.png");
-  mask-image: url("/official/UI_Card_Horo_CharaMask_00.png");
-}
-
 .holo-mu3 {
   opacity: 1;
   filter: none;
@@ -75,61 +44,6 @@
   opacity: 1;
   filter: none;
   mix-blend-mode: normal;
-}
-
-.holo-mask-preview-plane {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  opacity: 0.7;
-  transform: translateZ(0);
-  isolation: isolate;
-  mix-blend-mode: normal;
-  -webkit-mask-position: 0 0;
-  mask-position: 0 0;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-}
-
-.holo-mai .holo-mask-preview-plane {
-  opacity: 0.64;
-}
-
-.holo-mask-preview-fill {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    url("/official/UI_Card_Horo_Pattern_00.png"),
-    url("/img/glitter.png"),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 1px, rgba(0, 0, 0, 0) 1px 8px),
-    linear-gradient(135deg, rgba(82, 84, 88, 0.9), rgba(24, 25, 28, 0.9) 46%, rgba(98, 99, 104, 0.86));
-  background-blend-mode: soft-light, overlay, screen, normal;
-  background-position:
-    var(--holo-fine-x, 56%) var(--holo-fine-y, 43%),
-    var(--holo-bg-x-inv, 53%) var(--holo-bg-y, 40%),
-    var(--holo-bg-x, 47%) center,
-    center;
-  background-size: 128px 128px, 42% 42%, 10px 100%, 100% 100%;
-  filter: grayscale(1) contrast(1.25) brightness(0.82);
-}
-
-.holo-mu3 .holo-mask-preview-fill {
-  background:
-    url("/official/UI_Card_Horo_Pattern_00.png"),
-    url("/img/glitter.png"),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.13) 0 1px, rgba(0, 0, 0, 0) 1px 9px),
-    linear-gradient(135deg, rgba(78, 80, 85, 0.9), rgba(22, 23, 26, 0.9) 48%, rgba(91, 92, 98, 0.86));
-  background-blend-mode: soft-light, overlay, screen, normal;
-  background-position:
-    var(--holo-fine-x, 56%) var(--holo-fine-y, 43%),
-    var(--holo-bg-x-inv, 53%) var(--holo-bg-y, 40%),
-    center var(--holo-bg-y, 40%),
-    center;
-  background-size: 128px 128px, 42% 42%, 100% 10px, 100% 100%;
-  filter: grayscale(1) contrast(1.25) brightness(0.82);
 }
 
 .holo-foil-plane {
@@ -150,15 +64,6 @@
   opacity: var(--holo-opacity, 0.98);
   transform: translateZ(0);
   isolation: isolate;
-  -webkit-mask-position: 0 0;
-  mask-position: 0 0;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-}
-
-.mu3-holo-dom-mask {
   -webkit-mask-position: 0 0;
   mask-position: 0 0;
   -webkit-mask-repeat: no-repeat;
@@ -317,31 +222,20 @@
   mix-blend-mode: hard-light;
 }
 
-/* =====================================================================
-   MU3 bright rainbow holo (refactored)
-   - Keeps the engraved swirl micro-pattern (UI_Card_Horo_Pattern_00) as
-     structure, but lifts it into a vivid full-spectrum rainbow that
-     sweeps hue with viewing angle (--holo-hue) and stays bright.
-   - Scoped to .holo-foil-mu3 so MAI / public foils are unaffected.
-   ===================================================================== */
+/* MU3 cosmos / glitter foil (scoped to .holo-foil-mu3; MAI reuses it, public is
+   unaffected): a bright silvery field of tiny multicolour sparkle flecks whose
+   hue rides the viewing angle (--holo-hue), not a smooth saturated rainbow. */
 .holo-foil-mu3 {
-  /* Cosmos / glitter holo, matching the printed O.N.G.E.K.I. SR foil: a bright
-     silvery field densely covered in tiny multicolour sparkle flecks, NOT a
-     smooth saturated rainbow.
-     --mu3-sparkle: fractal turbulence pushed through a steep gamma so only the
-       peaks survive -> sparse bright colour specks (the "stardust"). */
+  /* --mu3-sparkle: fractal turbulence through a steep gamma so only the peaks
+     survive -> sparse bright colour specks (the "stardust"). */
   --mu3-sparkle:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='gamma' amplitude='1.6' exponent='3.5' offset='0'/%3E%3CfeFuncG type='gamma' amplitude='1.6' exponent='3.5' offset='0'/%3E%3CfeFuncB type='gamma' amplitude='1.6' exponent='3.5' offset='0'/%3E%3CfeFuncA type='linear' slope='0' intercept='1'/%3E%3C/feComponentTransfer%3E%3CfeColorMatrix type='saturate' values='3.4'/%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23s)'/%3E%3C/svg%3E");
   /* --mu3-sparkle-fine: a second, smaller-scale speck field for depth. */
   --mu3-sparkle-fine:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='sf'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' seed='23' stitchTiles='stitch'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='gamma' amplitude='1.6' exponent='4' offset='0'/%3E%3CfeFuncG type='gamma' amplitude='1.6' exponent='4' offset='0'/%3E%3CfeFuncB type='gamma' amplitude='1.6' exponent='4' offset='0'/%3E%3CfeFuncA type='linear' slope='0' intercept='1'/%3E%3C/feComponentTransfer%3E%3CfeColorMatrix type='saturate' values='3'/%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23sf)'/%3E%3C/svg%3E");
-  /* --mu3-bed: a very PALE rainbow (silvery pastel, low saturation) centred on
-     the moving light point. It is faint enough that neighbouring flecks keep
-     their own independent random colours, but because it is a continuous
-     spectrum, hue-rotating it by viewing angle gives a clearly visible overall
-     colour cast that sweeps green -> blue -> pink as the card tilts. This is
-     what makes the angle colour-change perceptible again without turning the
-     flecks back into a continuous rainbow. */
+  /* --mu3-bed: a very pale pastel rainbow centred on the light point, faint
+     enough that flecks keep their own colours but continuous enough that
+     hue-rotating it by viewing angle gives a visible overall colour cast. */
   --mu3-bed:
     radial-gradient(
       150% 150% at var(--holo-bg-x, 47%) var(--holo-bg-y, 40%),
@@ -392,12 +286,9 @@
     center,
     50% 50%,
     var(--holo-bg-x, 47%) var(--holo-bg-y, 40%);
-  /* sparkle screened on top (its OWN random per-fleck colour), engraved grain
-     soft-lit into the silver bed for texture - no continuous rainbow underneath,
-     so neighbouring flecks are independent colours. The sparkle and grain are
-     anchored to the card (fixed positions); only the silver highlight follows
-     the light and the hue rotates, so the flecks stay put and twinkle in place
-     instead of sliding as the card tilts. */
+  /* Sparkle and grain are anchored to the card (fixed positions); only the
+     silver highlight follows the light and the hue rotates, so flecks twinkle
+     in place instead of sliding as the card tilts. */
   background-blend-mode: screen, soft-light, normal;
   filter:
     hue-rotate(var(--holo-hue, 0deg))
@@ -475,78 +366,9 @@
   mix-blend-mode: hard-light;
 }
 
-.holo-foil-mai {
-  opacity: calc(var(--holo-opacity, 0.9) * 0.82);
-}
-
-.holo-foil-mai .holo-foil-base {
-  filter: brightness(calc((var(--holo-pointer-from-center, 0.35) * 0.28) + 0.86)) contrast(1.85) saturate(1.45);
-}
-
-.holo-foil-mai .holo-foil-glints,
-.holo-foil-mai .holo-foil-sparkles {
-  opacity: calc(var(--holo-sparkle-opacity, 0.9) * 0.58);
-}
-
 .holo-foil-public {
   -webkit-mask-image: none;
   mask-image: none;
-}
-
-.holo-bg-mask {
-  opacity: 0.8;
-  mix-blend-mode: color-dodge;
-}
-
-.holo-frame-mask {
-  opacity: 1;
-  mix-blend-mode: color-dodge;
-}
-
-.holo-frame-add {
-  opacity: 0.78;
-}
-
-.holo-pattern-mask {
-  opacity: 0.56;
-  mix-blend-mode: color-dodge;
-}
-
-.holo-sign-pass {
-  opacity: 0.86;
-  mix-blend-mode: screen;
-}
-
-.holo-sign-mask {
-  opacity: 0.95;
-  mix-blend-mode: color-dodge;
-}
-
-.holo-rainbow {
-  opacity: 0.92;
-  mix-blend-mode: color-dodge;
-  background:
-    linear-gradient(115deg, rgba(255, 35, 87, 0.72), rgba(255, 220, 68, 0.68), rgba(35, 235, 165, 0.68), rgba(50, 170, 255, 0.72), rgba(190, 80, 255, 0.72), rgba(255, 35, 87, 0.72)),
-    repeating-linear-gradient(62deg, rgba(255, 255, 255, 0.24) 0 6px, rgba(255, 255, 255, 0) 6px 18px),
-    radial-gradient(circle at 28% 20%, rgba(255, 255, 255, 0.44), transparent 22%);
-  background-size: 180% 180%, 220px 220px, 100% 100%;
-}
-
-.holo-rainbow-mask {
-  opacity: 1;
-  filter: saturate(1.55) contrast(1.12);
-}
-
-.holo-fixed-light {
-  opacity: 0.7;
-  mix-blend-mode: screen;
-  background:
-    radial-gradient(circle at var(--holo-light-x) var(--holo-light-y), rgba(255, 255, 255, 0.92) 0 4%, rgba(255, 255, 255, 0.42) 10%, rgba(120, 255, 240, 0.2) 18%, transparent 34%),
-    radial-gradient(circle at calc(var(--holo-light-x) + 18%) calc(var(--holo-light-y) + 20%), rgba(255, 255, 180, 0.32), transparent 28%);
-}
-
-.holo-fixed-light-mask {
-  opacity: 0.82;
 }
 
 @keyframes holoSparkleTwinkle {
@@ -595,28 +417,6 @@
   66% {
     opacity: 0.9;
     transform: translate(0, 0);
-  }
-}
-
-@keyframes holoSvgGlintPulse {
-  0%,
-  100% {
-    opacity: 0.62;
-  }
-  33% {
-    opacity: 1;
-  }
-  66% {
-    opacity: 0.82;
-  }
-}
-
-@keyframes holoInterferencePulse {
-  from {
-    opacity: 0.4;
-  }
-  to {
-    opacity: 0.68;
   }
 }
 

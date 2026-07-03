@@ -515,11 +515,11 @@ export function calcCounterFigures(rawValue: string, flags: number) {
 }
 
 export function counterFigureWidth(figure: number, digitWidth: number, signWidth: number) {
-  return figure === 10 || figure === 11 || figure === 12 || figure === 13 ? signWidth : digitWidth;
+  return figure === 10 || figure === 11 || figure === 12 ? signWidth : digitWidth;
 }
 
 export function counterFigureHeight(figure: number, digitHeight: number, signHeight: number) {
-  return figure === 10 || figure === 11 || figure === 12 || figure === 13 ? signHeight : digitHeight;
+  return figure === 10 || figure === 11 || figure === 12 ? signHeight : digitHeight;
 }
 
 export function counterFigureBackgroundPosition(figure: number) {
@@ -537,10 +537,6 @@ export function counterFigureBackgroundPosition(figure: number) {
     case 12:
       col = 3;
       row = 2;
-      break;
-    case 13:
-      col = 0;
-      row = 3;
       break;
     default:
       col = figure & 3;

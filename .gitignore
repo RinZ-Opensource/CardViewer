@@ -7,6 +7,7 @@ dist/
 .analysis/package-sample/CardMaker_Data/Managed/*.dll
 
 # Local tooling caches
+.claude/
 .venv/
 .wrangler/
 __pycache__/

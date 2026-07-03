@@ -3,6 +3,36 @@ import { OFFICIAL_ASSET_ROOT } from "./constants";
 import { LruMap } from "./lru";
 import { Bounds, TmpFontMetrics, TmpGlyph, UnityFontMetrics } from "./types";
 
+// Cap the canvas backing-store scale: 1x floor for crispness, 2.5x ceiling to
+// bound memory/CPU on hi-DPI displays; assume 2x during SSR (no window).
+const CANVAS_MIN_DPR = 1;
+const CANVAS_MAX_DPR = 2.5;
+const SSR_DPR = 2;
+
+export function getPixelRatio() {
+  return typeof window === "undefined"
+    ? SSR_DPR
+    : Math.max(CANVAS_MIN_DPR, Math.min(CANVAS_MAX_DPR, window.devicePixelRatio || 1));
+}
+
+// Fallback glyph codepoints when a character is missing from the atlas:
+// U+25A1 white square, then '?'.
+const MISSING_GLYPH_CODEPOINT = "9633";
+const QUESTION_MARK_CODEPOINT = "63";
+
+// Unity TextAnchor grid: alignment 0-8 = vertical*3 + horizontal, each axis
+// 0=start, 1=center, 2=end.
+function decodeUnityAnchor(alignment: number) {
+  return { horizontal: alignment % 3, vertical: Math.floor(alignment / 3) };
+}
+
+// Offset of `content` within `container` for anchor pos 0=start/1=center/2=end.
+function alignOffset(pos: number, container: number, content: number) {
+  if (pos === 1) return (container - content) / 2;
+  if (pos === 2) return container - content;
+  return 0;
+}
+
 export function renderCanvasText(
   canvas: HTMLCanvasElement,
   text: string,
@@ -19,8 +49,7 @@ export function renderCanvasText(
     characterSpacing: number;
   },
 ) {
-  const pixelRatio =
-    typeof window === "undefined" ? 2 : Math.max(1, Math.min(2.5, window.devicePixelRatio || 1));
+  const pixelRatio = getPixelRatio();
   const canvasWidth = Math.max(1, Math.ceil(options.w * pixelRatio));
   const canvasHeight = Math.max(1, Math.ceil(options.h * pixelRatio));
   if (canvas.width !== canvasWidth) canvas.width = canvasWidth;
@@ -38,16 +67,14 @@ export function renderCanvasText(
   const lines = text.split(/\r?\n/);
   const lineHeight = options.fontSize * options.lineSpacing;
   const totalHeight = lineHeight * Math.max(1, lines.length);
-  const vertical = Math.floor(options.alignment / 3);
-  const horizontal = options.alignment % 3;
-  const top = vertical === 0 ? 0 : vertical === 1 ? (options.h - totalHeight) / 2 : options.h - totalHeight;
+  const { horizontal, vertical } = decodeUnityAnchor(options.alignment);
+  const top = alignOffset(vertical, options.h, totalHeight);
 
   lines.forEach((line, lineIndex) => {
     const lineWidth = Math.max(1, measureCanvasLine(context, line, options.characterSpacing));
     const fitScale = options.fitHorizontal ? Math.min(1, options.w / lineWidth) : 1;
     const drawWidth = lineWidth * fitScale;
-    const left =
-      horizontal === 0 ? 0 : horizontal === 1 ? (options.w - drawWidth) / 2 : options.w - drawWidth;
+    const left = alignOffset(horizontal, options.w, drawWidth);
     context.save();
     context.translate(left, top + lineIndex * lineHeight);
     context.scale(fitScale, 1);
@@ -101,6 +128,21 @@ export type TmpHorizontalAlign = "left" | "center" | "right";
 export type TmpVerticalAlign = "top" | "middle" | "bottom";
 export const TMP_TEXT_PADDING = 36;
 
+// Map TMP's string aligns onto the same 0=start / 1=center / 2=end index the
+// Unity anchor helpers use, so all three text pipelines share alignOffset.
+const TMP_H_INDEX: Record<TmpHorizontalAlign, number> = { left: 0, center: 1, right: 2 };
+const TMP_V_INDEX: Record<TmpVerticalAlign, number> = { top: 0, middle: 1, bottom: 2 };
+
+// Face / outline tints (RGB) per variant, mirroring the in-game TMP material.
+const TMP_FACE_COLOR: Record<TmpTextVariant, number[]> = {
+  main: [255, 255, 255],
+  shadow: [38, 146, 192],
+};
+const TMP_OUTLINE_COLOR: Record<TmpTextVariant, number[]> = {
+  main: [37, 146, 193],
+  shadow: [30, 128, 178],
+};
+
 export type TmpTextRenderOptions = {
   w: number;
   h: number;
@@ -126,9 +168,8 @@ export function clearCanvas(canvas: HTMLCanvasElement) {
   context?.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-// The atlas cache holds one image per font texture (a handful), so it needs no
-// bound. The per-glyph canvas cache is keyed by glyph × size × kind × color and
-// can grow with the variety of rendered text, so cap it with an LRU.
+// The atlas cache holds one image per font texture (unbounded is fine). The
+// per-glyph canvas cache can grow with text variety, so bound it with an LRU.
 export const tmpAtlasCache = new Map<string, Promise<HTMLImageElement>>();
 export const TMP_GLYPH_CANVAS_CACHE_MAX = 4096;
 export const tmpGlyphCanvasCache = new LruMap<string, HTMLCanvasElement>({
@@ -179,8 +220,7 @@ export function rasterizeTmpText(
   text: string,
   options: TmpTextRenderOptions,
 ): RasterizedTextLayer | null {
-  const pixelRatio =
-    typeof window === "undefined" ? 2 : Math.max(1, Math.min(2.5, window.devicePixelRatio || 1));
+  const pixelRatio = getPixelRatio();
   const logicalWidth = options.w + options.padding * 2;
   const logicalHeight = options.h + options.padding * 2;
   const canvasWidth = Math.max(1, Math.ceil(logicalWidth * pixelRatio));
@@ -211,22 +251,12 @@ export function rasterizeTmpText(
   const fontScale = effectiveSize / font.fontInfo.PointSize;
   const lineHeight = font.fontInfo.LineHeight * fontScale;
   const totalHeight = lineHeight * Math.max(1, lines.length);
-  const top =
-    options.verticalAlign === "top"
-      ? options.padding
-      : options.verticalAlign === "middle"
-        ? options.padding + (options.h - totalHeight) / 2
-        : options.padding + options.h - totalHeight;
-  const mainColor = options.variant === "main" ? [255, 255, 255] : [38, 146, 192];
-  const outlineColor = options.variant === "main" ? [37, 146, 193] : [30, 128, 178];
+  const top = options.padding + alignOffset(TMP_V_INDEX[options.verticalAlign], options.h, totalHeight);
+  const mainColor = TMP_FACE_COLOR[options.variant];
+  const outlineColor = TMP_OUTLINE_COLOR[options.variant];
   lines.forEach((line, lineIndex) => {
     const lineWidth = measureTmpLine(font, line, effectiveSize, options.characterSpacing);
-    const originX =
-      options.horizontalAlign === "left"
-        ? options.padding
-        : options.horizontalAlign === "center"
-          ? options.padding + (options.w - lineWidth) / 2
-          : options.padding + options.w - lineWidth;
+    const originX = options.padding + alignOffset(TMP_H_INDEX[options.horizontalAlign], options.w, lineWidth);
     const baseline = top + lineIndex * lineHeight + font.fontInfo.Ascender * fontScale;
     const sharedRun = {
       dpr: pixelRatio,
@@ -416,10 +446,17 @@ export function canvasAlphaBounds(
   };
 }
 
+// Per-layer SDF coverage: `edge` is the ~50% coverage distance sample (0-255),
+// `softness` the antialiasing half-width around it.
+const SDF_THRESHOLDS: Record<"face" | "outline" | "underlay", { edge: number; softness: number }> = {
+  face: { edge: 152, softness: 22 },
+  outline: { edge: 88, softness: 34 },
+  underlay: { edge: 74, softness: 42 },
+};
+
 export function tmpSdfAlpha(value: number, kind: "face" | "outline" | "underlay") {
-  if (kind === "face") return smoothAlpha(value, 152, 22);
-  if (kind === "outline") return smoothAlpha(value, 88, 34);
-  return smoothAlpha(value, 74, 42);
+  const { edge, softness } = SDF_THRESHOLDS[kind];
+  return smoothAlpha(value, edge, softness);
 }
 
 export function smoothAlpha(value: number, edge: number, softness: number) {
@@ -449,7 +486,7 @@ export function measureTmpLine(
 
 export function tmpGlyph(font: TmpFontMetrics, char: string) {
   const code = char.codePointAt(0) ?? 0;
-  return font.glyphs[String(code)] ?? font.glyphs["9633"] ?? font.glyphs["63"];
+  return font.glyphs[String(code)] ?? font.glyphs[MISSING_GLYPH_CODEPOINT] ?? font.glyphs[QUESTION_MARK_CODEPOINT];
 }
 
 export function reactText(children: React.ReactNode) {
@@ -489,10 +526,8 @@ export function layoutUnityText(
   const fitScaleX = fitHorizontal ? Math.min(1, rectWidth / maxWidth) : 1;
   const lineHeight = font.lineSpacing * scale * lineSpacing;
   const totalHeight = lineHeight * Math.max(1, lines.length);
-  const vertical = Math.floor(alignment / 3);
-  const horizontal = alignment % 3;
-  const topBase =
-    vertical === 0 ? 0 : vertical === 1 ? (rectHeight - totalHeight) / 2 : rectHeight - totalHeight;
+  const { horizontal, vertical } = decodeUnityAnchor(alignment);
+  const topBase = alignOffset(vertical, rectHeight, totalHeight);
   const output: Array<{
     key: string;
     style: React.CSSProperties;
@@ -505,8 +540,7 @@ export function layoutUnityText(
 
   laidOutLines.forEach((line, lineIndex) => {
     const lineWidth = line.width * fitScaleX;
-    const lineLeft =
-      horizontal === 0 ? 0 : horizontal === 1 ? (rectWidth - lineWidth) / 2 : rectWidth - lineWidth;
+    const lineLeft = alignOffset(horizontal, rectWidth, lineWidth);
     let cursor = 0;
 
     line.chars.forEach((char, charIndex) => {
@@ -554,6 +588,6 @@ export function layoutUnityText(
 
 export function unityGlyph(font: UnityFontMetrics, char: string) {
   const code = char.codePointAt(0) ?? 0;
-  return font.chars[String(code)] ?? font.chars["9633"] ?? font.chars["63"];
+  return font.chars[String(code)] ?? font.chars[MISSING_GLYPH_CODEPOINT] ?? font.chars[QUESTION_MARK_CODEPOINT];
 }
 

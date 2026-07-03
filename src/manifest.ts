@@ -1,9 +1,8 @@
 import { STATIC_MANIFEST_URL } from "./constants";
 import { CardRecord, OnlineManifestIndex, OnlineManifestShard, ScanResult } from "./types";
 
-// Cap how many manifest shards we fetch at once and bound each request, so a
-// manifest with hundreds of shards can't open hundreds of simultaneous
-// connections or hang forever on a stalled response.
+// Cap concurrent shard fetches and bound each request, so a many-shard manifest
+// can't open hundreds of connections or hang on a stalled response.
 export const SHARD_FETCH_CONCURRENCY = 6;
 export const SHARD_FETCH_TIMEOUT_MS = 30_000;
 
@@ -78,10 +77,8 @@ export async function loadStaticScanResult(
     const index = await fetchJson<OnlineManifestIndex>(indexUrl);
     if (!index.shards.length) return scanResultFromIndex(index, []);
 
-    // Fetch every shard concurrently right after the index (no first-then-rest
-    // waterfall), capped/timed by mapWithConcurrency. The first shard still
-    // drives an early partial render as soon as it resolves; result order is
-    // preserved so the merged card order is stable.
+    // Fetch all shards concurrently (capped by mapWithConcurrency); the first
+    // drives an early partial render, and order is preserved for a stable merge.
     const shardResults = await mapWithConcurrency(
       index.shards,
       SHARD_FETCH_CONCURRENCY,
@@ -97,7 +94,10 @@ export async function loadStaticScanResult(
     );
     const cards = shardResults.flatMap((shard) => shard.cards);
     return scanResultFromIndex(index, cards);
-  } catch {
+  } catch (err) {
+    // Fall back to a single legacy (non-sharded) manifest, but surface the
+    // original error so real failures aren't silently masked by the fallback.
+    console.warn("Sharded manifest load failed; trying legacy manifest", err);
     return fetchJson<ScanResult>(STATIC_MANIFEST_URL);
   }
 }

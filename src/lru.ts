@@ -1,7 +1,5 @@
-// A small Map-compatible LRU cache. Eviction is driven by a max entry count
-// and/or a byte budget (via `sizeOf`); the least-recently-used entry is dropped
-// first. `get`/`set` both refresh recency. Used to bound the long-lived image
-// and glyph caches so a long browsing session can't grow memory without limit.
+// A small Map-compatible LRU cache bounded by entry count and/or a byte budget
+// (via `sizeOf`). get/set refresh recency; the least-recently-used is evicted.
 export class LruMap<K, V> {
   private readonly map = new Map<K, V>();
   private readonly sizes = new Map<K, number>();

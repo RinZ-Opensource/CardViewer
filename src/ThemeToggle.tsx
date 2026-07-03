@@ -1,4 +1,3 @@
-import React from "react";
 import { ThemePreference, useThemePreference } from "./theme";
 
 // A single compact control that cycles through the three modes, so the feature

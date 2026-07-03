@@ -22,15 +22,16 @@
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  /* ============================================================
-     UI chrome theme tokens. Light by default; dark overrides live
-     in :root[data-theme="dark"] below. The card-art styles further
-     down faithfully reproduce the real cards and are intentionally
-     NOT themed. The resolved theme (light|dark) is written to
-     <html data-theme> by public/theme-init.js (pre-paint) and
-     src/theme.ts (runtime).
-     ============================================================ */
+  /* UI chrome theme tokens; dark overrides live in :root[data-theme="dark"].
+     Card-art styles further down are intentionally NOT themed. */
   color-scheme: light;
+  /* Layout tokens (not theme-dependent): shared control height and radii. */
+  --control-h: 34px;
+  --radius-sm: 7px;
+  --radius-md: 8px;
+  /* Card-row thumbnail width; the row's grid column is driven from the same
+     value. Overridden inside the narrow-viewport breakpoint in ui.css. */
+  --thumb-w: 46px;
   --ui-bg: #eef2f4;
   --ui-shell-bg: linear-gradient(90deg, #eef6f5 0%, #eef2f4 36%, #f5f3ef 100%);
   --ui-stage-bg: linear-gradient(135deg, #f7faf9 0%, #e3ecec 52%, #f7f3ee 100%);
@@ -235,7 +236,7 @@ button {
 .editor-panel.empty,
 .editor-section {
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--ui-surface);
 }
 
@@ -296,7 +297,6 @@ p,
 small,
 .field-label,
 .control span,
-.stats-grid span,
 .preview-meta,
 .edit-json summary {
   color: var(--ui-text-muted);
@@ -307,8 +307,8 @@ small,
 .primary-button,
 .ghost-button,
 .segment button {
-  min-height: 34px;
-  border-radius: 7px;
+  min-height: var(--control-h);
+  border-radius: var(--radius-sm);
   padding: 0 14px;
   white-space: nowrap;
 }
@@ -369,7 +369,7 @@ small,
 .control select {
   width: 100%;
   border: 1px solid var(--ui-input-border);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--ui-surface);
   color: var(--ui-text);
   outline: none;
@@ -397,42 +397,6 @@ small,
 .control select:focus {
   border-color: var(--ui-accent);
   box-shadow: 0 0 0 3px var(--ui-accent-ring);
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.stats-grid div {
-  min-width: 0;
-  padding: 9px;
-  border-radius: 7px;
-  background: var(--ui-tile-bg);
-}
-
-.stats-grid strong {
-  display: block;
-  font-size: 17px;
-  color: var(--ui-text-strong);
-}
-
-.error-line,
-.saved-line {
-  margin-top: 12px;
-  font-size: 12px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.error-line {
-  color: var(--ui-danger);
-}
-
-.saved-line {
-  color: var(--ui-accent);
 }
 
 .error-toast {
@@ -557,10 +521,10 @@ small,
 .filter-control select {
   width: 100%;
   min-width: 0;
-  height: 34px;
+  height: var(--control-h);
   padding: 0 9px;
   border: 1px solid var(--ui-input-border);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--ui-surface);
   color: var(--ui-text);
   outline: none;
@@ -577,7 +541,7 @@ small,
   gap: 4px;
   margin-top: 10px;
   padding: 4px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--ui-ghost-bg);
 }
 
@@ -621,14 +585,14 @@ small,
 .card-row {
   position: relative;
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) 8px;
+  grid-template-columns: var(--thumb-w) minmax(0, 1fr) 8px;
   align-items: center;
   gap: 11px;
   min-height: 75px;
   width: 100%;
   padding: 8px 10px 8px 8px;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--ui-surface);
   color: var(--ui-text);
   text-align: left;
@@ -642,7 +606,7 @@ small,
 .thumb-slot {
   display: grid;
   place-items: center;
-  width: 46px;
+  width: var(--thumb-w);
   height: 64px;
   overflow: hidden;
   border-radius: 6px;
@@ -702,14 +666,44 @@ small,
   gap: 10px;
 }
 
+/* Card name + inline load spinner (spinner shows only while scanning). */
+.preview-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.preview-spinner {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--ui-text-muted) 32%, transparent);
+  border-top-color: var(--ui-accent);
+  animation: preview-spin 0.7s linear infinite;
+}
+
+@keyframes preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview-spinner {
+    animation-duration: 1.8s;
+  }
+}
+
 .theme-toggle {
   display: inline-grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  min-height: 34px;
+  width: var(--control-h);
+  height: var(--control-h);
+  min-height: var(--control-h);
   flex: none;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--ui-ghost-bg);
   color: var(--ui-text-heading);
 }
@@ -737,7 +731,7 @@ small,
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--ui-stage-bg);
   perspective: 900px;
 }

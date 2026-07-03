@@ -1,10 +1,9 @@
 import { applyEdits, randomDigitString } from "./cardData";
+import { PLAYER_EDIT_KEYS } from "./cardEdits";
 import { CardEdits, CardRecord, PrintField, PrintFieldValue } from "./types";
 
-const PLAYER_FIELD_KEYS = new Set(["userName", "rating", "friendCode"]);
-
 function isPlayerField(field: PrintField) {
-  return PLAYER_FIELD_KEYS.has(field.key);
+  return PLAYER_EDIT_KEYS.has(field.key);
 }
 
 export function EditorPanel({

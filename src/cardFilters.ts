@@ -14,6 +14,21 @@ export type CardFilterConfig = {
   options: FilterOption[];
 };
 
+// Facet dropdowns per game: each is a filter key + its display label (also used
+// as the placeholder). The option list is derived from the cards at build time.
+const GAME_FACETS: Record<string, Array<{ key: string; label: string }>> = {
+  MAI: [
+    { key: "mai.type", label: "Type" },
+    { key: "mai.character", label: "Character" },
+    { key: "mai.version", label: "Version" },
+  ],
+  MU3: [
+    { key: "mu3.rarity", label: "Rarity" },
+    { key: "mu3.character", label: "Character" },
+    { key: "mu3.version", label: "Version" },
+  ],
+};
+
 export function buildFilterConfig(
   cards: CardRecord[],
   edits: Record<string, CardEdits>,
@@ -22,54 +37,21 @@ export function buildFilterConfig(
   const games = uniqueOptions(cards.map((card) => card.game));
   const filters: CardFilterConfig[] = [];
   const selectedGame = activeFilters.game || (games[0]?.value ?? "");
+  const facets = GAME_FACETS[selectedGame];
+  if (!facets) return filters;
 
-  if (selectedGame === "MAI") {
-    const maiCards = cards.filter((card) => card.game === "MAI");
+  // Merge each card's edits once, then derive every facet's options from the
+  // merged cards (instead of re-running applyEdits per card per facet).
+  const mergedGameCards = cards
+    .filter((card) => card.game === selectedGame)
+    .map((card) => applyEdits(card, effectiveCardEdits(edits, card)));
+  for (const facet of facets) {
     pushFilter(
       filters,
-      "mai.type",
-      "Type",
-      "Type",
-      uniqueOptions(maiCards.map((card) => cardFilterValue(card, effectiveCardEdits(edits, card), "mai.type"))),
-    );
-    pushFilter(
-      filters,
-      "mai.character",
-      "Character",
-      "Character",
-      uniqueOptions(maiCards.map((card) => cardFilterValue(card, effectiveCardEdits(edits, card), "mai.character"))),
-    );
-    pushFilter(
-      filters,
-      "mai.version",
-      "Version",
-      "Version",
-      uniqueOptions(maiCards.map((card) => cardFilterValue(card, effectiveCardEdits(edits, card), "mai.version"))),
-    );
-  }
-
-  if (selectedGame === "MU3") {
-    const mu3Cards = cards.filter((card) => card.game === "MU3");
-    pushFilter(
-      filters,
-      "mu3.rarity",
-      "Rarity",
-      "Rarity",
-      uniqueOptions(mu3Cards.map((card) => cardFilterValue(card, effectiveCardEdits(edits, card), "mu3.rarity"))),
-    );
-    pushFilter(
-      filters,
-      "mu3.character",
-      "Character",
-      "Character",
-      uniqueOptions(mu3Cards.map((card) => cardFilterValue(card, effectiveCardEdits(edits, card), "mu3.character"))),
-    );
-    pushFilter(
-      filters,
-      "mu3.version",
-      "Version",
-      "Version",
-      uniqueOptions(mu3Cards.map((card) => cardFilterValue(card, effectiveCardEdits(edits, card), "mu3.version"))),
+      facet.key,
+      facet.label,
+      facet.label,
+      uniqueOptions(mergedGameCards.map((card) => mergedCardFilterValue(card, facet.key))),
     );
   }
 
@@ -98,15 +80,15 @@ function naturalCompare(left: string, right: string) {
 }
 
 export function cardMatchesFilters(card: CardRecord, edits: CardEdits | undefined, filters: Record<string, string>) {
+  const merged = applyEdits(card, edits);
   for (const [key, expected] of Object.entries(filters)) {
     if (!expected) continue;
-    if (cardFilterValue(card, edits, key) !== expected) return false;
+    if (mergedCardFilterValue(merged, key) !== expected) return false;
   }
   return true;
 }
 
-function cardFilterValue(card: CardRecord, edits: CardEdits | undefined, key: string) {
-  const merged = applyEdits(card, edits);
+function mergedCardFilterValue(merged: CardRecord, key: string) {
   switch (key) {
     case "game":
       return merged.game;
@@ -135,21 +117,18 @@ function firstCardField(card: CardRecord, keys: string[]) {
   return "";
 }
 
+// Card frame tiers by in-game typeId (5 is unused / has no distinct frame).
+const MAI_TYPE_NAMES: Record<string, string> = {
+  "2": "Bronze",
+  "3": "Silver",
+  "4": "Gold",
+  "6": "Freedom",
+};
+
 function maiTypeName(typeId: string) {
-  switch (typeId.trim()) {
-    case "2":
-      return "Bronze";
-    case "3":
-      return "Silver";
-    case "4":
-      return "Gold";
-    case "6":
-      return "Freedom";
-    case "":
-      return "";
-    default:
-      return `Type ${typeId.trim()}`;
-  }
+  const id = typeId.trim();
+  if (!id) return "";
+  return MAI_TYPE_NAMES[id] ?? `Type ${id}`;
 }
 
 function normalizedVersion(value: string) {

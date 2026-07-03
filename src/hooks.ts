@@ -1,12 +1,16 @@
 import React from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { assetLayerLoadPriority, visibleAssetLayers } from "./cards";
-import { USE_OFFICIAL_ASSETS, canInvokeTauri } from "./constants";
+import { maiLinkedPrintEdits } from "./cardData";
+import { PLAYER_EDIT_KEYS, SHARED_PLAYER_EDITS_KEY, sharedPlayerEdits } from "./cardEdits";
+import { DEFAULT_PACKAGE_ROOT, EDIT_STORAGE_KEY, USE_OFFICIAL_ASSETS, canInvokeTauri } from "./constants";
 import { loadOfficialFonts, loadOfficialTmpFont } from "./fonts";
 import { isStaticAssetPath, readCachedImageDataUrl } from "./imageLoader";
-import { CardRecord, LoadedAssetDataUrls, LoadedImageDataUrl, OfficialFontKey, TmpFontMetrics, UnityFontMetrics } from "./types";
+import { loadStaticScanResult } from "./manifest";
+import { mockScanResult } from "./mockData";
+import { CardEdits, CardRecord, LoadedAssetDataUrls, LoadedImageDataUrl, OfficialFontKey, PrintFieldValue, ScanResult, TmpFontMetrics, UnityFontMetrics } from "./types";
 
-// Loads the Unity bitmap fonts and the TMP SDF font used by the official card
-// renderers. No-op outside the private/official deployment.
+// Loads the official Unity + TMP fonts; no-op outside the private deployment.
 export function useOfficialFonts() {
   const [officialFonts, setOfficialFonts] = React.useState<
     Partial<Record<OfficialFontKey, UnityFontMetrics>>
@@ -34,9 +38,159 @@ export function useOfficialFonts() {
   return { officialFonts, tmpFont };
 }
 
-// Tracks the card list's scroll position and height (via ResizeObserver) so the
-// caller can compute the virtual window. Returns the ref to attach to the
-// scroll container plus an onScroll handler.
+// Loads the card scan once on mount: exported static manifest first, then a
+// mock dataset in the browser, then the Tauri package scan as a fallback.
+// `setSelectedId` is threaded in so a completed load can seed the selection.
+export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction<string>>) {
+  const [scanResult, setScanResult] = React.useState<ScanResult | null>(null);
+  const [packageRoot, setPackageRoot] = React.useState(DEFAULT_PACKAGE_ROOT);
+  const [status, setStatus] = React.useState("Ready");
+  const [error, setError] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
+  const autoLoadStartedRef = React.useRef(false);
+  const loadSequenceRef = React.useRef(0);
+
+  React.useEffect(() => {
+    if (!error) return;
+    const timer = window.setTimeout(() => setError(""), 5000);
+    return () => window.clearTimeout(timer);
+  }, [error]);
+
+  React.useEffect(() => {
+    if (autoLoadStartedRef.current) return;
+    autoLoadStartedRef.current = true;
+
+    const scanPackage = async () => {
+      setError("");
+      setLoading(true);
+      const tauriAvailable = canInvokeTauri();
+      const loadId = loadSequenceRef.current + 1;
+      loadSequenceRef.current = loadId;
+      const isCurrentLoad = () => loadSequenceRef.current === loadId;
+      const applyScanResult = (result: ScanResult) => {
+        const nextDisplayCards = result.cards.filter((card) => card.recordType === "Card");
+        setScanResult(result);
+        setPackageRoot(result.packageRoot || packageRoot);
+        setSelectedId((current) =>
+          nextDisplayCards.some((card) => card.dataName === current)
+            ? current
+            : nextDisplayCards[0]?.dataName ?? "",
+        );
+      };
+
+      try {
+        setStatus("Loading exported manifest");
+        try {
+          const result = await loadStaticScanResult((partial, loadedCards, totalCards) => {
+            if (!isCurrentLoad()) return;
+            applyScanResult(partial);
+            setStatus(
+              `Loaded ${loadedCards.toLocaleString()} of ${totalCards.toLocaleString()} exported records`,
+            );
+          });
+          if (!isCurrentLoad()) return;
+          applyScanResult(result);
+          setStatus(`Loaded ${result.cards.length.toLocaleString()} exported records`);
+          return;
+        } catch {
+          if (!tauriAvailable) {
+            const result = mockScanResult(packageRoot);
+            if (!isCurrentLoad()) return;
+            applyScanResult(result);
+            setStatus("Browser preview data loaded");
+            return;
+          }
+          setStatus("Manifest unavailable; scanning package");
+        }
+
+        const result = await invoke<ScanResult>("scan_package", { packageRoot });
+        if (!isCurrentLoad()) return;
+        applyScanResult(result);
+        setStatus(`Loaded ${result.cards.length.toLocaleString()} records`);
+      } catch (err) {
+        if (!isCurrentLoad()) return;
+        setError(String(err));
+        setStatus("Scan failed");
+      } finally {
+        if (isCurrentLoad()) setLoading(false);
+      }
+    };
+
+    void scanPackage();
+  }, [packageRoot, setSelectedId]);
+
+  return { scanResult, status, error, setError, loading };
+}
+
+// Owns the persisted print-edit state and the mutations against it. Per-card
+// edits are keyed by dataName; player-data edits (name / rating / friend code)
+// are shared across cards under a single key.
+export function useCardEdits() {
+  const [edits, setEdits] = React.useState<Record<string, CardEdits>>(() => {
+    const raw = localStorage.getItem(EDIT_STORAGE_KEY);
+    if (!raw) return {};
+    try {
+      return JSON.parse(raw) as Record<string, CardEdits>;
+    } catch {
+      return {};
+    }
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(edits));
+  }, [edits]);
+
+  const updateCardField = React.useCallback((card: CardRecord, fieldKey: string, value: PrintFieldValue) => {
+    setEdits((prev) => ({
+      ...prev,
+      [card.dataName]: {
+        ...prev[card.dataName],
+        ...maiLinkedPrintEdits(card, fieldKey, value),
+      },
+    }));
+  }, []);
+
+  const updatePlayerField = React.useCallback((fieldKey: string, value: PrintFieldValue) => {
+    if (!PLAYER_EDIT_KEYS.has(fieldKey)) return;
+    setEdits((prev) => {
+      const next: Record<string, CardEdits> = {
+        ...prev,
+        [SHARED_PLAYER_EDITS_KEY]: {
+          ...sharedPlayerEdits(prev),
+          [fieldKey]: value,
+        },
+      };
+
+      // A player field now lives under the shared key, so drop any stale
+      // per-card copy (and the card entry if it becomes empty).
+      for (const [key, cardEdits] of Object.entries(prev)) {
+        if (key === SHARED_PLAYER_EDITS_KEY || cardEdits[fieldKey] === undefined) continue;
+        const cleaned = { ...cardEdits };
+        delete cleaned[fieldKey];
+        if (Object.keys(cleaned).length === 0) {
+          delete next[key];
+        } else {
+          next[key] = cleaned;
+        }
+      }
+
+      return next;
+    });
+  }, []);
+
+  const resetCardEdits = React.useCallback((card: CardRecord) => {
+    setEdits((prev) => {
+      const next = { ...prev };
+      delete next[card.dataName];
+      return next;
+    });
+  }, []);
+
+  return { edits, updateCardField, updatePlayerField, resetCardEdits };
+}
+
+// Tracks the card list's scroll position and height (via ResizeObserver) for the
+// caller's virtual-window math.
 export function useCardListViewport() {
   const cardListRef = React.useRef<HTMLElement | null>(null);
   const [cardListViewport, setCardListViewport] = React.useState({ height: 0, scrollTop: 0 });
@@ -100,10 +254,8 @@ export function useSelectedImageDataUrl(selected: CardRecord | null, selectedIma
     return () => {
       cancelled = true;
     };
-    // `selected` is intentionally not a dependency: the only thing the effect
-    // reads from it (the resolved image path) is `selectedImagePath`, which the
-    // caller derives from `selected` and which becomes "" when it clears. Adding
-    // `selected` would re-run on unrelated edits without changing the result.
+    // `selected` intentionally omitted: the effect only reads selectedImagePath
+    // (derived from it by the caller), so depending on it adds redundant re-runs.
   }, [selectedImagePath]);
 
   return loadedImageDataUrl?.path === selectedImagePath ? loadedImageDataUrl.dataUrl : "";
@@ -152,24 +304,19 @@ export function useSelectedAssetDataUrls(
     return () => {
       cancelled = true;
     };
-    // `selected` and `streamingAssets` are intentionally not listed: both feed
-    // into `selectedAssetsSignature` (computed by the caller from exactly those
-    // two), so any layer-affecting change already flips the signature and
-    // re-runs this effect. Depending on them directly would only add redundant
-    // re-runs for fields that don't change the visible layers.
+    // `selected` / `streamingAssets` intentionally omitted: both feed
+    // selectedAssetsSignature, so any layer-affecting change already re-runs this.
   }, [selected?.dataName, selectedAssetsSignature]);
 
   return loadedAssetDataUrls.signature === selectedAssetsSignature ? loadedAssetDataUrls.urls : {};
 }
 
-// Loads thumbnails for the given cards, batching state updates per animation
-// frame and de-duplicating in-flight/cached requests. Returns a dataName->url map.
-// Keeps at most this many decoded thumbnails in component state. Evicted
-// entries still live in the (LRU-bounded) imageDataUrlCache, so scrolling back
-// re-resolves them instantly. The cap is far larger than any on-screen window,
-// so currently-visible thumbnails are never the ones dropped.
+// Max decoded thumbnails kept in component state (FIFO); evicted entries remain
+// in the LRU imageDataUrlCache, so scrolling back re-resolves instantly.
 export const THUMB_CACHE_MAX_ENTRIES = 2048;
 
+// Loads thumbnails for the given cards, batching state updates per frame and
+// de-duplicating in-flight/cached requests.
 export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
   const [thumbCache, setThumbCache] = React.useState<Record<string, string>>({});
   const thumbCacheRef = React.useRef<Record<string, string>>({});

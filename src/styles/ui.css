@@ -1,6 +1,5 @@
-/* Printed-card text overlay (.print-*), preview placeholder / meta overlays,
-   the editor panel, and all responsive @media overrides (kept last so they win
-   over the base rules by source order, exactly as in the original file). */
+/* Printed-card text overlay (.print-*), preview/meta overlays, the editor panel,
+   and the responsive @media overrides (kept last so they win by source order). */
 
 .print-layer {
   position: absolute;
@@ -497,13 +496,12 @@
   }
 
   .card-row {
-    grid-template-columns: 42px minmax(0, 1fr) 8px;
+    --thumb-w: 42px;
     gap: 9px;
     min-height: 72px;
   }
 
   .thumb-slot {
-    width: 42px;
     height: 59px;
   }
 

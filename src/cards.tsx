@@ -1,6 +1,6 @@
 import React from "react";
-import { Mu3LimitBreakStars, clampInt, fieldBool, fieldNumber, fieldString, formatDisplaySerial, formatMaiEndDate, maiCardTypeEffects, maiEffectIconAsset, maiFrameAssets, maiOfficialHolo, maiRatingBaseAsset, mu3AttackValue, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3FrameAsset, mu3NeedsSign, mu3RareSpriteName, mu3RarityKind, mu3ShowMainFrame, mu3SkillAsset, numericField, officialHolo, qrSource, twoDigits } from "./cardData";
-import { CANVAS_FONT_SEGA_MARU_DB, CARD_TILT_X_MAX, CARD_TILT_Y_MAX, MAI_CHARA_NAME_RECT, MAI_END_DATE_RECT, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MU3_AWAKEN_MARK_RECT, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
+import { clampInt, fieldBool, fieldNumber, fieldString, formatDisplaySerial, formatMaiEndDate, maiCardTypeEffects, maiCharaChoice, maiEffectIconAsset, maiFrameAssets, maiOfficialHolo, maiRatingBaseAsset, mu3AttackValue, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3FrameAsset, mu3MaxOwnCount, mu3NeedsSign, mu3RareSpriteName, mu3RarityKind, mu3ShowMainFrame, mu3SkillAsset, numericField, officialHolo, qrSource, twoDigits } from "./cardData";
+import { CANVAS_FONT_SEGA_MARU_DB, CARD_TILT_X_MAX, CARD_TILT_Y_MAX, MAI_CHARA_NAME_RECT, MAI_EFFECT_ICON_RECT, MAI_END_DATE_RECT, MAI_FRIEND_CODE_BASE_RECT, MAI_MASTER_ICON_RECT, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MAI_PLAYER_NAME_BASE_RECT, MAI_QR_CODE_BASE_RECT, MAI_RATING_BASE_RECT, MAI_RATING_ICON_RECT, MAI_SERIAL_CODE_BASE_RECT, MU3_ATTRIBUTE_RECT, MU3_AWAKEN_MARK_RECT, MU3_CMN_ICON_RECT, MU3_DIGITAL_MARK_RECT, MU3_GRADE_RECT, MU3_LIMIT_BREAK_STAR_POSITIONS, MU3_LIMIT_BREAK_STAR_Y, MU3_MAX_LABEL_RECT, MU3_QR_BASE_RECT, MU3_RARE_SPRITE_RECT, MU3_RIGHTS_PLATE_RECT, MU3_RIGHTS_RECT, MU3_SKILL_BASE_RECT, MU3_USER_NAME_BASE_RECT, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
 import { HoloShaderLayer } from "./holo";
 import { ImageLoadPriority, isStaticAssetPath } from "./imageLoader";
 import { LayerCanvasText, LayerChuCounter, LayerDigitCounter, LayerImage, LayerQr, LayerTmpText, LayerUnityText } from "./layers";
@@ -196,9 +196,8 @@ export function cardLightStyle(tilt: { x: number; y: number }, mode: ViewMode): 
   const rightEdge = clampNumber(0.18 - tilt.y / 85, 0.04, 0.48);
   const shiftX = clampNumber((bgX - 50) * 0.78, -14, 14);
   const shiftY = clampNumber((bgY - 50) * 0.58, -12, 12);
-  // Drive a strong, angle-dependent hue sweep for the holographic foil.
-  // Horizontal tilt does most of the work; vertical adds a secondary shift so
-  // the spectrum visibly travels as the card is moved in any direction.
+  // Angle-dependent hue sweep for the foil: horizontal tilt dominates, vertical
+  // adds a secondary shift so the spectrum travels as the card moves.
   const holoHue = clampNumber((pointerX - 50) * 3.4 + (pointerY - 50) * 1.5, -210, 210);
   const spectrumAngle = clampNumber(108 + (pointerX - 50) * 0.7 - (pointerY - 50) * 0.5, 70, 150);
 
@@ -261,17 +260,9 @@ export function visibleAssetLayers(card: CardRecord | null, streamingAssets?: st
 }
 
 export function maiFallbackAssetLayer(layer: AssetLayer): AssetLayer {
-  const fallbackKey =
-    layer.key === "maiBase"
-      ? "maiBaseFallback"
-      : layer.key === "maiChara"
-        ? "maiCharaFallback"
-        : layer.key === "maiMask"
-          ? "maiMaskFallback"
-          : `${layer.key}Fallback`;
   return {
     ...layer,
-    key: fallbackKey,
+    key: `${layer.key}Fallback`,
     label: `${layer.label} fallback`,
   };
 }
@@ -329,36 +320,6 @@ export function dynamicMaiAssetLayers(card: CardRecord, streamingAssets: string)
     });
   }
   return layers;
-}
-
-export type MaiCharaChoice = {
-  id: number;
-  mapId: number;
-  uniqueId: number;
-  name: string;
-};
-
-export function maiCharaChoice(card: CardRecord, charaId: number): MaiCharaChoice | null {
-  return parseMaiCharaChoices(fieldString(card, "charaChoices")).find((choice) => choice.id === charaId) ?? null;
-}
-
-export function parseMaiCharaChoices(value: string): MaiCharaChoice[] {
-  return value
-    .split(/\r?\n/)
-    .map((line) => {
-      const [idText, mapText, uniqueText, ...nameParts] = line.split("|");
-      const id = Number(idText);
-      const mapId = Number(mapText);
-      const uniqueId = Number(uniqueText);
-      if (!Number.isFinite(id) || !Number.isFinite(mapId) || !Number.isFinite(uniqueId)) return null;
-      return {
-        id,
-        mapId,
-        uniqueId,
-        name: nameParts.join("|") || String(id),
-      };
-    })
-    .filter((choice): choice is MaiCharaChoice => choice !== null);
 }
 
 export function OfficialCardCanvas({
@@ -540,17 +501,17 @@ export function MaiOfficialCard({
         <LayerImage src={officialAsset(passAsset)} {...passRect} />
       ) : null}
       {effectIconAsset && !hideCardIcon ? (
-        <LayerImage src={officialAsset(effectIconAsset)} x={-303} y={-403} w={112} h={112} />
+        <LayerImage src={officialAsset(effectIconAsset)} {...MAI_EFFECT_ICON_RECT} />
       ) : null}
       {effects.master && !hideCardIcon ? (
-        <LayerImage src={officialAsset("UI_CMA_Icon_Master_00")} x={-193.2} y={-403} w={112} h={112} />
+        <LayerImage src={officialAsset("UI_CMA_Icon_Master_00")} {...MAI_MASTER_ICON_RECT} />
       ) : null}
       {effects.ratingMusic && !hideCardIcon ? (
-        <LayerImage src={officialAsset("UI_CMA_Icon_Rating_00")} x={-84} y={-403} w={112} h={112} />
+        <LayerImage src={officialAsset("UI_CMA_Icon_Rating_00")} {...MAI_RATING_ICON_RECT} />
       ) : null}
       {!hidePlayerName ? (
         <>
-          <LayerImage src={officialAsset("UI_CMA_PlayerName_Base_00")} x={211} y={397} w={276} h={48} />
+          <LayerImage src={officialAsset("UI_CMA_PlayerName_Base_00")} {...MAI_PLAYER_NAME_BASE_RECT} />
           <LayerUnityText className="official-title mai-player" fontKey="maru32" fontSize={29} alignment={0} color="#000000" fitHorizontal characterSpacing={10} horizontalScale={0.9} x={180.4} y={387} w={181.2} h={50}>
             {fieldString(card, "userName") || "PLAYER"}
           </LayerUnityText>
@@ -558,7 +519,7 @@ export function MaiOfficialCard({
       ) : null}
       {!hideFriendCode ? (
         <>
-          <LayerImage src={officialAsset("UI_CMA_FriendCode_Base_00")} x={211} y={360.8} w={276} h={40} />
+          <LayerImage src={officialAsset("UI_CMA_FriendCode_Base_00")} {...MAI_FRIEND_CODE_BASE_RECT} />
           {hasFriendCode ? (
             <LayerUnityText className="official-code mai-friend" fontKey="maru32" fontSize={16} alignment={4} color="#000000" fitHorizontal characterSpacing={1} fixedGlyphTop x={245.8} y={359.4} w={192} h={23.7}>
               {fieldString(card, "friendCode")}
@@ -572,7 +533,7 @@ export function MaiOfficialCard({
       ) : null}
       {!hideRating ? (
         <>
-          <LayerImage src={officialAsset(ratingBase)} x={212.4} y={456.9} w={280} h={76} />
+          <LayerImage src={officialAsset(ratingBase)} {...MAI_RATING_BASE_RECT} />
           <LayerDigitCounter
             className="official-rating mai-rating-counter"
             value={fieldString(card, "rating") || "0"}
@@ -594,14 +555,14 @@ export function MaiOfficialCard({
       ) : null}
       {!hideSerialAndQR ? (
         <>
-          <LayerImage src={officialAsset("UI_CMA_SerialCode_Base_00")} x={0} y={-486.5} w={490} h={32} />
+          <LayerImage src={officialAsset("UI_CMA_SerialCode_Base_00")} {...MAI_SERIAL_CODE_BASE_RECT} />
           <LayerUnityText className="official-serial mai-serial" fontKey="kaku16" fontSize={16} alignment={1} fitHorizontal characterSpacing={-1} x={-100.9} y={-488.7} w={266} h={18}>
             {formatDisplaySerial(serial)}
           </LayerUnityText>
           <LayerUnityText className="official-serial mai-version" fontKey="kaku16" fontSize={16} alignment={0} fitHorizontal characterSpacing={-1} x={171.3} y={-488.7} w={266} h={18}>
             {fieldString(card, "verCharaId") || card.id}
           </LayerUnityText>
-          <LayerImage src={officialAsset("UI_CMA_QRCode_Base_00")} x={249.7} y={-394.7} w={164} h={164} />
+          <LayerImage src={officialAsset("UI_CMA_QRCode_Base_00")} {...MAI_QR_CODE_BASE_RECT} />
           <LayerQr source={qrSource(card, serial)} x={249.7} y={-394.7} w={113} h={113} />
         </>
       ) : null}
@@ -609,6 +570,159 @@ export function MaiOfficialCard({
         <HoloShaderLayer card={card} assetDataUrls={assetDataUrls} lightStyle={lightStyle} inline />
       ) : null}
     </div>
+  );
+}
+
+export function Mu3LimitBreakStars({ card }: { card: CardRecord }) {
+  const maxStars = mu3MaxOwnCount(card);
+  const activeStars = clampInt(numericField(card, "ownCount", 0), 0, maxStars);
+  return (
+    <>
+      {MU3_LIMIT_BREAK_STAR_POSITIONS.slice(0, maxStars).map((x, index) => (
+        <LayerImage
+          src={officialAsset(index < activeStars ? "UI_Card_star_01" : "UI_Card_star_00")}
+          x={x}
+          y={MU3_LIMIT_BREAK_STAR_Y}
+          w={50}
+          h={50}
+          key={index}
+        />
+      ))}
+    </>
+  );
+}
+
+// Layer groups shared by both MU3 card kinds (Mu3OfficialCard / Mu3AssetCard).
+// Each owns its own visibility check; the few divergent bits (user-name size,
+// QR fallback, card-number text) are passed in as props.
+function Mu3AttackLimit({ card }: { card: CardRecord }) {
+  if (fieldBool(card, "hideAttackLimit")) return null;
+  const attackValue = mu3AttackValue(card);
+  return (
+    <>
+      <LayerImage src={officialAsset("UI_Card_max_00")} {...MU3_MAX_LABEL_RECT} />
+      <Mu3LimitBreakStars card={card} />
+      <LayerDigitCounter
+        className="official-counter mu3-max-attack"
+        value={attackValue || "0"}
+        sprite={officialAsset("UI_Card_NUM_attack")}
+        x={-291}
+        y={-276.6}
+        w={100}
+        h={100}
+        align="center"
+        digitWidth={70}
+        digitHeight={70}
+        signWidth={70}
+        signHeight={70}
+        charSpacing={-29.9}
+        flags={0}
+      />
+    </>
+  );
+}
+
+function Mu3AwakenMark({ card }: { card: CardRecord }) {
+  const awakenMark = mu3AwakenMarkAsset(card);
+  if (fieldBool(card, "hideAwaken") || !awakenMark) return null;
+  return <LayerImage src={officialAsset(awakenMark)} {...MU3_AWAKEN_MARK_RECT} />;
+}
+
+function Mu3Grade({ card, assetDataUrls }: { card: CardRecord; assetDataUrls: Record<string, string> }) {
+  if (fieldBool(card, "hideGrade") || !assetDataUrls.mu3Grade || numericField(card, "gradeId", -1) < 0) return null;
+  return <LayerImage src={assetDataUrls.mu3Grade} {...MU3_GRADE_RECT} />;
+}
+
+function Mu3UserName({ card, fontSize, characterSpacing }: { card: CardRecord; fontSize: number; characterSpacing: number }) {
+  if (fieldBool(card, "hideUserName")) return null;
+  return (
+    <>
+      <LayerImage src={officialAsset("UI_Card_UserName_00")} {...MU3_USER_NAME_BASE_RECT} />
+      <LayerCanvasText className="official-title mu3-user" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={fontSize} fontWeight={550} alignment={4} color="#000000" characterSpacing={characterSpacing} x={267.1} y={-300.6} w={190} h={19.2} fitHorizontal>
+        {fieldString(card, "userName") || "USER"}
+      </LayerCanvasText>
+    </>
+  );
+}
+
+function Mu3Qr({ card, serialFallback }: { card: CardRecord; serialFallback: string }) {
+  if (fieldBool(card, "hideQRCode")) return null;
+  return (
+    <>
+      <LayerImage src={officialAsset("UI_Card_qr_base_00")} {...MU3_QR_BASE_RECT} />
+      <LayerQr source={qrSource(card, serialFallback)} x={249.4} y={-392.3} w={113} h={113} />
+    </>
+  );
+}
+
+function Mu3Footer({
+  card,
+  assetDataUrls,
+  cardNoText,
+  cardNoCharSpacing,
+}: {
+  card: CardRecord;
+  assetDataUrls: Record<string, string>;
+  cardNoText: string;
+  cardNoCharSpacing: number;
+}) {
+  return (
+    <>
+      <LayerImage src={officialAsset("UI_Card_rightsplate_00")} {...MU3_RIGHTS_PLATE_RECT} />
+      <LayerCanvasText className="official-serial mu3-serial" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} characterSpacing={2} alignment={1} color="#ffffff" x={-135} y={-495.9} w={311} h={21} fitHorizontal>
+        {formatDisplaySerial(fieldString(card, "serialId"))}
+      </LayerCanvasText>
+      <LayerCanvasText className="official-serial mu3-cardno" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} characterSpacing={cardNoCharSpacing} alignment={1} color="#ffffff" x={132} y={-495.9} w={311} h={21} fitHorizontal>
+        {cardNoText}
+      </LayerCanvasText>
+      {assetDataUrls.mu3Rights && numericField(card, "rightsId", -1) > 0 ? (
+        <LayerImage src={assetDataUrls.mu3Rights} {...MU3_RIGHTS_RECT} />
+      ) : null}
+    </>
+  );
+}
+
+// A MU3 title rendered twice — an offset shadow pass under the main pass — from
+// one set of shared params (only the two positions differ).
+function Mu3ShadowedTitle({
+  name,
+  fontSize,
+  characterSpacing,
+  autoSize,
+  minFontSize,
+  x,
+  y,
+  shadowX,
+  shadowY,
+  w,
+  h,
+  rotation,
+  children,
+}: {
+  name: string;
+  fontSize: number;
+  characterSpacing?: number;
+  autoSize?: boolean;
+  minFontSize?: number;
+  x: number;
+  y: number;
+  shadowX: number;
+  shadowY: number;
+  w: number;
+  h: number;
+  rotation?: number;
+  children: React.ReactNode;
+}) {
+  const shared = { fontSize, characterSpacing, autoSize, minFontSize, w, h, rotation };
+  return (
+    <>
+      <LayerTmpText className={`official-title mu3-${name}-shadow`} variant="shadow" x={shadowX} y={shadowY} {...shared}>
+        {children}
+      </LayerTmpText>
+      <LayerTmpText className={`official-title mu3-${name}`} variant="main" x={x} y={y} {...shared}>
+        {children}
+      </LayerTmpText>
+    </>
   );
 }
 
@@ -638,10 +752,6 @@ export function Mu3OfficialCard({
   const showFrame = mu3ShowMainFrame(card);
   const charaSrc = assetDataUrls.mu3Chara;
   const cardBgSrc = assetDataUrls.mu3CardBg;
-  const gradeId = numericField(card, "gradeId", -1);
-  const rightsId = numericField(card, "rightsId", -1);
-  const attackValue = mu3AttackValue(card);
-  const awakenMark = mu3AwakenMarkAsset(card);
   const {
     isCommonModel,
     nickname: mu3Nickname,
@@ -661,19 +771,17 @@ export function Mu3OfficialCard({
       {showFrame && frameAsset ? <LayerImage src={officialAsset(frameAsset)} x={0} y={0} w={768} h={1052} /> : null}
       {!fieldBool(card, "hideAttrRarity") ? (
         <>
-          <LayerImage src={officialAsset(`UI_Card_Attribute_${twoDigits(attr)}_${mu3AttributeName(attr)}`)} x={-297} y={439} w={130} h={130} />
-          <LayerImage src={officialAsset(rareSprite)} x={-161.4} y={442.3} w={208} h={118} />
+          <LayerImage src={officialAsset(`UI_Card_Attribute_${twoDigits(attr)}_${mu3AttributeName(attr)}`)} {...MU3_ATTRIBUTE_RECT} />
+          <LayerImage src={officialAsset(rareSprite)} {...MU3_RARE_SPRITE_RECT} />
         </>
       ) : null}
       {fieldBool(card, "digitalOnly") ? (
-        <LayerImage src={officialAsset("UI_Card_DigitalMark_00")} x={239.2} y={477.4} w={294} h={102} />
+        <LayerImage src={officialAsset("UI_Card_DigitalMark_00")} {...MU3_DIGITAL_MARK_RECT} />
       ) : null}
-      {!fieldBool(card, "hideGrade") && assetDataUrls.mu3Grade && gradeId >= 0 ? (
-        <LayerImage src={assetDataUrls.mu3Grade} x={295} y={455} w={94} h={142} />
-      ) : null}
+      <Mu3Grade card={card} assetDataUrls={assetDataUrls} />
       {!fieldBool(card, "hideSkill") ? (
         <>
-          <LayerImage src={officialAsset(mu3SkillAsset(card))} x={-40.3} y={-367.7} w={628} h={108} />
+          <LayerImage src={officialAsset(mu3SkillAsset(card))} {...MU3_SKILL_BASE_RECT} />
           <LayerCanvasText
             className="official-skill-name mu3-skill-name"
             fontFamily={CANVAS_FONT_SEGA_MARU_DB}
@@ -705,95 +813,36 @@ export function Mu3OfficialCard({
           </LayerCanvasText>
         </>
       ) : null}
-      {!fieldBool(card, "hideAttackLimit") ? (
-        <>
-          <LayerImage src={officialAsset("UI_Card_max_00")} x={-291} y={-228.6} w={108} h={34} />
-          <Mu3LimitBreakStars card={card} />
-          <LayerDigitCounter
-            className="official-counter mu3-max-attack"
-            value={attackValue || "0"}
-            sprite={officialAsset("UI_Card_NUM_attack")}
-            x={-291}
-            y={-276.6}
-            w={100}
-            h={100}
-            align="center"
-            digitWidth={70}
-            digitHeight={70}
-            signWidth={70}
-            signHeight={70}
-            charSpacing={-29.9}
-            flags={0}
-          />
-        </>
-      ) : null}
-      {!fieldBool(card, "hideAwaken") && awakenMark ? (
-        <LayerImage src={officialAsset(awakenMark)} {...MU3_AWAKEN_MARK_RECT} />
-      ) : null}
-      {!fieldBool(card, "hideUserName") ? (
-        <>
-          <LayerImage src={officialAsset("UI_Card_UserName_00")} x={278} y={-291.8} w={212} h={56} />
-          <LayerCanvasText className="official-title mu3-user" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={22} fontWeight={550} alignment={4} color="#000000" characterSpacing={6} x={267.1} y={-300.6} w={190} h={19.2} fitHorizontal>
-            {fieldString(card, "userName") || "USER"}
-          </LayerCanvasText>
-        </>
-      ) : null}
+      <Mu3AttackLimit card={card} />
+      <Mu3AwakenMark card={card} />
+      <Mu3UserName card={card} fontSize={22} characterSpacing={6} />
       {!fieldBool(card, "hideName") ? (
         isCommonModel ? (
           <>
-            <LayerTmpText className="official-title mu3-nickname-shadow" fontSize={23.6} variant="shadow" characterSpacing={-0.06} x={42.9} y={-176.4} w={550} h={26.2} rotation={6}>
+            <Mu3ShadowedTitle name="nickname" fontSize={23.6} characterSpacing={-0.06} x={40} y={-175} shadowX={42.9} shadowY={-176.4} w={550} h={26.2} rotation={6}>
               {mu3Nickname}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-nickname" fontSize={23.6} variant="main" characterSpacing={-0.06} x={40} y={-175} w={550} h={26.2} rotation={6}>
-              {mu3Nickname}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-character-name-shadow" fontSize={43} variant="shadow" autoSize minFontSize={24} x={53.8} y={-199} w={523.8} h={26} rotation={6}>
+            </Mu3ShadowedTitle>
+            <Mu3ShadowedTitle name="character-name" fontSize={43} autoSize minFontSize={24} x={50} y={-197} shadowX={53.8} shadowY={-199} w={523.8} h={26} rotation={6}>
               {mu3CharacterName}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-character-name" fontSize={43} variant="main" autoSize minFontSize={24} x={50} y={-197} w={523.8} h={26} rotation={6}>
-              {mu3CharacterName}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-ip-title-shadow" fontSize={14.6} variant="shadow" autoSize minFontSize={12} x={111.6} y={-232.1} w={411.6} h={19.7} rotation={6}>
+            </Mu3ShadowedTitle>
+            <Mu3ShadowedTitle name="ip-title" fontSize={14.6} autoSize minFontSize={12} x={110.6} y={-230.9} shadowX={111.6} shadowY={-232.1} w={411.6} h={19.7} rotation={6}>
               {mu3IpName}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-ip-title" fontSize={14.6} variant="main" autoSize minFontSize={12} x={110.6} y={-230.9} w={411.6} h={19.7} rotation={6}>
-              {mu3IpName}
-            </LayerTmpText>
-            <LayerImage src={officialAsset("UI_Card_CMN_3D_Icon_00")} x={262.8} y={-224.3} w={146} h={38} rotation={6} />
+            </Mu3ShadowedTitle>
+            <LayerImage src={officialAsset("UI_Card_CMN_3D_Icon_00")} {...MU3_CMN_ICON_RECT} />
           </>
         ) : (
           <>
-            <LayerTmpText className="official-title mu3-nickname-shadow" fontSize={23.6} variant="shadow" characterSpacing={-0.06} x={41.5} y={-185.3} w={550} h={26.2} rotation={6}>
+            <Mu3ShadowedTitle name="nickname" fontSize={23.6} characterSpacing={-0.06} x={38.6} y={-183.9} shadowX={41.5} shadowY={-185.3} w={550} h={26.2} rotation={6}>
               {mu3Nickname}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-nickname" fontSize={23.6} variant="main" characterSpacing={-0.06} x={38.6} y={-183.9} w={550} h={26.2} rotation={6}>
-              {mu3Nickname}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-character-name-shadow" fontSize={43} variant="shadow" autoSize minFontSize={24} x={42.7} y={-225.7} w={546} h={37} rotation={6}>
+            </Mu3ShadowedTitle>
+            <Mu3ShadowedTitle name="character-name" fontSize={43} autoSize minFontSize={24} x={38.7} y={-224.5} shadowX={42.7} shadowY={-225.7} w={546} h={37} rotation={6}>
               {mu3BaseCharacterName}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-character-name" fontSize={43} variant="main" autoSize minFontSize={24} x={38.7} y={-224.5} w={546} h={37} rotation={6}>
-              {mu3BaseCharacterName}
-            </LayerTmpText>
+            </Mu3ShadowedTitle>
           </>
         )
       ) : null}
-      {!fieldBool(card, "hideQRCode") ? (
-        <>
-          <LayerImage src={officialAsset("UI_Card_qr_base_00")} x={251.8} y={-396.1} w={157} h={158} />
-          <LayerQr source={qrSource(card, fieldString(card, "serialId") || fieldString(card, "cardNo"))} x={249.4} y={-392.3} w={113} h={113} />
-        </>
-      ) : null}
-      <LayerImage src={officialAsset("UI_Card_rightsplate_00")} x={0} y={-502} w={768} h={48} />
-      <LayerCanvasText className="official-serial mu3-serial" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} characterSpacing={2} alignment={1} color="#ffffff" x={-135} y={-495.9} w={311} h={21} fitHorizontal>
-        {formatDisplaySerial(fieldString(card, "serialId"))}
-      </LayerCanvasText>
-      <LayerCanvasText className="official-serial mu3-cardno" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} characterSpacing={1} alignment={1} color="#ffffff" x={132} y={-495.9} w={311} h={21} fitHorizontal>
-        {fieldString(card, "cardNo") || "CARD NO."}
-      </LayerCanvasText>
-      {assetDataUrls.mu3Rights && rightsId > 0 ? (
-        <LayerImage src={assetDataUrls.mu3Rights} x={-85} y={-447} w={520} h={64} />
-      ) : null}
+      <Mu3Qr card={card} serialFallback={fieldString(card, "serialId") || fieldString(card, "cardNo")} />
+      <Mu3Footer card={card} assetDataUrls={assetDataUrls} cardNoText={fieldString(card, "cardNo") || "CARD NO."} cardNoCharSpacing={1} />
       {officialHolo(card) ? <HoloShaderLayer card={card} assetDataUrls={assetDataUrls} lightStyle={lightStyle} inline /> : null}
     </div>
   );
@@ -808,10 +857,6 @@ export function Mu3AssetCard({
   imageDataUrl: string;
   assetDataUrls: Record<string, string>;
 }) {
-  const gradeId = numericField(card, "gradeId", -1);
-  const rightsId = numericField(card, "rightsId", -1);
-  const attackValue = mu3AttackValue(card);
-  const awakenMark = mu3AwakenMarkAsset(card);
   const { nickname: mu3Nickname, baseCharacterName: mu3CharacterName } = mu3CardNames(card);
   return (
     <div className="official-card official-mu3 official-mu3-asset">
@@ -820,78 +865,24 @@ export function Mu3AssetCard({
       ) : (
         <LayerImage src={officialAsset("UI_Card_BG_N_00")} x={0} y={0} w={768} h={1052} />
       )}
-      {!fieldBool(card, "hideGrade") && assetDataUrls.mu3Grade && gradeId >= 0 ? (
-        <LayerImage src={assetDataUrls.mu3Grade} x={295} y={455} w={94} h={142} />
-      ) : null}
-      {!fieldBool(card, "hideAttackLimit") ? (
-        <>
-          <LayerImage src={officialAsset("UI_Card_max_00")} x={-291} y={-228.6} w={108} h={34} />
-          <Mu3LimitBreakStars card={card} />
-          <LayerDigitCounter
-            className="official-counter mu3-max-attack"
-            value={attackValue || "0"}
-            sprite={officialAsset("UI_Card_NUM_attack")}
-            x={-291}
-            y={-276.6}
-            w={100}
-            h={100}
-            align="center"
-            digitWidth={70}
-            digitHeight={70}
-            signWidth={70}
-            signHeight={70}
-            charSpacing={-29.9}
-            flags={0}
-          />
-        </>
-      ) : null}
-      {!fieldBool(card, "hideAwaken") && awakenMark ? (
-        <LayerImage src={officialAsset(awakenMark)} {...MU3_AWAKEN_MARK_RECT} />
-      ) : null}
-      {!fieldBool(card, "hideUserName") ? (
-        <>
-          <LayerImage src={officialAsset("UI_Card_UserName_00")} x={278} y={-291.8} w={212} h={56} />
-          <LayerCanvasText className="official-title mu3-user" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} fontWeight={550} alignment={4} color="#000000" characterSpacing={3} x={267.1} y={-300.6} w={190} h={19.2} fitHorizontal>
-            {fieldString(card, "userName") || "USER"}
-          </LayerCanvasText>
-        </>
-      ) : null}
+      <Mu3Grade card={card} assetDataUrls={assetDataUrls} />
+      <Mu3AttackLimit card={card} />
+      <Mu3AwakenMark card={card} />
+      <Mu3UserName card={card} fontSize={19} characterSpacing={3} />
       {!fieldBool(card, "hideName") ? (
         <>
           {mu3Nickname ? (
-            <>
-              <LayerTmpText className="official-title mu3-nickname-shadow" fontSize={23.6} variant="shadow" characterSpacing={-0.06} x={41.5} y={-185.3} w={550} h={26.2} rotation={6}>
-                {mu3Nickname}
-              </LayerTmpText>
-              <LayerTmpText className="official-title mu3-nickname" fontSize={23.6} variant="main" characterSpacing={-0.06} x={38.6} y={-183.9} w={550} h={26.2} rotation={6}>
-                {mu3Nickname}
-              </LayerTmpText>
-            </>
+            <Mu3ShadowedTitle name="nickname" fontSize={23.6} characterSpacing={-0.06} x={38.6} y={-183.9} shadowX={41.5} shadowY={-185.3} w={550} h={26.2} rotation={6}>
+              {mu3Nickname}
+            </Mu3ShadowedTitle>
           ) : null}
-          <LayerTmpText className="official-title mu3-character-name-shadow" fontSize={43} variant="shadow" autoSize minFontSize={24} x={42.7} y={-225.7} w={546} h={37} rotation={6}>
+          <Mu3ShadowedTitle name="character-name" fontSize={43} autoSize minFontSize={24} x={38.7} y={-224.5} shadowX={42.7} shadowY={-225.7} w={546} h={37} rotation={6}>
             {mu3CharacterName}
-          </LayerTmpText>
-          <LayerTmpText className="official-title mu3-character-name" fontSize={43} variant="main" autoSize minFontSize={24} x={38.7} y={-224.5} w={546} h={37} rotation={6}>
-            {mu3CharacterName}
-          </LayerTmpText>
+          </Mu3ShadowedTitle>
         </>
       ) : null}
-      {!fieldBool(card, "hideQRCode") ? (
-        <>
-          <LayerImage src={officialAsset("UI_Card_qr_base_00")} x={251.8} y={-396.1} w={157} h={158} />
-          <LayerQr source={qrSource(card, fieldString(card, "cardNo"))} x={249.4} y={-392.3} w={113} h={113} />
-        </>
-      ) : null}
-      <LayerImage src={officialAsset("UI_Card_rightsplate_00")} x={0} y={-502} w={768} h={48} />
-      <LayerCanvasText className="official-serial mu3-serial" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} characterSpacing={2} alignment={1} color="#ffffff" x={-135} y={-495.9} w={311} h={21} fitHorizontal>
-        {formatDisplaySerial(fieldString(card, "serialId"))}
-      </LayerCanvasText>
-      <LayerCanvasText className="official-serial mu3-cardno" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} characterSpacing={2} alignment={1} color="#ffffff" x={132} y={-495.9} w={311} h={21} fitHorizontal>
-        {fieldString(card, "cardNo") || card.id}
-      </LayerCanvasText>
-      {assetDataUrls.mu3Rights && rightsId > 0 ? (
-        <LayerImage src={assetDataUrls.mu3Rights} x={-85} y={-447} w={520} h={64} />
-      ) : null}
+      <Mu3Qr card={card} serialFallback={fieldString(card, "cardNo")} />
+      <Mu3Footer card={card} assetDataUrls={assetDataUrls} cardNoText={fieldString(card, "cardNo") || card.id} cardNoCharSpacing={2} />
     </div>
   );
 }
