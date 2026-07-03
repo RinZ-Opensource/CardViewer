@@ -35,6 +35,9 @@
   --control-h: 34px;
   --radius-sm: 7px;
   --radius-md: 8px;
+  /* Card-row thumbnail width; the row's grid column is driven from the same
+     value. Overridden inside the narrow-viewport breakpoint in ui.css. */
+  --thumb-w: 46px;
   --ui-bg: #eef2f4;
   --ui-shell-bg: linear-gradient(90deg, #eef6f5 0%, #eef2f4 36%, #f5f3ef 100%);
   --ui-stage-bg: linear-gradient(135deg, #f7faf9 0%, #e3ecec 52%, #f7f3ee 100%);
@@ -589,7 +592,7 @@ small,
 .card-row {
   position: relative;
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) 8px;
+  grid-template-columns: var(--thumb-w) minmax(0, 1fr) 8px;
   align-items: center;
   gap: 11px;
   min-height: 75px;
@@ -610,7 +613,7 @@ small,
 .thumb-slot {
   display: grid;
   place-items: center;
-  width: 46px;
+  width: var(--thumb-w);
   height: 64px;
   overflow: hidden;
   border-radius: 6px;

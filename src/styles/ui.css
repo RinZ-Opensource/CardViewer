@@ -497,13 +497,12 @@
   }
 
   .card-row {
-    grid-template-columns: 42px minmax(0, 1fr) 8px;
+    --thumb-w: 42px;
     gap: 9px;
     min-height: 72px;
   }
 
   .thumb-slot {
-    width: 42px;
     height: 59px;
   }
 
