@@ -683,6 +683,50 @@ function Mu3Footer({
   );
 }
 
+// A MU3 title rendered twice — an offset shadow pass under the main pass — from
+// one set of shared params (only the two positions differ).
+function Mu3ShadowedTitle({
+  name,
+  fontSize,
+  characterSpacing,
+  autoSize,
+  minFontSize,
+  x,
+  y,
+  shadowX,
+  shadowY,
+  w,
+  h,
+  rotation,
+  children,
+}: {
+  name: string;
+  fontSize: number;
+  characterSpacing?: number;
+  autoSize?: boolean;
+  minFontSize?: number;
+  x: number;
+  y: number;
+  shadowX: number;
+  shadowY: number;
+  w: number;
+  h: number;
+  rotation?: number;
+  children: React.ReactNode;
+}) {
+  const shared = { fontSize, characterSpacing, autoSize, minFontSize, w, h, rotation };
+  return (
+    <>
+      <LayerTmpText className={`official-title mu3-${name}-shadow`} variant="shadow" x={shadowX} y={shadowY} {...shared}>
+        {children}
+      </LayerTmpText>
+      <LayerTmpText className={`official-title mu3-${name}`} variant="main" x={x} y={y} {...shared}>
+        {children}
+      </LayerTmpText>
+    </>
+  );
+}
+
 export function Mu3OfficialCard({
   card,
   imageDataUrl,
@@ -776,40 +820,25 @@ export function Mu3OfficialCard({
       {!fieldBool(card, "hideName") ? (
         isCommonModel ? (
           <>
-            <LayerTmpText className="official-title mu3-nickname-shadow" fontSize={23.6} variant="shadow" characterSpacing={-0.06} x={42.9} y={-176.4} w={550} h={26.2} rotation={6}>
+            <Mu3ShadowedTitle name="nickname" fontSize={23.6} characterSpacing={-0.06} x={40} y={-175} shadowX={42.9} shadowY={-176.4} w={550} h={26.2} rotation={6}>
               {mu3Nickname}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-nickname" fontSize={23.6} variant="main" characterSpacing={-0.06} x={40} y={-175} w={550} h={26.2} rotation={6}>
-              {mu3Nickname}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-character-name-shadow" fontSize={43} variant="shadow" autoSize minFontSize={24} x={53.8} y={-199} w={523.8} h={26} rotation={6}>
+            </Mu3ShadowedTitle>
+            <Mu3ShadowedTitle name="character-name" fontSize={43} autoSize minFontSize={24} x={50} y={-197} shadowX={53.8} shadowY={-199} w={523.8} h={26} rotation={6}>
               {mu3CharacterName}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-character-name" fontSize={43} variant="main" autoSize minFontSize={24} x={50} y={-197} w={523.8} h={26} rotation={6}>
-              {mu3CharacterName}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-ip-title-shadow" fontSize={14.6} variant="shadow" autoSize minFontSize={12} x={111.6} y={-232.1} w={411.6} h={19.7} rotation={6}>
+            </Mu3ShadowedTitle>
+            <Mu3ShadowedTitle name="ip-title" fontSize={14.6} autoSize minFontSize={12} x={110.6} y={-230.9} shadowX={111.6} shadowY={-232.1} w={411.6} h={19.7} rotation={6}>
               {mu3IpName}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-ip-title" fontSize={14.6} variant="main" autoSize minFontSize={12} x={110.6} y={-230.9} w={411.6} h={19.7} rotation={6}>
-              {mu3IpName}
-            </LayerTmpText>
+            </Mu3ShadowedTitle>
             <LayerImage src={officialAsset("UI_Card_CMN_3D_Icon_00")} {...MU3_CMN_ICON_RECT} />
           </>
         ) : (
           <>
-            <LayerTmpText className="official-title mu3-nickname-shadow" fontSize={23.6} variant="shadow" characterSpacing={-0.06} x={41.5} y={-185.3} w={550} h={26.2} rotation={6}>
+            <Mu3ShadowedTitle name="nickname" fontSize={23.6} characterSpacing={-0.06} x={38.6} y={-183.9} shadowX={41.5} shadowY={-185.3} w={550} h={26.2} rotation={6}>
               {mu3Nickname}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-nickname" fontSize={23.6} variant="main" characterSpacing={-0.06} x={38.6} y={-183.9} w={550} h={26.2} rotation={6}>
-              {mu3Nickname}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-character-name-shadow" fontSize={43} variant="shadow" autoSize minFontSize={24} x={42.7} y={-225.7} w={546} h={37} rotation={6}>
+            </Mu3ShadowedTitle>
+            <Mu3ShadowedTitle name="character-name" fontSize={43} autoSize minFontSize={24} x={38.7} y={-224.5} shadowX={42.7} shadowY={-225.7} w={546} h={37} rotation={6}>
               {mu3BaseCharacterName}
-            </LayerTmpText>
-            <LayerTmpText className="official-title mu3-character-name" fontSize={43} variant="main" autoSize minFontSize={24} x={38.7} y={-224.5} w={546} h={37} rotation={6}>
-              {mu3BaseCharacterName}
-            </LayerTmpText>
+            </Mu3ShadowedTitle>
           </>
         )
       ) : null}
@@ -844,21 +873,13 @@ export function Mu3AssetCard({
       {!fieldBool(card, "hideName") ? (
         <>
           {mu3Nickname ? (
-            <>
-              <LayerTmpText className="official-title mu3-nickname-shadow" fontSize={23.6} variant="shadow" characterSpacing={-0.06} x={41.5} y={-185.3} w={550} h={26.2} rotation={6}>
-                {mu3Nickname}
-              </LayerTmpText>
-              <LayerTmpText className="official-title mu3-nickname" fontSize={23.6} variant="main" characterSpacing={-0.06} x={38.6} y={-183.9} w={550} h={26.2} rotation={6}>
-                {mu3Nickname}
-              </LayerTmpText>
-            </>
+            <Mu3ShadowedTitle name="nickname" fontSize={23.6} characterSpacing={-0.06} x={38.6} y={-183.9} shadowX={41.5} shadowY={-185.3} w={550} h={26.2} rotation={6}>
+              {mu3Nickname}
+            </Mu3ShadowedTitle>
           ) : null}
-          <LayerTmpText className="official-title mu3-character-name-shadow" fontSize={43} variant="shadow" autoSize minFontSize={24} x={42.7} y={-225.7} w={546} h={37} rotation={6}>
+          <Mu3ShadowedTitle name="character-name" fontSize={43} autoSize minFontSize={24} x={38.7} y={-224.5} shadowX={42.7} shadowY={-225.7} w={546} h={37} rotation={6}>
             {mu3CharacterName}
-          </LayerTmpText>
-          <LayerTmpText className="official-title mu3-character-name" fontSize={43} variant="main" autoSize minFontSize={24} x={38.7} y={-224.5} w={546} h={37} rotation={6}>
-            {mu3CharacterName}
-          </LayerTmpText>
+          </Mu3ShadowedTitle>
         </>
       ) : null}
       <Mu3Qr card={card} serialFallback={fieldString(card, "cardNo")} />
