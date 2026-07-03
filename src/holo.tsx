@@ -176,6 +176,30 @@ function pushHoloTmpTextMask(masks: HoloTmpTextMask[], mask: HoloTmpTextMask) {
   });
 }
 
+// Mask twin of the visual Mu3ShadowedTitle: push the shadow and main passes of
+// one MU3 title from a single set of params (only the two positions differ).
+function pushShadowedTitleMask(
+  masks: HoloTmpTextMask[],
+  title: {
+    text: string;
+    fontSize: number;
+    characterSpacing?: number;
+    autoSize?: boolean;
+    minFontSize?: number;
+    x: number;
+    y: number;
+    shadowX: number;
+    shadowY: number;
+    w: number;
+    h: number;
+    rotation?: number;
+  },
+) {
+  const { x, y, shadowX, shadowY, ...shared } = title;
+  pushHoloTmpTextMask(masks, { ...shared, variant: "shadow", x: shadowX, y: shadowY });
+  pushHoloTmpTextMask(masks, { ...shared, variant: "main", x, y });
+}
+
 export function MaiOfficialHoloLayer({
   card,
   assetDataUrls,
@@ -360,18 +384,13 @@ export function Mu3OfficialHoloLayer({
   }
   if (!fieldBool(card, "hideName")) {
     if (isCommonModel) {
-      pushHoloTmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "shadow", characterSpacing: -0.06, x: 42.9, y: -176.4, w: 550, h: 26.2, rotation: 6 });
-      pushHoloTmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "main", characterSpacing: -0.06, x: 40, y: -175, w: 550, h: 26.2, rotation: 6 });
-      pushHoloTmpTextMask(frontTextMasks, { text: mu3CharacterName, fontSize: 43, variant: "shadow", autoSize: true, minFontSize: 24, x: 53.8, y: -199, w: 523.8, h: 26, rotation: 6 });
-      pushHoloTmpTextMask(frontTextMasks, { text: mu3CharacterName, fontSize: 43, variant: "main", autoSize: true, minFontSize: 24, x: 50, y: -197, w: 523.8, h: 26, rotation: 6 });
-      pushHoloTmpTextMask(frontTextMasks, { text: mu3IpName, fontSize: 14.6, variant: "shadow", autoSize: true, minFontSize: 12, x: 111.6, y: -232.1, w: 411.6, h: 19.7, rotation: 6 });
-      pushHoloTmpTextMask(frontTextMasks, { text: mu3IpName, fontSize: 14.6, variant: "main", autoSize: true, minFontSize: 12, x: 110.6, y: -230.9, w: 411.6, h: 19.7, rotation: 6 });
+      pushShadowedTitleMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, characterSpacing: -0.06, x: 40, y: -175, shadowX: 42.9, shadowY: -176.4, w: 550, h: 26.2, rotation: 6 });
+      pushShadowedTitleMask(frontTextMasks, { text: mu3CharacterName, fontSize: 43, autoSize: true, minFontSize: 24, x: 50, y: -197, shadowX: 53.8, shadowY: -199, w: 523.8, h: 26, rotation: 6 });
+      pushShadowedTitleMask(frontTextMasks, { text: mu3IpName, fontSize: 14.6, autoSize: true, minFontSize: 12, x: 110.6, y: -230.9, shadowX: 111.6, shadowY: -232.1, w: 411.6, h: 19.7, rotation: 6 });
       frontImages.push({ href: officialAsset("UI_Card_CMN_3D_Icon_00"), ...MU3_CMN_ICON_RECT });
     } else {
-      pushHoloTmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "shadow", characterSpacing: -0.06, x: 41.5, y: -185.3, w: 550, h: 26.2, rotation: 6 });
-      pushHoloTmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "main", characterSpacing: -0.06, x: 38.6, y: -183.9, w: 550, h: 26.2, rotation: 6 });
-      pushHoloTmpTextMask(frontTextMasks, { text: mu3BaseCharacterName, fontSize: 43, variant: "shadow", autoSize: true, minFontSize: 24, x: 42.7, y: -225.7, w: 546, h: 37, rotation: 6 });
-      pushHoloTmpTextMask(frontTextMasks, { text: mu3BaseCharacterName, fontSize: 43, variant: "main", autoSize: true, minFontSize: 24, x: 38.7, y: -224.5, w: 546, h: 37, rotation: 6 });
+      pushShadowedTitleMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, characterSpacing: -0.06, x: 38.6, y: -183.9, shadowX: 41.5, shadowY: -185.3, w: 550, h: 26.2, rotation: 6 });
+      pushShadowedTitleMask(frontTextMasks, { text: mu3BaseCharacterName, fontSize: 43, autoSize: true, minFontSize: 24, x: 38.7, y: -224.5, shadowX: 42.7, shadowY: -225.7, w: 546, h: 37, rotation: 6 });
     }
   }
   if (!fieldBool(card, "hideQRCode")) {
