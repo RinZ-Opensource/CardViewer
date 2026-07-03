@@ -40,14 +40,18 @@ export function buildFilterConfig(
   const facets = GAME_FACETS[selectedGame];
   if (!facets) return filters;
 
-  const gameCards = cards.filter((card) => card.game === selectedGame);
+  // Merge each card's edits once, then derive every facet's options from the
+  // merged cards (instead of re-running applyEdits per card per facet).
+  const mergedGameCards = cards
+    .filter((card) => card.game === selectedGame)
+    .map((card) => applyEdits(card, effectiveCardEdits(edits, card)));
   for (const facet of facets) {
     pushFilter(
       filters,
       facet.key,
       facet.label,
       facet.label,
-      uniqueOptions(gameCards.map((card) => cardFilterValue(card, effectiveCardEdits(edits, card), facet.key))),
+      uniqueOptions(mergedGameCards.map((card) => mergedCardFilterValue(card, facet.key))),
     );
   }
 
@@ -76,15 +80,15 @@ function naturalCompare(left: string, right: string) {
 }
 
 export function cardMatchesFilters(card: CardRecord, edits: CardEdits | undefined, filters: Record<string, string>) {
+  const merged = applyEdits(card, edits);
   for (const [key, expected] of Object.entries(filters)) {
     if (!expected) continue;
-    if (cardFilterValue(card, edits, key) !== expected) return false;
+    if (mergedCardFilterValue(merged, key) !== expected) return false;
   }
   return true;
 }
 
-function cardFilterValue(card: CardRecord, edits: CardEdits | undefined, key: string) {
-  const merged = applyEdits(card, edits);
+function mergedCardFilterValue(merged: CardRecord, key: string) {
   switch (key) {
     case "game":
       return merged.game;
