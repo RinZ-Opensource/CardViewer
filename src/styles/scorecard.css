@@ -144,23 +144,6 @@
   background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_03.png");
 }
 
-.msc-box-dxscore {
-  left: 22px;
-  top: 386.5px;
-  width: 160px;
-  height: 25px;
-  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_01.png");
-}
-
-/* Notched denominator plate (UI_MSS_MBase_Box_02) — shape matters, stretch it */
-.msc-box-dxscore-max {
-  left: 97px;
-  top: 387px;
-  width: 85px;
-  height: 36px;
-  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_02.png");
-}
-
 .msc-designer-label {
   position: absolute;
   left: 20.5px;
@@ -186,17 +169,14 @@
   height: 68px;
 }
 
-.msc-tab-back {
-  top: 1.9px;
-}
-
-.msc-tab-front {
+.msc-tab {
   top: 2.9px;
 }
 
 .msc-pill {
   position: absolute;
   width: 116px;
+  top: 16.9px;
 }
 
 .msc-pill.at-left {
@@ -207,15 +187,6 @@
   left: 144px;
 }
 
-.msc-pill-front {
-  top: 16.9px;
-}
-
-.msc-pill-back {
-  top: 24.9px;
-  filter: brightness(0.765);
-}
-
 .msc-jacket {
   position: absolute;
   left: 42px;
@@ -223,7 +194,8 @@
   width: 200px;
   height: 200px;
   object-fit: cover;
-  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.85));
+  /* prefab IMG_Jacket carries a UI Outline component, not a drop shadow */
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8);
 }
 
 /* --- difficulty banner + level --- */
@@ -371,13 +343,15 @@
   top: 364px;
 }
 
-/* --- DX score row (MaruGothic DB white on the navy boxes) --- */
+/* --- DX score row (MaruGothic DB, white with navy outline) --- */
 
 .msc-dx-value,
 .msc-dx-slash,
 .msc-dx-max {
   position: absolute;
   color: #fff;
+  -webkit-text-stroke: 1.1px #16386b;
+  paint-order: stroke fill;
   font-family: var(--font-sega-maru-db, "Yu Gothic", sans-serif);
   font-weight: 700;
 }
@@ -456,6 +430,7 @@
   font-size: 12px;
   font-weight: 700;
   color: #353535;
+  white-space: nowrap;
 }
 
 .scorecard-empty {

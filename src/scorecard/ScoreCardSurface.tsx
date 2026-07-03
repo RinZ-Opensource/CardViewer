@@ -1,6 +1,6 @@
 import React from "react";
 import { ThemeToggle } from "../ThemeToggle";
-import { exportNodeAsPng } from "../exportPng";
+import { exportNodeAsPng, renderNodeToPng } from "../exportPng";
 import { MAI_SCORECARD_EXPORT_WIDTH, MaiScoreCard } from "./MaiScoreCard";
 import { MAI_DIFFICULTY_LABEL } from "./maiScore";
 import { MAI_SAMPLE_SONGS } from "./sampleSongs";
@@ -97,8 +97,7 @@ export function ScoreCardSurface() {
               }),
         ),
       );
-      const { toPng } = await import("html-to-image");
-      return toPng(target, { pixelRatio: 3 });
+      return renderNodeToPng(target, target.offsetWidth * 3);
     };
     return () => {
       delete scope.__setScorecardState;

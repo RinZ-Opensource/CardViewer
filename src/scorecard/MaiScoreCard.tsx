@@ -123,11 +123,8 @@ export function MaiScoreCard({ song, chart, state, maxDxScore, captureRef }: Mai
   const stars = maiDxStars(dxScore, maxDxScore);
   const levelSheet = maiSprite(`UI_NUM_MLevel_${MAI_LEVEL_SHEET[chart.difficulty]}`);
   const [achievementInt, achievementFrac = "0000"] = achievement.split(".");
-
-  // Bookmark tabs: DX bump left (Tab_01), Standard bump right (Tab_02); the
-  // active chart type's tab and pill render in front, the other is dimmed.
-  const frontTab = song.isDx ? "Tab_01" : "Tab_02";
-  const backTab = song.isDx ? "Tab_02" : "Tab_01";
+  // Empty achievement input = unplayed: blank plates, no score rows.
+  const played = state.achievement.trim().length > 0;
 
   return (
     <div className="mai-scorecard" ref={captureRef}>
@@ -136,29 +133,27 @@ export function MaiScoreCard({ song, chart, state, maxDxScore, captureRef }: Mai
       {/* White-section backplates + labels (prefab MusicData_NEW / DXScore) */}
       <span className="msc-box msc-box-achievement" />
       <span className="msc-box msc-box-rank" />
-      <span className="msc-box msc-box-dxscore" />
-      <span className="msc-box msc-box-dxscore-max" />
       <img
         className="msc-designer-label"
         src={maiSprite("UI_MSS_MBase_Text_NotesDesigner")}
         alt="NOTES DESIGNER"
       />
-      <img
-        className="msc-dxscore-label"
-        src={maiSprite("UI_MSS_MBase_Text_DXscore")}
-        alt="DX SCORE"
-      />
+      {played ? (
+        <img
+          className="msc-dxscore-label"
+          src={maiSprite("UI_MSS_MBase_Text_DXscore")}
+          alt="DX SCORE"
+        />
+      ) : null}
 
-      {/* Bookmark tabs (card top) */}
-      <img className="msc-tab msc-tab-back" src={maiSprite(`UI_MSS_MBase_${suffix}_${backTab}`)} alt="" />
+      {/* Bookmark tab: DX bump left (Tab_01), Standard bump right (Tab_02) */}
       <img
-        className={`msc-pill msc-pill-back ${song.isDx ? "at-right" : "at-left"}`}
-        src={maiSprite(song.isDx ? "UI_MSS_Infoicon_StandardMode" : "UI_MSS_Infoicon_DeluxeMode")}
+        className="msc-tab"
+        src={maiSprite(`UI_MSS_MBase_${suffix}_${song.isDx ? "Tab_01" : "Tab_02"}`)}
         alt=""
       />
-      <img className="msc-tab msc-tab-front" src={maiSprite(`UI_MSS_MBase_${suffix}_${frontTab}`)} alt="" />
       <img
-        className={`msc-pill msc-pill-front ${song.isDx ? "at-left" : "at-right"}`}
+        className={`msc-pill ${song.isDx ? "at-left" : "at-right"}`}
         src={maiSprite(song.isDx ? "UI_MSS_Infoicon_DeluxeMode" : "UI_MSS_Infoicon_StandardMode")}
         alt={song.isDx ? "でらっくす" : "スタンダード"}
       />
@@ -191,47 +186,53 @@ export function MaiScoreCard({ song, chart, state, maxDxScore, captureRef }: Mai
         <FitText maxWidth={240}>{song.artist}</FitText>
       </div>
 
-      {/* Achievement row (NewRodin EB gold on the navy box) */}
-      <span className="msc-ach msc-ach-int">{achievementInt}</span>
-      <span className="msc-ach msc-ach-dec">.{achievementFrac}</span>
-      <span className="msc-ach msc-ach-pct">%</span>
-      <img className="msc-rank" src={maiSprite(MAI_RANK_SPRITE[rank])} alt={rank} />
+      {/* Achievement + rank row */}
+      {played ? (
+        <>
+          <span className="msc-ach msc-ach-int">{achievementInt}</span>
+          <span className="msc-ach msc-ach-dec">.{achievementFrac}</span>
+          <span className="msc-ach msc-ach-pct">%</span>
+          <img className="msc-rank" src={maiSprite(MAI_RANK_SPRITE[rank])} alt={rank} />
+        </>
+      ) : null}
 
       {/* Badge medals */}
-      {state.comboBadge !== "none" ? (
+      {played && state.comboBadge !== "none" ? (
         <img className="msc-medal msc-medal-combo" src={maiSprite(MAI_COMBO_SPRITE[state.comboBadge])} alt={state.comboBadge} />
       ) : (
         <img className="msc-medal-blank msc-medal-combo-blank" src={maiSprite("UI_MSS_MBase_Icon_Blank")} alt="" />
       )}
-      {state.syncBadge !== "none" ? (
+      {played && state.syncBadge !== "none" ? (
         <img className="msc-medal msc-medal-sync" src={maiSprite(MAI_SYNC_SPRITE[state.syncBadge])} alt={state.syncBadge} />
       ) : (
         <img className="msc-medal-blank msc-medal-sync-blank" src={maiSprite("UI_MSS_MBase_Icon_Blank")} alt="" />
       )}
 
-      {/* DX score row (MaruGothic DB white on the navy boxes) */}
-      <span className="msc-dx-value">{dxScore.toLocaleString()}</span>
-      <span className="msc-dx-slash">/</span>
-      <span className="msc-dx-max">{maxDxScore > 0 ? maxDxScore.toLocaleString() : "----"}</span>
-
-      {/* DX star pips: 5 always, earned orange / unearned blue-gray */}
-      <span className="msc-stars">
-        {Array.from({ length: 5 }, (_, index) => (
-          <span
-            key={index}
-            className={`msc-star-pip ${index < stars ? "earned" : ""}`}
-            style={{
-              WebkitMaskImage: `url("${maiSprite(MAI_STAR_SPRITE)}")`,
-              maskImage: `url("${maiSprite(MAI_STAR_SPRITE)}")`,
-            }}
-          />
-        ))}
-      </span>
+      {/* DX score row + star pips (hidden when unplayed) */}
+      {played ? (
+        <>
+          <span className="msc-dx-value">{dxScore}</span>
+          <span className="msc-dx-slash">/</span>
+          <span className="msc-dx-max">{maxDxScore > 0 ? String(maxDxScore) : "----"}</span>
+          <span className="msc-stars">
+            {Array.from({ length: 5 }, (_, index) => (
+              <span
+                key={index}
+                className={`msc-star-pip ${index < stars ? "earned" : ""}`}
+                style={{
+                  WebkitMaskImage: `url("${maiSprite(MAI_STAR_SPRITE)}")`,
+                  maskImage: `url("${maiSprite(MAI_STAR_SPRITE)}")`,
+                }}
+              />
+            ))}
+          </span>
+        </>
+      ) : null}
 
       <FitText maxWidth={162} className="msc-designer-name">
         {chart.notesDesigner || "-"}
       </FitText>
-      <span className="msc-bpm">BPM:{song.bpm}</span>
+      <span className="msc-bpm">BPM {song.bpm}</span>
     </div>
   );
 }
