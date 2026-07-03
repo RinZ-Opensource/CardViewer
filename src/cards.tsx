@@ -593,6 +593,96 @@ export function Mu3LimitBreakStars({ card }: { card: CardRecord }) {
   );
 }
 
+// Layer groups shared by both MU3 card kinds (Mu3OfficialCard / Mu3AssetCard).
+// Each owns its own visibility check; the few divergent bits (user-name size,
+// QR fallback, card-number text) are passed in as props.
+function Mu3AttackLimit({ card }: { card: CardRecord }) {
+  if (fieldBool(card, "hideAttackLimit")) return null;
+  const attackValue = mu3AttackValue(card);
+  return (
+    <>
+      <LayerImage src={officialAsset("UI_Card_max_00")} {...MU3_MAX_LABEL_RECT} />
+      <Mu3LimitBreakStars card={card} />
+      <LayerDigitCounter
+        className="official-counter mu3-max-attack"
+        value={attackValue || "0"}
+        sprite={officialAsset("UI_Card_NUM_attack")}
+        x={-291}
+        y={-276.6}
+        w={100}
+        h={100}
+        align="center"
+        digitWidth={70}
+        digitHeight={70}
+        signWidth={70}
+        signHeight={70}
+        charSpacing={-29.9}
+        flags={0}
+      />
+    </>
+  );
+}
+
+function Mu3AwakenMark({ card }: { card: CardRecord }) {
+  const awakenMark = mu3AwakenMarkAsset(card);
+  if (fieldBool(card, "hideAwaken") || !awakenMark) return null;
+  return <LayerImage src={officialAsset(awakenMark)} {...MU3_AWAKEN_MARK_RECT} />;
+}
+
+function Mu3Grade({ card, assetDataUrls }: { card: CardRecord; assetDataUrls: Record<string, string> }) {
+  if (fieldBool(card, "hideGrade") || !assetDataUrls.mu3Grade || numericField(card, "gradeId", -1) < 0) return null;
+  return <LayerImage src={assetDataUrls.mu3Grade} {...MU3_GRADE_RECT} />;
+}
+
+function Mu3UserName({ card, fontSize, characterSpacing }: { card: CardRecord; fontSize: number; characterSpacing: number }) {
+  if (fieldBool(card, "hideUserName")) return null;
+  return (
+    <>
+      <LayerImage src={officialAsset("UI_Card_UserName_00")} {...MU3_USER_NAME_BASE_RECT} />
+      <LayerCanvasText className="official-title mu3-user" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={fontSize} fontWeight={550} alignment={4} color="#000000" characterSpacing={characterSpacing} x={267.1} y={-300.6} w={190} h={19.2} fitHorizontal>
+        {fieldString(card, "userName") || "USER"}
+      </LayerCanvasText>
+    </>
+  );
+}
+
+function Mu3Qr({ card, serialFallback }: { card: CardRecord; serialFallback: string }) {
+  if (fieldBool(card, "hideQRCode")) return null;
+  return (
+    <>
+      <LayerImage src={officialAsset("UI_Card_qr_base_00")} {...MU3_QR_BASE_RECT} />
+      <LayerQr source={qrSource(card, serialFallback)} x={249.4} y={-392.3} w={113} h={113} />
+    </>
+  );
+}
+
+function Mu3Footer({
+  card,
+  assetDataUrls,
+  cardNoText,
+  cardNoCharSpacing,
+}: {
+  card: CardRecord;
+  assetDataUrls: Record<string, string>;
+  cardNoText: string;
+  cardNoCharSpacing: number;
+}) {
+  return (
+    <>
+      <LayerImage src={officialAsset("UI_Card_rightsplate_00")} {...MU3_RIGHTS_PLATE_RECT} />
+      <LayerCanvasText className="official-serial mu3-serial" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} characterSpacing={2} alignment={1} color="#ffffff" x={-135} y={-495.9} w={311} h={21} fitHorizontal>
+        {formatDisplaySerial(fieldString(card, "serialId"))}
+      </LayerCanvasText>
+      <LayerCanvasText className="official-serial mu3-cardno" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} characterSpacing={cardNoCharSpacing} alignment={1} color="#ffffff" x={132} y={-495.9} w={311} h={21} fitHorizontal>
+        {cardNoText}
+      </LayerCanvasText>
+      {assetDataUrls.mu3Rights && numericField(card, "rightsId", -1) > 0 ? (
+        <LayerImage src={assetDataUrls.mu3Rights} {...MU3_RIGHTS_RECT} />
+      ) : null}
+    </>
+  );
+}
+
 export function Mu3OfficialCard({
   card,
   imageDataUrl,
@@ -619,10 +709,6 @@ export function Mu3OfficialCard({
   const showFrame = mu3ShowMainFrame(card);
   const charaSrc = assetDataUrls.mu3Chara;
   const cardBgSrc = assetDataUrls.mu3CardBg;
-  const gradeId = numericField(card, "gradeId", -1);
-  const rightsId = numericField(card, "rightsId", -1);
-  const attackValue = mu3AttackValue(card);
-  const awakenMark = mu3AwakenMarkAsset(card);
   const {
     isCommonModel,
     nickname: mu3Nickname,
@@ -649,9 +735,7 @@ export function Mu3OfficialCard({
       {fieldBool(card, "digitalOnly") ? (
         <LayerImage src={officialAsset("UI_Card_DigitalMark_00")} {...MU3_DIGITAL_MARK_RECT} />
       ) : null}
-      {!fieldBool(card, "hideGrade") && assetDataUrls.mu3Grade && gradeId >= 0 ? (
-        <LayerImage src={assetDataUrls.mu3Grade} {...MU3_GRADE_RECT} />
-      ) : null}
+      <Mu3Grade card={card} assetDataUrls={assetDataUrls} />
       {!fieldBool(card, "hideSkill") ? (
         <>
           <LayerImage src={officialAsset(mu3SkillAsset(card))} {...MU3_SKILL_BASE_RECT} />
@@ -686,39 +770,9 @@ export function Mu3OfficialCard({
           </LayerCanvasText>
         </>
       ) : null}
-      {!fieldBool(card, "hideAttackLimit") ? (
-        <>
-          <LayerImage src={officialAsset("UI_Card_max_00")} {...MU3_MAX_LABEL_RECT} />
-          <Mu3LimitBreakStars card={card} />
-          <LayerDigitCounter
-            className="official-counter mu3-max-attack"
-            value={attackValue || "0"}
-            sprite={officialAsset("UI_Card_NUM_attack")}
-            x={-291}
-            y={-276.6}
-            w={100}
-            h={100}
-            align="center"
-            digitWidth={70}
-            digitHeight={70}
-            signWidth={70}
-            signHeight={70}
-            charSpacing={-29.9}
-            flags={0}
-          />
-        </>
-      ) : null}
-      {!fieldBool(card, "hideAwaken") && awakenMark ? (
-        <LayerImage src={officialAsset(awakenMark)} {...MU3_AWAKEN_MARK_RECT} />
-      ) : null}
-      {!fieldBool(card, "hideUserName") ? (
-        <>
-          <LayerImage src={officialAsset("UI_Card_UserName_00")} {...MU3_USER_NAME_BASE_RECT} />
-          <LayerCanvasText className="official-title mu3-user" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={22} fontWeight={550} alignment={4} color="#000000" characterSpacing={6} x={267.1} y={-300.6} w={190} h={19.2} fitHorizontal>
-            {fieldString(card, "userName") || "USER"}
-          </LayerCanvasText>
-        </>
-      ) : null}
+      <Mu3AttackLimit card={card} />
+      <Mu3AwakenMark card={card} />
+      <Mu3UserName card={card} fontSize={22} characterSpacing={6} />
       {!fieldBool(card, "hideName") ? (
         isCommonModel ? (
           <>
@@ -759,22 +813,8 @@ export function Mu3OfficialCard({
           </>
         )
       ) : null}
-      {!fieldBool(card, "hideQRCode") ? (
-        <>
-          <LayerImage src={officialAsset("UI_Card_qr_base_00")} {...MU3_QR_BASE_RECT} />
-          <LayerQr source={qrSource(card, fieldString(card, "serialId") || fieldString(card, "cardNo"))} x={249.4} y={-392.3} w={113} h={113} />
-        </>
-      ) : null}
-      <LayerImage src={officialAsset("UI_Card_rightsplate_00")} {...MU3_RIGHTS_PLATE_RECT} />
-      <LayerCanvasText className="official-serial mu3-serial" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} characterSpacing={2} alignment={1} color="#ffffff" x={-135} y={-495.9} w={311} h={21} fitHorizontal>
-        {formatDisplaySerial(fieldString(card, "serialId"))}
-      </LayerCanvasText>
-      <LayerCanvasText className="official-serial mu3-cardno" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} characterSpacing={1} alignment={1} color="#ffffff" x={132} y={-495.9} w={311} h={21} fitHorizontal>
-        {fieldString(card, "cardNo") || "CARD NO."}
-      </LayerCanvasText>
-      {assetDataUrls.mu3Rights && rightsId > 0 ? (
-        <LayerImage src={assetDataUrls.mu3Rights} {...MU3_RIGHTS_RECT} />
-      ) : null}
+      <Mu3Qr card={card} serialFallback={fieldString(card, "serialId") || fieldString(card, "cardNo")} />
+      <Mu3Footer card={card} assetDataUrls={assetDataUrls} cardNoText={fieldString(card, "cardNo") || "CARD NO."} cardNoCharSpacing={1} />
       {officialHolo(card) ? <HoloShaderLayer card={card} assetDataUrls={assetDataUrls} lightStyle={lightStyle} inline /> : null}
     </div>
   );
@@ -789,10 +829,6 @@ export function Mu3AssetCard({
   imageDataUrl: string;
   assetDataUrls: Record<string, string>;
 }) {
-  const gradeId = numericField(card, "gradeId", -1);
-  const rightsId = numericField(card, "rightsId", -1);
-  const attackValue = mu3AttackValue(card);
-  const awakenMark = mu3AwakenMarkAsset(card);
   const { nickname: mu3Nickname, baseCharacterName: mu3CharacterName } = mu3CardNames(card);
   return (
     <div className="official-card official-mu3 official-mu3-asset">
@@ -801,42 +837,10 @@ export function Mu3AssetCard({
       ) : (
         <LayerImage src={officialAsset("UI_Card_BG_N_00")} x={0} y={0} w={768} h={1052} />
       )}
-      {!fieldBool(card, "hideGrade") && assetDataUrls.mu3Grade && gradeId >= 0 ? (
-        <LayerImage src={assetDataUrls.mu3Grade} {...MU3_GRADE_RECT} />
-      ) : null}
-      {!fieldBool(card, "hideAttackLimit") ? (
-        <>
-          <LayerImage src={officialAsset("UI_Card_max_00")} {...MU3_MAX_LABEL_RECT} />
-          <Mu3LimitBreakStars card={card} />
-          <LayerDigitCounter
-            className="official-counter mu3-max-attack"
-            value={attackValue || "0"}
-            sprite={officialAsset("UI_Card_NUM_attack")}
-            x={-291}
-            y={-276.6}
-            w={100}
-            h={100}
-            align="center"
-            digitWidth={70}
-            digitHeight={70}
-            signWidth={70}
-            signHeight={70}
-            charSpacing={-29.9}
-            flags={0}
-          />
-        </>
-      ) : null}
-      {!fieldBool(card, "hideAwaken") && awakenMark ? (
-        <LayerImage src={officialAsset(awakenMark)} {...MU3_AWAKEN_MARK_RECT} />
-      ) : null}
-      {!fieldBool(card, "hideUserName") ? (
-        <>
-          <LayerImage src={officialAsset("UI_Card_UserName_00")} {...MU3_USER_NAME_BASE_RECT} />
-          <LayerCanvasText className="official-title mu3-user" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} fontWeight={550} alignment={4} color="#000000" characterSpacing={3} x={267.1} y={-300.6} w={190} h={19.2} fitHorizontal>
-            {fieldString(card, "userName") || "USER"}
-          </LayerCanvasText>
-        </>
-      ) : null}
+      <Mu3Grade card={card} assetDataUrls={assetDataUrls} />
+      <Mu3AttackLimit card={card} />
+      <Mu3AwakenMark card={card} />
+      <Mu3UserName card={card} fontSize={19} characterSpacing={3} />
       {!fieldBool(card, "hideName") ? (
         <>
           {mu3Nickname ? (
@@ -857,22 +861,8 @@ export function Mu3AssetCard({
           </LayerTmpText>
         </>
       ) : null}
-      {!fieldBool(card, "hideQRCode") ? (
-        <>
-          <LayerImage src={officialAsset("UI_Card_qr_base_00")} {...MU3_QR_BASE_RECT} />
-          <LayerQr source={qrSource(card, fieldString(card, "cardNo"))} x={249.4} y={-392.3} w={113} h={113} />
-        </>
-      ) : null}
-      <LayerImage src={officialAsset("UI_Card_rightsplate_00")} {...MU3_RIGHTS_PLATE_RECT} />
-      <LayerCanvasText className="official-serial mu3-serial" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} characterSpacing={2} alignment={1} color="#ffffff" x={-135} y={-495.9} w={311} h={21} fitHorizontal>
-        {formatDisplaySerial(fieldString(card, "serialId"))}
-      </LayerCanvasText>
-      <LayerCanvasText className="official-serial mu3-cardno" fontFamily={CANVAS_FONT_SEGA_MARU_DB} fontSize={19} characterSpacing={2} alignment={1} color="#ffffff" x={132} y={-495.9} w={311} h={21} fitHorizontal>
-        {fieldString(card, "cardNo") || card.id}
-      </LayerCanvasText>
-      {assetDataUrls.mu3Rights && rightsId > 0 ? (
-        <LayerImage src={assetDataUrls.mu3Rights} {...MU3_RIGHTS_RECT} />
-      ) : null}
+      <Mu3Qr card={card} serialFallback={fieldString(card, "cardNo")} />
+      <Mu3Footer card={card} assetDataUrls={assetDataUrls} cardNoText={fieldString(card, "cardNo") || card.id} cardNoCharSpacing={2} />
     </div>
   );
 }
