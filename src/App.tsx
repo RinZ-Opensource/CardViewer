@@ -216,12 +216,27 @@ export function App() {
       <main className="app-shell">
       <aside className="sidebar">
         <section className="filters">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search printed text"
-            className="search-input"
-          />
+          <div className="search-field">
+            <svg
+              className="search-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search printed text"
+              className="search-input"
+            />
+          </div>
           {games.length > 0 ? (
             <div className="segment">
               {games.map((game) => (
@@ -295,7 +310,7 @@ export function App() {
                         {card.dataName} / {card.recordType}
                       </small>
                     </span>
-                    {edits[card.dataName] ? <span className="edited-dot" /> : null}
+                    {edits[card.dataName] ? <span className="chip-edited">edited</span> : null}
                   </button>
                 );
               })}
@@ -313,7 +328,7 @@ export function App() {
                 <span className="preview-spinner" role="status" aria-label={status || "Loading"} title={status} />
               ) : null}
             </div>
-            <p>{selected ? `${selected.game} / ${selected.dataName}` : "Scan a package"}</p>
+            <p className="preview-subtitle">{selected ? `${selected.game} / ${selected.dataName}` : "Scan a package"}</p>
           </div>
           <div className="preview-actions">
             <ThemeToggle />
