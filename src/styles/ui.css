@@ -160,8 +160,8 @@
 }
 
 .preview-meta span {
-  padding: 7px 10px;
-  border-radius: 7px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
   background: var(--ui-meta-bg);
   border: 1px solid var(--ui-meta-border);
   backdrop-filter: blur(10px);
@@ -202,6 +202,21 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.editor-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-header h3::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--ui-accent);
 }
 
 .form-grid {
@@ -250,19 +265,54 @@
 }
 
 .toggle-control {
-  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-columns: 30px minmax(0, 1fr);
   align-items: center;
-  min-height: 32px;
-  padding: 7px 8px;
+  min-height: 34px;
+  padding: 7px 10px;
   border: 1px solid var(--ui-border);
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--ui-toggle-bg);
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+
+.toggle-control:has(input:checked) {
+  border-color: color-mix(in srgb, var(--ui-accent) 52%, var(--ui-border));
+  background: var(--ui-accent-soft);
 }
 
 .toggle-control input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--ui-accent);
+  appearance: none;
+  -webkit-appearance: none;
+  width: 30px;
+  height: 18px;
+  margin: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-text-muted) 34%, transparent);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+
+.toggle-control input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.16s ease;
+}
+
+.toggle-control input:checked {
+  background: var(--ui-accent);
+}
+
+.toggle-control input:checked::after {
+  transform: translateX(12px);
 }
 
 .edit-json {
@@ -272,18 +322,43 @@
 }
 
 .edit-json summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
+  list-style: none;
+}
+
+.edit-json summary::-webkit-details-marker {
+  display: none;
+}
+
+.edit-json summary::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--ui-text-muted);
+  border-bottom: 1.5px solid var(--ui-text-muted);
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.edit-json[open] summary::before {
+  transform: rotate(45deg);
 }
 
 .edit-json pre {
   max-height: 170px;
   overflow: auto;
-  padding: 10px;
-  border-radius: 7px;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: var(--radius-control);
   background: #292d2f;
   color: #f5eee5;
+  font-family: var(--font-mono);
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 @media (max-width: 1180px) {

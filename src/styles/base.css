@@ -19,16 +19,32 @@
   --font-official-number:
     "CardViewer Zen Kaku", "CardViewer NewRodin", "Impact", "Arial Black",
     sans-serif;
+  /* Data/mono face for IDs, serials, tabular figures, and the override JSON. */
+  --font-mono:
+    ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   /* UI chrome theme tokens; dark overrides live in :root[data-theme="dark"].
      Card-art styles further down are intentionally NOT themed. */
   color-scheme: light;
-  /* Layout tokens (not theme-dependent): shared control height and radii. */
+  /* Layout tokens (not theme-dependent): control height, radii, spacing scale. */
   --control-h: 34px;
-  --radius-sm: 7px;
-  --radius-md: 8px;
+  /* Semantic radii: controls/inputs ~10, rows/insets ~12, panels/cards ~16, pills. */
+  --radius-control: 10px;
+  --radius-inset: 12px;
+  --radius-card: 16px;
+  --radius-pill: 999px;
+  /* Aliases kept for legacy rules; prefer the semantic radii above. */
+  --radius-sm: var(--radius-control);
+  --radius-md: var(--radius-inset);
+  /* 4px-based spacing scale. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
   /* Card-row thumbnail width; the row's grid column is driven from the same
      value. Overridden inside the narrow-viewport breakpoint in ui.css. */
   --thumb-w: 46px;
@@ -52,6 +68,7 @@
   --ui-accent-strong: #007d80;
   --ui-accent-hover: #00696c;
   --ui-accent-ring: rgba(11, 111, 112, 0.12);
+  --ui-accent-soft: #dceeed;
   --ui-ghost-bg: #e8eef0;
   --ui-ghost-hover: #dbe5e8;
   --ui-segment-text: #5d6870;
@@ -63,6 +80,8 @@
   --ui-meta-bg: rgba(255, 253, 249, 0.8);
   --ui-meta-border: rgba(216, 210, 198, 0.9);
   --ui-edited-dot: #c85f38;
+  --ui-edited-soft: #f4e9d4;
+  --ui-edited-text: #9a6212;
 
   color: var(--ui-text);
   background: var(--ui-bg);
@@ -93,6 +112,7 @@
   --ui-accent-strong: #1cb6b0;
   --ui-accent-hover: #149c97;
   --ui-accent-ring: rgba(36, 198, 192, 0.24);
+  --ui-accent-soft: #123a39;
   --ui-ghost-bg: #283037;
   --ui-ghost-hover: #323c42;
   --ui-segment-text: #95a2a9;
@@ -104,6 +124,8 @@
   --ui-meta-bg: rgba(20, 26, 28, 0.82);
   --ui-meta-border: rgba(74, 86, 90, 0.7);
   --ui-edited-dot: #db7d52;
+  --ui-edited-soft: #38301d;
+  --ui-edited-text: #e0a552;
 }
 
 /* Theme-switch crossfade (driven from src/theme.ts). The View Transitions API
@@ -236,7 +258,7 @@ button {
 .editor-panel.empty,
 .editor-section {
   border: 1px solid var(--ui-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-card);
   background: var(--ui-surface);
 }
 
@@ -316,7 +338,6 @@ small,
 .primary-button {
   background: var(--ui-accent);
   color: #fff;
-  box-shadow: 0 8px 18px rgba(11, 111, 112, 0.2);
 }
 
 .ghost-button {
@@ -399,6 +420,27 @@ small,
   box-shadow: 0 0 0 3px var(--ui-accent-ring);
 }
 
+.search-field {
+  position: relative;
+  display: block;
+}
+
+.search-field .search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  color: var(--ui-text-muted);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.search-field .search-input {
+  padding-left: 34px;
+}
+
 .error-toast {
   position: fixed;
   left: 50%;
@@ -414,9 +456,7 @@ small,
   background: var(--ui-surface);
   color: var(--ui-danger);
   border: 1px solid rgba(214, 70, 70, 0.42);
-  box-shadow:
-    0 14px 34px rgba(120, 30, 30, 0.2),
-    0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 20px rgba(20, 40, 40, 0.12);
   font-size: 13px;
   line-height: 1.45;
   animation: error-toast-in 0.18s ease-out;
@@ -451,9 +491,7 @@ small,
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
-  box-shadow:
-    0 12px 30px rgba(0, 125, 128, 0.38),
-    0 3px 8px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 22px rgba(0, 125, 128, 0.24);
   transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
 }
 
@@ -466,9 +504,7 @@ small,
 .export-fab:hover {
   background: var(--ui-accent-hover);
   transform: translateY(-2px);
-  box-shadow:
-    0 14px 32px rgba(0, 125, 128, 0.44),
-    0 3px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 26px rgba(0, 125, 128, 0.3);
 }
 
 .export-fab:active {
@@ -555,10 +591,13 @@ small,
   color: var(--ui-segment-text);
 }
 
+.segment button:hover {
+  color: var(--ui-text);
+}
+
 .segment button.active {
-  background: var(--ui-surface);
-  color: var(--ui-text-strong);
-  box-shadow: 0 1px 4px rgba(42, 37, 31, 0.1);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-strong);
 }
 
 .card-list {
@@ -585,22 +624,38 @@ small,
 .card-row {
   position: relative;
   display: grid;
-  grid-template-columns: var(--thumb-w) minmax(0, 1fr) 8px;
+  grid-template-columns: var(--thumb-w) minmax(0, 1fr) auto;
   align-items: center;
   gap: 11px;
   min-height: 75px;
   width: 100%;
   padding: 8px 10px 8px 8px;
   border: 1px solid var(--ui-border-strong);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-inset);
   background: var(--ui-surface);
   color: var(--ui-text);
   text-align: left;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+
+.card-row:hover {
+  border-color: color-mix(in srgb, var(--ui-accent) 42%, var(--ui-border-strong));
 }
 
 .card-row.active {
   border-color: var(--ui-accent);
-  background: var(--ui-row-active-bg);
+  background: var(--ui-accent-soft);
+}
+
+.card-row.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--ui-accent);
 }
 
 .thumb-slot {
@@ -640,11 +695,32 @@ small,
   font-size: 13px;
 }
 
-.edited-dot {
-  width: 8px;
-  height: 8px;
+.row-main small {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.chip-edited {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--ui-edited-soft);
+  color: var(--ui-edited-text);
+  border: 1px solid color-mix(in srgb, var(--ui-edited-text) 28%, transparent);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip-edited::before {
+  content: "";
+  width: 5px;
+  height: 5px;
   border-radius: 999px;
-  background: var(--ui-edited-dot);
+  background: var(--ui-edited-text);
 }
 
 .workspace {
@@ -672,6 +748,12 @@ small,
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+.preview-subtitle {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .preview-spinner {
@@ -731,7 +813,7 @@ small,
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--ui-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-card);
   background: var(--ui-stage-bg);
   perspective: 900px;
 }
