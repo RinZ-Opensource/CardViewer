@@ -236,10 +236,39 @@ button {
   cursor: pointer;
 }
 
+.shell-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--ui-shell-bg);
+}
+
+.surface-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-sidebar-bg);
+}
+
+.surface-brand {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-muted);
+}
+
+.surface-body {
+  flex: 1;
+  min-height: 0;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 390px minmax(0, 1fr);
-  height: 100vh;
+  height: 100%;
   background: var(--ui-shell-bg);
 }
 

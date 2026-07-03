@@ -31,12 +31,28 @@ export function installPrivateFontFaces() {
   font-style: normal;
   font-display: swap;
 }
+@font-face {
+  font-family: "CardViewer SegaKakuDB";
+  src: url("/fonts/private/SEGA-KakuGothic-DB.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "CardViewer NewRodinDB";
+  src: url("/fonts/private/FOT-NewRodinN-DB.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 html[data-deployment-mode="private"] {
   --font-sega-kaku: "CardViewer Zen Kaku", "CardViewer NewRodin", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-sega-maru: "CardViewer Zen Maru", "CardViewer Humming", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-sega-maru-db: "CardViewer SegaMaruDB", "CardViewer Zen Maru", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-tmp-humming: "CardViewer Humming", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-official-number: "CardViewer NewRodin", "Impact", "Arial Black", sans-serif;
+  --font-mai-kaku: "CardViewer SegaKakuDB", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
+  --font-mai-rodin: "CardViewer NewRodinDB", "CardViewer NewRodin", "Arial Black", sans-serif;
 }`;
   document.head.append(style);
 }

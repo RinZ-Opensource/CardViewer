@@ -1,6 +1,6 @@
 import React from "react";
-import { toPng } from "html-to-image";
 import { EditorPanel } from "./EditorPanel";
+import { exportNodeAsPng } from "./exportPng";
 import { ThemeToggle } from "./ThemeToggle";
 import { applyEdits } from "./cardData";
 import { effectiveCardEdits } from "./cardEdits";
@@ -186,23 +186,11 @@ export function App() {
       await new Promise((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(() => resolve(null))),
       );
-      const width = target.offsetWidth || CARD_WIDTH;
-      const pixelRatio = Math.min(4, Math.max(1, CARD_WIDTH / width));
-      const dataUrl = await toPng(target, {
-        pixelRatio,
-        // Keep the card art + holo overlay, drop the soft edge-light glow.
-        filter: (node) =>
-          !(node instanceof HTMLElement && node.classList.contains("edge-light")),
-      });
-      const baseName =
-        (selected.displayName || selected.dataName || "card")
-          .replace(/[\\/:*?"<>|]/g, "_")
-          .replace(/[.\s]+$/, "")
-          .trim() || "card";
-      const anchor = document.createElement("a");
-      anchor.href = dataUrl;
-      anchor.download = `${baseName}.png`;
-      anchor.click();
+      await exportNodeAsPng(
+        target,
+        selected.displayName || selected.dataName || "card",
+        CARD_WIDTH,
+      );
     } catch (err) {
       setError(`Export failed: ${String(err)}`);
     } finally {

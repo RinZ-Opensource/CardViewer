@@ -1,0 +1,325 @@
+/* ---------------------------------------------------------------------------
+ * Score-card surface layout
+ * ------------------------------------------------------------------------- */
+
+.scorecard-shell {
+  display: grid;
+  grid-template-columns: 390px minmax(0, 1fr);
+  height: 100%;
+  background: var(--ui-shell-bg);
+}
+
+.scorecard-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-right: 1px solid var(--ui-border);
+  background: var(--ui-sidebar-bg);
+  overflow-y: auto;
+}
+
+.scorecard-form h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.scorecard-form .control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ui-text-muted);
+}
+
+.scorecard-form .control input,
+.scorecard-form .control select {
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-panel-bg);
+  color: var(--ui-text);
+}
+
+.scorecard-form .segment {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.scorecard-preview {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.scorecard-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+}
+
+.scorecard-export {
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--ui-accent, #3b82f6);
+  color: #fff;
+  font-weight: 600;
+}
+
+.scorecard-export:disabled {
+  opacity: 0.6;
+}
+
+.scorecard-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  min-height: 0;
+}
+
+/* Scales the design-space card up for on-screen preview (factor set from JS to
+ * fit the stage); export captures the unscaled inner node so PNG output stays
+ * in design pixels x pixelRatio. */
+.scorecard-zoom {
+  transform-origin: center;
+  flex: 0 0 auto;
+}
+
+.scorecard-stage {
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------------------
+ * maimai DX music-select detail card (design space: 284x464 sprite px)
+ * ------------------------------------------------------------------------- */
+
+.mai-scorecard {
+  position: relative;
+  width: 284px;
+  height: 464px;
+  font-kerning: none;
+}
+
+.mai-scorecard img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.msc-base {
+  position: absolute;
+  inset: 0;
+  width: 284px;
+  height: 464px;
+}
+
+.msc-type-plate {
+  position: absolute;
+  left: 20px;
+  top: 33px;
+  width: 106px;
+}
+
+.msc-jacket {
+  position: absolute;
+  left: 43px;
+  top: 76px;
+  width: 198px;
+  height: 198px;
+  object-fit: cover;
+}
+
+.msc-diff-banner {
+  position: absolute;
+  left: 22px;
+  top: 277px;
+  width: 240px;
+}
+
+.msc-lv-row {
+  position: absolute;
+  right: 26px;
+  top: 272px;
+  height: 34px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.msc-lv-label {
+  height: 14px;
+  margin-bottom: 4px;
+}
+
+.sprite-digits {
+  display: inline-flex;
+  align-items: flex-end;
+}
+
+.sprite-digits > span {
+  display: inline-block;
+  background-repeat: no-repeat;
+}
+
+.msc-title {
+  position: absolute;
+  left: 28px;
+  width: 228px;
+  top: 305px;
+  height: 31px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.msc-artist {
+  position: absolute;
+  left: 28px;
+  width: 228px;
+  top: 336px;
+  height: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.msc-achievement {
+  position: absolute;
+  left: 26px;
+  top: 369px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.msc-achievement-unit {
+  margin-left: 3px;
+  margin-bottom: 1px;
+  font-family: var(--font-mai-rodin, "Arial Black", sans-serif);
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffc226;
+  -webkit-text-stroke: 1.1px #b3401d;
+  paint-order: stroke fill;
+}
+
+.msc-rank {
+  position: absolute;
+  right: 84px;
+  top: 375px;
+  height: 20px;
+}
+
+.msc-badges {
+  position: absolute;
+  right: 13px;
+  top: 366px;
+  display: flex;
+  gap: 2px;
+}
+
+.msc-badges img {
+  width: 35px;
+  height: 35px;
+}
+
+.msc-dxscore {
+  position: absolute;
+  left: 26px;
+  top: 401px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.msc-dxscore-label {
+  height: 12px;
+}
+
+.msc-dxscore-value {
+  font-family: var(--font-mai-rodin, "Arial Black", sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  -webkit-text-stroke: 1.1px #16386b;
+  paint-order: stroke fill;
+  letter-spacing: 0.02em;
+}
+
+.msc-dxscore-max {
+  font-size: 11px;
+}
+
+.msc-designer-row {
+  position: absolute;
+  left: 26px;
+  top: 417px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.msc-designer-label {
+  height: 9px;
+}
+
+.msc-stars {
+  display: flex;
+  gap: 1px;
+}
+
+.msc-stars img {
+  width: 12px;
+  height: 12px;
+}
+
+.msc-footer {
+  position: absolute;
+  left: 26px;
+  right: 22px;
+  top: 426px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.msc-designer-name {
+  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fff;
+  -webkit-text-stroke: 0.9px #16386b;
+  paint-order: stroke fill;
+  white-space: nowrap;
+  transform-origin: left;
+}
+
+.msc-bpm {
+  font-family: var(--font-mai-rodin, "Arial Black", sans-serif);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fff;
+  -webkit-text-stroke: 0.9px #16386b;
+  paint-order: stroke fill;
+}
+
+.scorecard-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--ui-text-muted);
+}
