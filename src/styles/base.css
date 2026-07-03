@@ -297,7 +297,6 @@ p,
 small,
 .field-label,
 .control span,
-.preview-status,
 .preview-meta,
 .edit-json summary {
   color: var(--ui-text-muted);
@@ -665,6 +664,36 @@ small,
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* Card name + inline load spinner (spinner shows only while scanning). */
+.preview-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.preview-spinner {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--ui-text-muted) 32%, transparent);
+  border-top-color: var(--ui-accent);
+  animation: preview-spin 0.7s linear infinite;
+}
+
+@keyframes preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview-spinner {
+    animation-duration: 1.8s;
+  }
 }
 
 .theme-toggle {

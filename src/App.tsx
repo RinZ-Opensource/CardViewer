@@ -21,7 +21,7 @@ export function App() {
   const { cardListRef, cardListViewport, updateCardListScroll } = useCardListViewport();
   const { officialFonts, tmpFont } = useOfficialFonts();
   const { edits, updateCardField, updatePlayerField, resetCardEdits } = useCardEdits();
-  const { scanResult, status, error, setError } = useScanResult(setSelectedId);
+  const { scanResult, status, error, setError, loading } = useScanResult(setSelectedId);
 
   const cards = scanResult?.cards ?? [];
   const displayCards = React.useMemo(
@@ -307,9 +307,13 @@ export function App() {
       <section className="workspace">
         <div className="preview-toolbar">
           <div>
-            <h2>{selected?.displayName ?? "No card selected"}</h2>
+            <div className="preview-title-row">
+              <h2>{selected?.displayName ?? "No card selected"}</h2>
+              {loading ? (
+                <span className="preview-spinner" role="status" aria-label={status || "Loading"} title={status} />
+              ) : null}
+            </div>
             <p>{selected ? `${selected.game} / ${selected.dataName}` : "Scan a package"}</p>
-            {status ? <p className="preview-status">{status}</p> : null}
           </div>
           <div className="preview-actions">
             <ThemeToggle />

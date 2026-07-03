@@ -46,6 +46,7 @@ export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction
   const [packageRoot, setPackageRoot] = React.useState(DEFAULT_PACKAGE_ROOT);
   const [status, setStatus] = React.useState("Ready");
   const [error, setError] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
   const autoLoadStartedRef = React.useRef(false);
   const loadSequenceRef = React.useRef(0);
 
@@ -61,6 +62,7 @@ export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction
 
     const scanPackage = async () => {
       setError("");
+      setLoading(true);
       const tauriAvailable = canInvokeTauri();
       const loadId = loadSequenceRef.current + 1;
       loadSequenceRef.current = loadId;
@@ -109,13 +111,15 @@ export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction
         if (!isCurrentLoad()) return;
         setError(String(err));
         setStatus("Scan failed");
+      } finally {
+        if (isCurrentLoad()) setLoading(false);
       }
     };
 
     void scanPackage();
   }, [packageRoot, setSelectedId]);
 
-  return { scanResult, status, error, setError };
+  return { scanResult, status, error, setError, loading };
 }
 
 // Owns the persisted print-edit state and the mutations against it. Per-card
