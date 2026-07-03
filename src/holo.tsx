@@ -97,7 +97,7 @@ export function HoloMaterialLayer({
   );
 }
 
-export type Mu3SvgImage = {
+export type HoloMaskImage = {
   href: string;
   x: number;
   y: number;
@@ -107,7 +107,7 @@ export type Mu3SvgImage = {
   maskMode?: HoloRootMaskMode;
 };
 
-export type Mu3SvgRect = {
+export type HoloMaskRect = {
   x: number;
   y: number;
   w: number;
@@ -115,7 +115,7 @@ export type Mu3SvgRect = {
   rotation?: number;
 };
 
-export type Mu3TmpTextMask = Mu3SvgRect & {
+export type HoloTmpTextMask = HoloMaskRect & {
   text: string;
   fontSize: number;
   variant: TmpTextVariant;
@@ -128,8 +128,8 @@ export type Mu3TmpTextMask = Mu3SvgRect & {
   maskIncludeUnderlay?: boolean;
 };
 
-export type Mu3MaskMode = "alpha" | "light-or-alpha" | "dark-or-alpha" | "raw";
-export type HoloRootMaskMode = Mu3MaskMode | "red";
+export type HoloMaskMode = "alpha" | "light-or-alpha" | "dark-or-alpha" | "raw";
+export type HoloRootMaskMode = HoloMaskMode | "red";
 
 export type HoloCssMaskOptions = {
   fallbackAllowWhenSparse?: boolean;
@@ -140,18 +140,18 @@ export type HoloCssMaskOptions = {
 // positional args) keeps call sites self-documenting and removes the transpose
 // risk between the identically-typed signMask/signClear/exclude image arrays.
 export type HoloMaskInput = {
-  rootImages: Mu3SvgImage[];
-  frontImages: Mu3SvgImage[];
-  frontRects: Mu3SvgRect[];
-  signMaskImages?: Mu3SvgImage[];
-  signClearImages?: Mu3SvgImage[];
-  frontTextMasks?: Mu3TmpTextMask[];
-  excludeImages?: Mu3SvgImage[];
+  rootImages: HoloMaskImage[];
+  frontImages: HoloMaskImage[];
+  frontRects: HoloMaskRect[];
+  signMaskImages?: HoloMaskImage[];
+  signClearImages?: HoloMaskImage[];
+  frontTextMasks?: HoloTmpTextMask[];
+  excludeImages?: HoloMaskImage[];
   tmpFont?: TmpFontMetrics | null;
   options?: HoloCssMaskOptions;
 };
 
-export function pushMu3TmpTextMask(masks: Mu3TmpTextMask[], mask: Mu3TmpTextMask) {
+function pushHoloTmpTextMask(masks: HoloTmpTextMask[], mask: HoloTmpTextMask) {
   if (!mask.text) return;
   masks.push({
     horizontalAlign: "right",
@@ -187,9 +187,9 @@ export function MaiOfficialHoloLayer({
   const ratingBase = maiRatingBaseAsset(card);
   const effects = maiCardTypeEffects(card);
   const effectIconAsset = maiEffectIconAsset(card);
-  const rootImages: Mu3SvgImage[] = [];
-  const frontImages: Mu3SvgImage[] = [];
-  const frontRects: Mu3SvgRect[] = [];
+  const rootImages: HoloMaskImage[] = [];
+  const frontImages: HoloMaskImage[] = [];
+  const frontRects: HoloMaskRect[] = [];
 
   rootImages.push({ href: officialAsset("UI_CMA_Holo_CardBase_00"), x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
   if (maskSrc) {
@@ -276,13 +276,13 @@ export function Mu3OfficialHoloLayer({
   const attr = clampInt(fieldNumber(card, "attribute", 0), 0, 2);
   const showSign = mu3NeedsSign(card) && assetDataUrls.mu3Sign && assetDataUrls.mu3SignMask;
   const rightsId = numericField(card, "rightsId", -1);
-  const rootImages: Mu3SvgImage[] = [];
-  const frontImages: Mu3SvgImage[] = [];
-  const frontRects: Mu3SvgRect[] = [];
-  const frontTextMasks: Mu3TmpTextMask[] = [];
-  const signMaskImages: Mu3SvgImage[] = [];
-  const signClearImages: Mu3SvgImage[] = [];
-  const excludeImages: Mu3SvgImage[] = [];
+  const rootImages: HoloMaskImage[] = [];
+  const frontImages: HoloMaskImage[] = [];
+  const frontRects: HoloMaskRect[] = [];
+  const frontTextMasks: HoloTmpTextMask[] = [];
+  const signMaskImages: HoloMaskImage[] = [];
+  const signClearImages: HoloMaskImage[] = [];
+  const excludeImages: HoloMaskImage[] = [];
   const tmpFont = React.useContext(TmpFontContext);
   const {
     isCommonModel,
@@ -345,18 +345,18 @@ export function Mu3OfficialHoloLayer({
   }
   if (!fieldBool(card, "hideName")) {
     if (isCommonModel) {
-      pushMu3TmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "shadow", characterSpacing: -0.06, x: 42.9, y: -176.4, w: 550, h: 26.2, rotation: 6 });
-      pushMu3TmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "main", characterSpacing: -0.06, x: 40, y: -175, w: 550, h: 26.2, rotation: 6 });
-      pushMu3TmpTextMask(frontTextMasks, { text: mu3CharacterName, fontSize: 43, variant: "shadow", autoSize: true, minFontSize: 24, x: 53.8, y: -199, w: 523.8, h: 26, rotation: 6 });
-      pushMu3TmpTextMask(frontTextMasks, { text: mu3CharacterName, fontSize: 43, variant: "main", autoSize: true, minFontSize: 24, x: 50, y: -197, w: 523.8, h: 26, rotation: 6 });
-      pushMu3TmpTextMask(frontTextMasks, { text: mu3IpName, fontSize: 14.6, variant: "shadow", autoSize: true, minFontSize: 12, x: 111.6, y: -232.1, w: 411.6, h: 19.7, rotation: 6 });
-      pushMu3TmpTextMask(frontTextMasks, { text: mu3IpName, fontSize: 14.6, variant: "main", autoSize: true, minFontSize: 12, x: 110.6, y: -230.9, w: 411.6, h: 19.7, rotation: 6 });
+      pushHoloTmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "shadow", characterSpacing: -0.06, x: 42.9, y: -176.4, w: 550, h: 26.2, rotation: 6 });
+      pushHoloTmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "main", characterSpacing: -0.06, x: 40, y: -175, w: 550, h: 26.2, rotation: 6 });
+      pushHoloTmpTextMask(frontTextMasks, { text: mu3CharacterName, fontSize: 43, variant: "shadow", autoSize: true, minFontSize: 24, x: 53.8, y: -199, w: 523.8, h: 26, rotation: 6 });
+      pushHoloTmpTextMask(frontTextMasks, { text: mu3CharacterName, fontSize: 43, variant: "main", autoSize: true, minFontSize: 24, x: 50, y: -197, w: 523.8, h: 26, rotation: 6 });
+      pushHoloTmpTextMask(frontTextMasks, { text: mu3IpName, fontSize: 14.6, variant: "shadow", autoSize: true, minFontSize: 12, x: 111.6, y: -232.1, w: 411.6, h: 19.7, rotation: 6 });
+      pushHoloTmpTextMask(frontTextMasks, { text: mu3IpName, fontSize: 14.6, variant: "main", autoSize: true, minFontSize: 12, x: 110.6, y: -230.9, w: 411.6, h: 19.7, rotation: 6 });
       frontImages.push({ href: officialAsset("UI_Card_CMN_3D_Icon_00"), ...MU3_CMN_ICON_RECT });
     } else {
-      pushMu3TmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "shadow", characterSpacing: -0.06, x: 41.5, y: -185.3, w: 550, h: 26.2, rotation: 6 });
-      pushMu3TmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "main", characterSpacing: -0.06, x: 38.6, y: -183.9, w: 550, h: 26.2, rotation: 6 });
-      pushMu3TmpTextMask(frontTextMasks, { text: mu3BaseCharacterName, fontSize: 43, variant: "shadow", autoSize: true, minFontSize: 24, x: 42.7, y: -225.7, w: 546, h: 37, rotation: 6 });
-      pushMu3TmpTextMask(frontTextMasks, { text: mu3BaseCharacterName, fontSize: 43, variant: "main", autoSize: true, minFontSize: 24, x: 38.7, y: -224.5, w: 546, h: 37, rotation: 6 });
+      pushHoloTmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "shadow", characterSpacing: -0.06, x: 41.5, y: -185.3, w: 550, h: 26.2, rotation: 6 });
+      pushHoloTmpTextMask(frontTextMasks, { text: mu3Nickname, fontSize: 23.6, variant: "main", characterSpacing: -0.06, x: 38.6, y: -183.9, w: 550, h: 26.2, rotation: 6 });
+      pushHoloTmpTextMask(frontTextMasks, { text: mu3BaseCharacterName, fontSize: 43, variant: "shadow", autoSize: true, minFontSize: 24, x: 42.7, y: -225.7, w: 546, h: 37, rotation: 6 });
+      pushHoloTmpTextMask(frontTextMasks, { text: mu3BaseCharacterName, fontSize: 43, variant: "main", autoSize: true, minFontSize: 24, x: 38.7, y: -224.5, w: 546, h: 37, rotation: 6 });
     }
   }
   if (!fieldBool(card, "hideQRCode")) {
@@ -415,34 +415,21 @@ export function useOfficialHoloMask(input: HoloMaskInput, enabled: boolean) {
     tmpFont = null,
     options = {},
   } = input;
+  // Serialize the raw mask inputs directly so any field added to HoloMaskImage /
+  // HoloTmpTextMask automatically participates in the memo key (no hand-kept
+  // field list to fall out of sync and leave a stale mask). tmpFont is reduced
+  // to a small identity tuple since its glyph table is too large to stringify.
   const maskKey = JSON.stringify({
     enabled,
-    fallbackAllowWhenSparse: options.fallbackAllowWhenSparse ?? true,
-    invertApplicationArea: options.invertApplicationArea ?? false,
-    root: rootImages.map((image) => [image.href, image.x, image.y, image.w, image.h, image.rotation ?? 0, image.maskMode ?? "alpha"]),
-    front: frontImages.map((image) => [image.href, image.x, image.y, image.w, image.h, image.rotation ?? 0, image.maskMode ?? "alpha"]),
-    rects: frontRects.map((rect) => [rect.x, rect.y, rect.w, rect.h, rect.rotation ?? 0]),
-    text: frontTextMasks.map((mask) => [
-      mask.text,
-      mask.x,
-      mask.y,
-      mask.w,
-      mask.h,
-      mask.rotation ?? 0,
-      mask.fontSize,
-      mask.variant,
-      mask.characterSpacing ?? 0,
-      mask.autoSize ?? false,
-      mask.minFontSize ?? mask.fontSize,
-      mask.horizontalAlign ?? "right",
-      mask.verticalAlign ?? "top",
-      mask.dilation ?? 1,
-      mask.maskIncludeUnderlay ?? false,
-    ]),
+    options,
+    rootImages,
+    frontImages,
+    frontRects,
+    frontTextMasks,
+    signMaskImages,
+    signClearImages,
+    excludeImages,
     tmpFont: tmpFont ? [tmpFont.texture, tmpFont.fontInfo.PointSize, tmpFont.fontInfo.LineHeight, tmpFont.fontInfo.Ascender] : null,
-    signMask: signMaskImages.map((image) => [image.href, image.x, image.y, image.w, image.h, image.rotation ?? 0, image.maskMode ?? "alpha"]),
-    signClear: signClearImages.map((image) => [image.href, image.x, image.y, image.w, image.h, image.rotation ?? 0, image.maskMode ?? "alpha"]),
-    exclude: excludeImages.map((image) => [image.href, image.x, image.y, image.w, image.h, image.rotation ?? 0, image.maskMode ?? "alpha"]),
   });
   const [maskUrl, setMaskUrl] = React.useState("");
 
@@ -471,7 +458,7 @@ export function useOfficialHoloMask(input: HoloMaskInput, enabled: boolean) {
   return maskUrl;
 }
 
-export async function renderOfficialHoloMask(input: HoloMaskInput) {
+async function renderOfficialHoloMask(input: HoloMaskInput) {
   const {
     rootImages,
     frontImages,
@@ -522,7 +509,7 @@ export async function renderOfficialHoloMask(input: HoloMaskInput) {
   signClearCtx.imageSmoothingEnabled = true;
   excludeCtx.imageSmoothingEnabled = true;
 
-  const loadImages = (images: Mu3SvgImage[]) =>
+  const loadImages = (images: HoloMaskImage[]) =>
     Promise.all(
       images.map(async (image) => {
         try {
@@ -547,32 +534,32 @@ export async function renderOfficialHoloMask(input: HoloMaskInput) {
 
   for (const loaded of loadedRootImages) {
     if (!loaded) continue;
-    drawMu3ImageMask(rootCtx, loaded.image, loaded.element);
+    drawMaskImage(rootCtx, loaded.image, loaded.element);
   }
   for (const loaded of loadedFrontImages) {
     if (!loaded) continue;
-    drawMu3ImageMask(frontCtx, loaded.image, loaded.element);
+    drawMaskImage(frontCtx, loaded.image, loaded.element);
   }
   frontCtx.fillStyle = "#ffffff";
   for (const rect of frontRects) {
-    drawMu3RectExclusion(frontCtx, rect);
+    drawMaskRect(frontCtx, rect);
   }
   if (tmpFont && tmpAtlas) {
     for (const mask of frontTextMasks) {
-      drawMu3TmpTextMask(frontTextCtx, mask, tmpFont, tmpAtlas);
+      drawHoloTmpTextMask(frontTextCtx, mask, tmpFont, tmpAtlas);
     }
   }
   for (const loaded of loadedSignMaskImages) {
     if (!loaded) continue;
-    drawMu3ImageMask(signMaskCtx, loaded.image, loaded.element);
+    drawMaskImage(signMaskCtx, loaded.image, loaded.element);
   }
   for (const loaded of loadedSignClearImages) {
     if (!loaded) continue;
-    drawMu3ImageMask(signClearCtx, loaded.image, loaded.element);
+    drawMaskImage(signClearCtx, loaded.image, loaded.element);
   }
   for (const loaded of loadedExcludeImages) {
     if (!loaded) continue;
-    drawMu3ImageMask(excludeCtx, loaded.image, loaded.element);
+    drawMaskImage(excludeCtx, loaded.image, loaded.element);
   }
 
   const rootData = rootCtx.getImageData(0, 0, CARD_WIDTH, CARD_HEIGHT);
@@ -612,7 +599,7 @@ export async function renderOfficialHoloMask(input: HoloMaskInput) {
   return canvas.toDataURL("image/png");
 }
 
-export function binarizeRenderedPixels(imageData: ImageData) {
+function binarizeRenderedPixels(imageData: ImageData) {
   const mask = new Uint8ClampedArray(imageData.width * imageData.height);
   for (let src = 0, dst = 0; src < imageData.data.length; src += 4, dst += 1) {
     mask[dst] =
@@ -626,7 +613,7 @@ export function binarizeRenderedPixels(imageData: ImageData) {
   return mask;
 }
 
-export function paintBinaryMask(imageData: ImageData, mask: Uint8ClampedArray<ArrayBufferLike>) {
+function paintBinaryMask(imageData: ImageData, mask: Uint8ClampedArray<ArrayBufferLike>) {
   for (let pixel = 0, index = 0; pixel < mask.length; pixel += 1, index += 4) {
     const alpha = mask[pixel] > 0 ? 255 : 0;
     imageData.data[index] = 255;
@@ -636,7 +623,7 @@ export function paintBinaryMask(imageData: ImageData, mask: Uint8ClampedArray<Ar
   }
 }
 
-export function dilateBinaryMask(src: Uint8ClampedArray<ArrayBufferLike>, width: number, height: number, iterations: number) {
+function dilateBinaryMask(src: Uint8ClampedArray<ArrayBufferLike>, width: number, height: number, iterations: number) {
   let current: Uint8ClampedArray<ArrayBufferLike> = src;
   let next: Uint8ClampedArray<ArrayBufferLike> = new Uint8ClampedArray(src.length);
   for (let pass = 0; pass < iterations; pass += 1) {
@@ -668,7 +655,7 @@ export function dilateBinaryMask(src: Uint8ClampedArray<ArrayBufferLike>, width:
   return current;
 }
 
-export function loadMaskImage(src: string) {
+function loadMaskImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
@@ -677,7 +664,7 @@ export function loadMaskImage(src: string) {
   });
 }
 
-export function drawMu3ImageMask(ctx: CanvasRenderingContext2D, image: Mu3SvgImage, element: HTMLImageElement) {
+function drawMaskImage(ctx: CanvasRenderingContext2D, image: HoloMaskImage, element: HTMLImageElement) {
   const maskCanvas = document.createElement("canvas");
   maskCanvas.width = CARD_WIDTH;
   maskCanvas.height = CARD_HEIGHT;
@@ -689,13 +676,13 @@ export function drawMu3ImageMask(ctx: CanvasRenderingContext2D, image: Mu3SvgIma
   });
 
   const imageData = maskCtx.getImageData(0, 0, CARD_WIDTH, CARD_HEIGHT);
-  normalizeMu3MaskData(imageData.data, image.maskMode ?? "alpha");
+  normalizeMaskData(imageData.data, image.maskMode ?? "alpha");
   maskCtx.putImageData(imageData, 0, 0);
 
   ctx.drawImage(maskCanvas, 0, 0);
 }
 
-export function normalizeMu3MaskData(data: Uint8ClampedArray, mode: HoloRootMaskMode) {
+function normalizeMaskData(data: Uint8ClampedArray, mode: HoloRootMaskMode) {
   if (mode === "raw") {
     return;
   }
@@ -765,15 +752,15 @@ export function normalizeMu3MaskData(data: Uint8ClampedArray, mode: HoloRootMask
   }
 }
 
-export function drawMu3RectExclusion(ctx: CanvasRenderingContext2D, rect: Mu3SvgRect) {
+function drawMaskRect(ctx: CanvasRenderingContext2D, rect: HoloMaskRect) {
   withUnityCanvasRect(ctx, rect, (left, top, width, height) => {
     ctx.fillRect(left, top, width, height);
   });
 }
 
-export function drawMu3TmpTextMask(
+function drawHoloTmpTextMask(
   ctx: CanvasRenderingContext2D,
-  mask: Mu3TmpTextMask,
+  mask: HoloTmpTextMask,
   font: TmpFontMetrics,
   atlas: HTMLImageElement,
 ) {
@@ -818,7 +805,7 @@ export function drawMu3TmpTextMask(
   ctx.drawImage(rawCanvas, 0, 0);
 }
 
-export function holoMaskStyle(maskUrl: string): React.CSSProperties | undefined {
+function holoMaskStyle(maskUrl: string): React.CSSProperties | undefined {
   if (!maskUrl) return undefined;
   return {
     WebkitMaskImage: `url("${maskUrl}")`,
