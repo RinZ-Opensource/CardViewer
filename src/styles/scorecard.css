@@ -91,15 +91,16 @@
 
 /* ---------------------------------------------------------------------------
  * maimai DX music-select detail card
- * Design space: 284x464 = MusicChainCard.prefab UI_Main. All coordinates below
- * are converted from the prefab's RectTransforms (center-origin, +y up ->
- * CSS top-left): left = cx + 142 - w/2, top = 227 - cy - h/2.
+ * Design space: MusicChainCard.prefab UI_Main (284x464) inside a 284x470
+ * canvas; .msc-body sits at top:6 so the bookmark tab renders raised 6px
+ * like the active in-game card. Coordinates inside .msc-body convert the
+ * prefab RectTransforms: left = cx + 142 - w/2, top = 232 - (cy + h/2).
  * ------------------------------------------------------------------------- */
 
 .mai-scorecard {
   position: relative;
   width: 284px;
-  height: 464px;
+  height: 470px;
   font-kerning: none;
 }
 
@@ -109,68 +110,14 @@
   -webkit-user-drag: none;
 }
 
-.msc-base {
-  position: absolute;
-  inset: 0;
-  width: 284px;
-  height: 464px;
-}
-
-/* --- white-section backplates ---
- * Prefab stacks navy Box_01 with the light Box_03 "blank" on top for the
- * achievement/rank slots, so the visible plates there are the light ones;
- * the DX-score strip keeps the navy Box_01/Box_02. Sprites are stretched
- * (they are tiny rounded rects; corner distortion is negligible). */
-
-.msc-box {
-  position: absolute;
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
-}
-
-.msc-box-achievement {
-  left: 23px;
-  top: 365.1px;
-  width: 104px;
-  height: 26px;
-  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_03.png");
-}
-
-.msc-box-rank {
-  left: 123px;
-  top: 365.1px;
-  width: 58px;
-  height: 26px;
-  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_03.png");
-}
-
-.msc-designer-label {
-  position: absolute;
-  left: 20.5px;
-  top: 405px;
-  width: 96px;
-  height: 16px;
-}
-
-.msc-dxscore-label {
-  position: absolute;
-  left: 32.6px;
-  top: 391px;
-  width: 70.4px;
-  height: 16px;
-}
-
-/* --- bookmark tabs (DX bump left / Standard bump right) --- */
+/* --- bookmark tab (raised layer, outside .msc-body) --- */
 
 .msc-tab {
   position: absolute;
   left: 0;
+  top: 2.9px;
   width: 284px;
   height: 68px;
-}
-
-.msc-tab {
-  top: 2.9px;
 }
 
 .msc-pill {
@@ -185,6 +132,95 @@
 
 .msc-pill.at-right {
   left: 144px;
+}
+
+.msc-body {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 284px;
+  height: 464px;
+}
+
+.msc-base {
+  position: absolute;
+  inset: 0;
+  width: 284px;
+  height: 464px;
+}
+
+/* --- white-section backplates: navy Box_01/Box_02 when played,
+       light Box_03 blanks when unplayed --- */
+
+.msc-box {
+  position: absolute;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+.msc-box.navy {
+  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_01.png");
+}
+
+.msc-box-achievement {
+  left: 22px;
+  top: 364.1px;
+  width: 106px;
+  height: 28px;
+}
+
+.msc-box-rank {
+  left: 122px;
+  top: 364.1px;
+  width: 60px;
+  height: 28px;
+}
+
+.msc-box-dxscore {
+  left: 22px;
+  top: 386.5px;
+  width: 160px;
+  height: 25px;
+}
+
+.msc-box-dxscore-max {
+  left: 97px;
+  top: 387px;
+  width: 85px;
+  height: 36px;
+  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_02.png");
+}
+
+.msc-box-achievement-blank {
+  left: 23px;
+  top: 365.1px;
+  width: 104px;
+  height: 26px;
+  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_03.png");
+}
+
+.msc-box-rank-blank {
+  left: 123px;
+  top: 365.1px;
+  width: 58px;
+  height: 26px;
+  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_03.png");
+}
+
+.msc-designer-label {
+  position: absolute;
+  left: 20.5px;
+  top: 405.1px;
+  width: 96px;
+  height: 16px;
+}
+
+.msc-dxscore-label {
+  position: absolute;
+  left: 32.6px;
+  top: 391px;
+  width: 70.4px;
+  height: 16px;
 }
 
 .msc-jacket {
@@ -215,20 +251,20 @@
   height: 76px;
 }
 
-.sprite-digits {
+.rect-digits {
   display: inline-flex;
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
-.sprite-digits > span {
+.rect-digits > span {
   display: inline-block;
   background-repeat: no-repeat;
 }
 
 .msc-lv-glyph {
   position: absolute;
-  left: 169.8px;
-  top: 258px;
+  left: 173.8px;
+  top: 248.8px;
 }
 
 .msc-lv-value {
@@ -253,7 +289,7 @@
   color: #fff;
   font-family: var(--font-mai-rodin-eb, "Arial Black", sans-serif);
   font-size: 16px;
-  font-weight: 800;
+  font-weight: normal;
   white-space: nowrap;
 }
 
@@ -267,13 +303,13 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-family: var(--font-sega-maru-db, "Yu Gothic", sans-serif);
+  font-family: var(--font-mai-maru, "Yu Gothic", sans-serif);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: normal;
   white-space: nowrap;
 }
 
-/* --- achievement row (NewRodin EB gold, flat, on the navy box) --- */
+/* --- achievement row (NewRodin EB gold on the navy box) --- */
 
 .msc-ach {
   position: absolute;
@@ -282,7 +318,7 @@
   line-height: 20px;
   font-family: var(--font-mai-rodin-eb, "Arial Black", sans-serif);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: normal;
   color: #f2c805;
 }
 
@@ -293,7 +329,7 @@
 }
 
 .msc-ach-dec {
-  left: 59px;
+  left: 57.9px;
 }
 
 .msc-ach-pct {
@@ -309,22 +345,22 @@
   height: 19.2px;
 }
 
-/* --- badge medals --- */
+/* --- badge medals (48px per user calibration; prefab box is 53) --- */
 
 .msc-medal {
   position: absolute;
-  width: 53px;
-  height: 53px;
+  width: 48px;
+  height: 48px;
 }
 
 .msc-medal-combo {
-  left: 173.5px;
-  top: 360.5px;
+  left: 176px;
+  top: 363px;
 }
 
 .msc-medal-sync {
-  left: 214.5px;
-  top: 360.5px;
+  left: 217px;
+  top: 363px;
 }
 
 .msc-medal-blank {
@@ -343,17 +379,16 @@
   top: 364px;
 }
 
-/* --- DX score row (MaruGothic DB, white with navy outline) --- */
+/* --- DX score row (MaruGothic DB white on the navy boxes) --- */
 
 .msc-dx-value,
 .msc-dx-slash,
 .msc-dx-max {
   position: absolute;
   color: #fff;
-  -webkit-text-stroke: 1.1px #16386b;
-  paint-order: stroke fill;
-  font-family: var(--font-sega-maru-db, "Yu Gothic", sans-serif);
-  font-weight: 700;
+  font-family: var(--font-mai-maru, "Yu Gothic", sans-serif);
+  font-weight: normal;
+  white-space: nowrap;
 }
 
 .msc-dx-value {
@@ -413,9 +448,9 @@
   top: 419px;
   height: 15px;
   line-height: 15px;
-  font-family: var(--font-sega-maru-db, "Yu Gothic", sans-serif);
+  font-family: var(--font-mai-maru, "Yu Gothic", sans-serif);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: normal;
   color: #113f80;
   white-space: nowrap;
 }
@@ -426,9 +461,9 @@
   top: 419px;
   height: 15px;
   line-height: 15px;
-  font-family: var(--font-sega-maru-db, "Yu Gothic", sans-serif);
+  font-family: var(--font-mai-maru, "Yu Gothic", sans-serif);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: normal;
   color: #353535;
   white-space: nowrap;
 }

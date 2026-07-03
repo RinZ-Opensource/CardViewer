@@ -45,6 +45,20 @@ export function installPrivateFontFaces() {
   font-style: normal;
   font-display: swap;
 }
+@font-face {
+  font-family: "CardViewer NewRodinNEB";
+  src: url("/fonts/private/FOT-NewRodinN-EB.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "CardViewer MaruDB";
+  src: url("/fonts/private/DF-MaruGothic-DB.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 html[data-deployment-mode="private"] {
   --font-sega-kaku: "CardViewer Zen Kaku", "CardViewer NewRodin", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-sega-maru: "CardViewer Zen Maru", "CardViewer Humming", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
@@ -53,7 +67,8 @@ html[data-deployment-mode="private"] {
   --font-official-number: "CardViewer NewRodin", "Impact", "Arial Black", sans-serif;
   --font-mai-kaku: "CardViewer SegaKakuDB", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-mai-rodin: "CardViewer NewRodinDB", "CardViewer NewRodin", "Arial Black", sans-serif;
-  --font-mai-rodin-eb: "CardViewer NewRodin", "Arial Black", sans-serif;
+  --font-mai-rodin-eb: "CardViewer NewRodinNEB", "CardViewer NewRodin", "Arial Black", sans-serif;
+  --font-mai-maru: "CardViewer MaruDB", "CardViewer SegaMaruDB", "Yu Gothic", "Meiryo", sans-serif;
 }`;
   document.head.append(style);
 }

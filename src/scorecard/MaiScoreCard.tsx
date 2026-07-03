@@ -1,8 +1,9 @@
 import React from "react";
 import {
+  GlyphSheet,
   MAI_COMBO_SPRITE,
   MAI_DIFF_SUFFIX,
-  MAI_LEVEL_DIGITS,
+  MAI_LEVEL_GLYPHS,
   MAI_LEVEL_SHEET,
   MAI_RANK_SPRITE,
   MAI_STAR_SPRITE,
@@ -13,51 +14,49 @@ import { formatAchievement, maiDxStars, maiRankForAchievement } from "./maiScore
 import { MaiChart, MaiScoreState, MaiSong } from "./types";
 
 /**
- * Native design size of the music-select detail card (MusicChainCard.prefab
- * UI_Main), so every overlay is authored in the prefab's own pixels.
+ * Design space: MusicChainCard.prefab UI_Main (284x464) plus 6px headroom so
+ * the bookmark tab can sit raised above the frame like the in-game active
+ * card. The body wrapper offsets all base-relative coordinates by +6.
  */
 export const MAI_SCORECARD_WIDTH = 284;
-export const MAI_SCORECARD_HEIGHT = 464;
+export const MAI_SCORECARD_HEIGHT = 470;
 /** Export at 3x so the 284px-wide base sprite still reads crisply. */
 export const MAI_SCORECARD_EXPORT_WIDTH = MAI_SCORECARD_WIDTH * 3;
 
-interface DigitSheetSpec {
-  cellWidth: number;
-  cellHeight: number;
-  columns: number;
-  rows: number;
-  glyphs: Record<string, [number, number]>;
-}
-
-interface SpriteDigitsProps {
-  sheet: DigitSheetSpec;
+interface RectDigitsProps {
+  sheet: GlyphSheet;
   src: string;
   text: string;
-  /** Rendered glyph height in design px. */
-  height: number;
-  /** Fraction of a cell width to overlap consecutive glyphs (sheet cells have padding). */
-  tracking?: number;
+  /** Unity render scale: design px per texture px (e.g. SpriteCounter 0.85). */
+  scale: number;
+  /** Extra horizontal gap between glyphs in design px. */
+  gap?: number;
   className?: string;
 }
 
-function SpriteDigits({ sheet, src, text, height, tracking = 0, className }: SpriteDigitsProps) {
-  const scale = height / sheet.cellHeight;
-  const cellWidth = sheet.cellWidth * scale;
+/**
+ * Renders text from a sprite sheet using tight glyph rects, preserving each
+ * glyph's vertical offset within its sheet cell (so "+" stays superscript).
+ */
+function RectDigits({ sheet, src, text, scale, gap = 2, className }: RectDigitsProps) {
   return (
-    <span className={`sprite-digits ${className ?? ""}`}>
+    <span className={`rect-digits ${className ?? ""}`} style={{ height: sheet.cellHeight * scale }}>
       {Array.from(text).map((glyph, index) => {
-        const cell = sheet.glyphs[glyph];
-        if (!cell) return null;
+        const rect = sheet.glyphs[glyph];
+        if (!rect) return null;
+        const [x, y, w, h] = rect;
+        const offsetInCell = y % sheet.cellHeight;
         return (
           <span
             key={index}
             style={{
-              width: cellWidth,
-              height,
-              marginLeft: index > 0 ? -cellWidth * tracking : 0,
+              width: w * scale,
+              height: h * scale,
+              marginLeft: index > 0 ? gap : 0,
+              marginTop: offsetInCell * scale,
               backgroundImage: `url("${src}")`,
-              backgroundPosition: `${-cell[0] * cellWidth}px ${-cell[1] * height}px`,
-              backgroundSize: `${sheet.columns * cellWidth}px ${sheet.rows * height}px`,
+              backgroundPosition: `${-x * scale}px ${-y * scale}px`,
+              backgroundSize: `${sheet.textureWidth * scale}px ${sheet.textureHeight * scale}px`,
             }}
           />
         );
@@ -128,25 +127,8 @@ export function MaiScoreCard({ song, chart, state, maxDxScore, captureRef }: Mai
 
   return (
     <div className="mai-scorecard" ref={captureRef}>
-      <img className="msc-base" src={maiSprite(`UI_MSS_MBase_${suffix}`)} alt="" />
-
-      {/* White-section backplates + labels (prefab MusicData_NEW / DXScore) */}
-      <span className="msc-box msc-box-achievement" />
-      <span className="msc-box msc-box-rank" />
-      <img
-        className="msc-designer-label"
-        src={maiSprite("UI_MSS_MBase_Text_NotesDesigner")}
-        alt="NOTES DESIGNER"
-      />
-      {played ? (
-        <img
-          className="msc-dxscore-label"
-          src={maiSprite("UI_MSS_MBase_Text_DXscore")}
-          alt="DX SCORE"
-        />
-      ) : null}
-
-      {/* Bookmark tab: DX bump left (Tab_01), Standard bump right (Tab_02) */}
+      {/* Bookmark tab, raised 6px above the base like the active in-game card:
+          DX bump left (Tab_01), Standard bump right (Tab_02). */}
       <img
         className="msc-tab"
         src={maiSprite(`UI_MSS_MBase_${suffix}_${song.isDx ? "Tab_01" : "Tab_02"}`)}
@@ -158,81 +140,111 @@ export function MaiScoreCard({ song, chart, state, maxDxScore, captureRef }: Mai
         alt={song.isDx ? "でらっくす" : "スタンダード"}
       />
 
-      <img className="msc-jacket" src={song.jacketUrl} alt="" decoding="async" />
+      <div className="msc-body">
+        <img className="msc-base" src={maiSprite(`UI_MSS_MBase_${suffix}`)} alt="" />
 
-      {/* Difficulty banner + level */}
-      <img className="msc-diff-banner" src={maiSprite(`UI_MSS_MBase_${suffix}_Text`)} alt={chart.difficulty} />
-      <img className="msc-lv-base" src={maiSprite(`UI_MSS_MBase_LvBase_${suffix}`)} alt="" />
-      <SpriteDigits
-        className="msc-lv-glyph"
-        sheet={MAI_LEVEL_DIGITS}
-        src={levelSheet}
-        text="L"
-        height={48}
-      />
-      <SpriteDigits
-        className="msc-lv-value"
-        sheet={MAI_LEVEL_DIGITS}
-        src={levelSheet}
-        text={chart.level}
-        height={51}
-        tracking={0.32}
-      />
+        {/* White-section backplates: navy when played, light blanks otherwise */}
+        {played ? (
+          <>
+            <span className="msc-box msc-box-achievement navy" />
+            <span className="msc-box msc-box-rank navy" />
+            <span className="msc-box msc-box-dxscore navy" />
+            <span className="msc-box msc-box-dxscore-max" />
+          </>
+        ) : (
+          <>
+            <span className="msc-box msc-box-achievement-blank" />
+            <span className="msc-box msc-box-rank-blank" />
+          </>
+        )}
+        <img
+          className="msc-designer-label"
+          src={maiSprite("UI_MSS_MBase_Text_NotesDesigner")}
+          alt="NOTES DESIGNER"
+        />
+        {played ? (
+          <img
+            className="msc-dxscore-label"
+            src={maiSprite("UI_MSS_MBase_Text_DXscore")}
+            alt="DX SCORE"
+          />
+        ) : null}
 
-      <div className="msc-title">
-        <FitText maxWidth={240}>{song.title}</FitText>
+        <img className="msc-jacket" src={song.jacketUrl} alt="" decoding="async" />
+
+        {/* Difficulty banner + level */}
+        <img className="msc-diff-banner" src={maiSprite(`UI_MSS_MBase_${suffix}_Text`)} alt={chart.difficulty} />
+        <img className="msc-lv-base" src={maiSprite(`UI_MSS_MBase_LvBase_${suffix}`)} alt="" />
+        <RectDigits
+          className="msc-lv-glyph"
+          sheet={MAI_LEVEL_GLYPHS}
+          src={levelSheet}
+          text="L"
+          scale={0.8}
+        />
+        <RectDigits
+          className="msc-lv-value"
+          sheet={MAI_LEVEL_GLYPHS}
+          src={levelSheet}
+          text={chart.level}
+          scale={0.85}
+        />
+
+        <div className="msc-title">
+          <FitText maxWidth={240}>{song.title}</FitText>
+        </div>
+        <div className="msc-artist">
+          <FitText maxWidth={240}>{song.artist}</FitText>
+        </div>
+
+        {/* Achievement + rank row */}
+        {played ? (
+          <>
+            <span className="msc-ach msc-ach-int">{achievementInt}</span>
+            <span className="msc-ach msc-ach-dec">.{achievementFrac}</span>
+            <span className="msc-ach msc-ach-pct">%</span>
+            <img className="msc-rank" src={maiSprite(MAI_RANK_SPRITE[rank])} alt={rank} />
+          </>
+        ) : null}
+
+        {/* Badge medals */}
+        {played && state.comboBadge !== "none" ? (
+          <img className="msc-medal msc-medal-combo" src={maiSprite(MAI_COMBO_SPRITE[state.comboBadge])} alt={state.comboBadge} />
+        ) : (
+          <img className="msc-medal-blank msc-medal-combo-blank" src={maiSprite("UI_MSS_MBase_Icon_Blank")} alt="" />
+        )}
+        {played && state.syncBadge !== "none" ? (
+          <img className="msc-medal msc-medal-sync" src={maiSprite(MAI_SYNC_SPRITE[state.syncBadge])} alt={state.syncBadge} />
+        ) : (
+          <img className="msc-medal-blank msc-medal-sync-blank" src={maiSprite("UI_MSS_MBase_Icon_Blank")} alt="" />
+        )}
+
+        {/* DX score row + star pips (hidden when unplayed) */}
+        {played ? (
+          <>
+            <span className="msc-dx-value">{dxScore.toLocaleString()}</span>
+            <span className="msc-dx-slash">/</span>
+            <span className="msc-dx-max">{maxDxScore > 0 ? maxDxScore.toLocaleString() : "----"}</span>
+            <span className="msc-stars">
+              {Array.from({ length: 5 }, (_, index) => (
+                <span
+                  key={index}
+                  className={`msc-star-pip ${index < stars ? "earned" : ""}`}
+                  style={{
+                    WebkitMaskImage: `url("${maiSprite(MAI_STAR_SPRITE)}")`,
+                    maskImage: `url("${maiSprite(MAI_STAR_SPRITE)}")`,
+                  }}
+                />
+              ))}
+            </span>
+          </>
+        ) : null}
+
+        <FitText maxWidth={162} className="msc-designer-name">
+          {chart.notesDesigner || "-"}
+        </FitText>
+        <span className="msc-bpm">BPM {song.bpm}</span>
       </div>
-      <div className="msc-artist">
-        <FitText maxWidth={240}>{song.artist}</FitText>
-      </div>
-
-      {/* Achievement + rank row */}
-      {played ? (
-        <>
-          <span className="msc-ach msc-ach-int">{achievementInt}</span>
-          <span className="msc-ach msc-ach-dec">.{achievementFrac}</span>
-          <span className="msc-ach msc-ach-pct">%</span>
-          <img className="msc-rank" src={maiSprite(MAI_RANK_SPRITE[rank])} alt={rank} />
-        </>
-      ) : null}
-
-      {/* Badge medals */}
-      {played && state.comboBadge !== "none" ? (
-        <img className="msc-medal msc-medal-combo" src={maiSprite(MAI_COMBO_SPRITE[state.comboBadge])} alt={state.comboBadge} />
-      ) : (
-        <img className="msc-medal-blank msc-medal-combo-blank" src={maiSprite("UI_MSS_MBase_Icon_Blank")} alt="" />
-      )}
-      {played && state.syncBadge !== "none" ? (
-        <img className="msc-medal msc-medal-sync" src={maiSprite(MAI_SYNC_SPRITE[state.syncBadge])} alt={state.syncBadge} />
-      ) : (
-        <img className="msc-medal-blank msc-medal-sync-blank" src={maiSprite("UI_MSS_MBase_Icon_Blank")} alt="" />
-      )}
-
-      {/* DX score row + star pips (hidden when unplayed) */}
-      {played ? (
-        <>
-          <span className="msc-dx-value">{dxScore}</span>
-          <span className="msc-dx-slash">/</span>
-          <span className="msc-dx-max">{maxDxScore > 0 ? String(maxDxScore) : "----"}</span>
-          <span className="msc-stars">
-            {Array.from({ length: 5 }, (_, index) => (
-              <span
-                key={index}
-                className={`msc-star-pip ${index < stars ? "earned" : ""}`}
-                style={{
-                  WebkitMaskImage: `url("${maiSprite(MAI_STAR_SPRITE)}")`,
-                  maskImage: `url("${maiSprite(MAI_STAR_SPRITE)}")`,
-                }}
-              />
-            ))}
-          </span>
-        </>
-      ) : null}
-
-      <FitText maxWidth={162} className="msc-designer-name">
-        {chart.notesDesigner || "-"}
-      </FitText>
-      <span className="msc-bpm">BPM {song.bpm}</span>
     </div>
   );
 }

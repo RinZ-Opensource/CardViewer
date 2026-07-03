@@ -69,29 +69,41 @@ export const MAI_STAR_EARNED = "#f8b534";
 export const MAI_STAR_UNEARNED = "#8a9dd3";
 export const MAI_STAR_SPRITE = "UI_MSS_DXScore_Star_02";
 
-interface DigitSheet {
-  /** Sheet grid cell size in native sprite px. */
-  cellWidth: number;
+export interface GlyphSheet {
+  /** Full texture size. */
+  textureWidth: number;
+  textureHeight: number;
+  /** Grid cell height (glyph vertical offsets are preserved within cells). */
   cellHeight: number;
-  columns: number;
-  rows: number;
-  glyphs: Record<string, [number, number]>;
+  /** Tight glyph rects [x, y, w, h] in texture px (alpha-thresholded). */
+  glyphs: Record<string, [number, number, number, number]>;
 }
 
 /**
- * UI_NUM_MLevel_XX: 192x240, 4x4 grid of 48x60 cells — the source texture of
- * the UI_CMN_MusicLevel_* sprites the game feeds to SpriteCounter.
- * "L" maps to the "Lv" glyph cell.
+ * UI_NUM_MLevel_XX: 192x240 sheet backing the UI_CMN_MusicLevel_* sprites the
+ * game feeds to SpriteCounter (48x60 grid). Rects are tight crops so glyphs
+ * render at Unity's visible size; "+" keeps its superscript offset, "L" is
+ * the "Lv" glyph.
  */
-export const MAI_LEVEL_DIGITS: DigitSheet = {
-  cellWidth: 48,
+export const MAI_LEVEL_GLYPHS: GlyphSheet = {
+  textureWidth: 192,
+  textureHeight: 240,
   cellHeight: 60,
-  columns: 4,
-  rows: 4,
   glyphs: {
-    "0": [0, 0], "1": [1, 0], "2": [2, 0], "3": [3, 0],
-    "4": [0, 1], "5": [1, 1], "6": [2, 1], "7": [3, 1],
-    "8": [0, 2], "9": [1, 2], "+": [2, 2], "-": [3, 2],
-    ",": [0, 3], ".": [1, 3], "L": [2, 3],
+    "0": [3, 5, 40, 52],
+    "1": [55, 6, 27, 50],
+    "2": [101, 5, 37, 51],
+    "3": [147, 5, 39, 52],
+    "4": [3, 66, 40, 49],
+    "5": [52, 66, 39, 51],
+    "6": [99, 65, 40, 52],
+    "7": [149, 66, 37, 50],
+    "8": [3, 125, 40, 52],
+    "9": [51, 125, 40, 52],
+    "+": [106, 122, 27, 27],
+    "-": [157, 141, 23, 13],
+    ",": [17, 210, 15, 21],
+    ".": [65, 211, 14, 14],
+    "L": [102, 207, 38, 29],
   },
 };
