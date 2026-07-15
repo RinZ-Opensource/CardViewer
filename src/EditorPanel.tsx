@@ -12,14 +12,18 @@ export function EditorPanel({
   onChange,
   onPlayerChange,
   onReset,
+  onResetPlayer,
   canReset,
+  canResetPlayer,
 }: {
   card: CardRecord | null;
   edits: CardEdits | undefined;
   onChange: (fieldKey: string, value: PrintFieldValue) => void;
   onPlayerChange: (fieldKey: string, value: PrintFieldValue) => void;
   onReset: () => void;
+  onResetPlayer: () => void;
   canReset: boolean;
+  canResetPlayer: boolean;
 }) {
   if (!card) {
     return <aside className="editor-panel empty">No selection</aside>;
@@ -48,6 +52,14 @@ export function EditorPanel({
         <section className="editor-section">
           <div className="editor-header">
             <h3>Player Data</h3>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={onResetPlayer}
+              disabled={!canResetPlayer}
+            >
+              Reset shared
+            </button>
           </div>
 
           {isPlayerDataApplicable ? (
@@ -64,7 +76,7 @@ export function EditorPanel({
         <section className="editor-section">
           <div className="editor-header">
             <h3>Print Surface</h3>
-            <button className="ghost-button" onClick={onReset} disabled={!canReset}>
+            <button type="button" className="ghost-button" onClick={onReset} disabled={!canReset}>
               Reset
             </button>
           </div>
@@ -144,18 +156,22 @@ export function PrintFieldControl({
     );
   }
 
+  const serialInputId = "print-field-serial-id";
   const input = (
     <input
+      id={field.key === "serialId" ? serialInputId : undefined}
       type={field.fieldType === "number" ? "number" : "text"}
       value={field.value ?? ""}
       onChange={(event) => onChange(field.key, event.target.value)}
     />
   );
 
-  return (
-    <label className="control">
-      <span>{field.label}</span>
-      {field.key === "serialId" ? (
+  if (field.key === "serialId") {
+    return (
+      <div className="control">
+        <label htmlFor={serialInputId}>
+          <span>{field.label}</span>
+        </label>
         <span className="input-with-action">
           {input}
           <button
@@ -168,9 +184,14 @@ export function PrintFieldControl({
             ↻
           </button>
         </span>
-      ) : (
-        input
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <label className="control">
+      <span>{field.label}</span>
+      {input}
     </label>
   );
 }

@@ -18,6 +18,7 @@ interface SongPickerProps<Song extends SongPickerSong> {
   /** Optional title suffix, e.g. maimai ［DX］/［スタンダード］. */
   songBadge?: (song: Song) => string | undefined;
   onSelect: (song: Song) => void;
+  onRetry?: () => void;
 }
 
 /** Case- and kana-insensitive search key (NFKC + katakana folded to hiragana). */
@@ -31,6 +32,19 @@ function searchKey(text: string): string {
 /** Row cap so an empty query doesn't render the full 1500+ song list. */
 const MAX_ROWS = 50;
 
+const SCREEN_READER_ONLY: React.CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  clipPath: "inset(50%)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
+
 /**
  * Searchable song dropdown shared by the three score-card forms: type to
  * filter title+artist, arrows + Enter to pick, Escape to close. Closed, the
@@ -43,29 +57,47 @@ export function SongPicker<Song extends SongPickerSong>({
   songKey,
   songBadge,
   onSelect,
+  onRetry,
 }: SongPickerProps<Song>) {
   const [query, setQuery] = React.useState("");
   const [open, setOpen] = React.useState(false);
   const [highlight, setHighlight] = React.useState(0);
   const listRef = React.useRef<HTMLUListElement | null>(null);
+  const instanceId = React.useId().replace(/:/g, "");
+  const labelId = `${instanceId}-song-label`;
+  const inputId = `${instanceId}-song-input`;
+  const listId = `${instanceId}-song-listbox`;
+  const statusId = `${instanceId}-song-status`;
 
-  const filtered = React.useMemo(() => {
+  const { filtered, totalMatches } = React.useMemo(() => {
     const needle = searchKey(query.trim());
     const matches = needle
       ? songs.filter((song) => searchKey(`${song.title}\n${song.artist}`).includes(needle))
       : songs;
-    return matches.slice(0, MAX_ROWS);
+    return {
+      filtered: matches.slice(0, MAX_ROWS),
+      totalMatches: matches.length,
+    };
   }, [songs, query]);
+
+  function optionId(song: Song) {
+    const key = encodeURIComponent(songKey(song)).replace(/%/g, "-") || "empty";
+    return `${listId}-option-${key}`;
+  }
+
+  const activeSong = open ? filtered[highlight] : undefined;
+  const activeOptionId = activeSong ? optionId(activeSong) : undefined;
+  const selectedKey = songKey(selected);
 
   React.useEffect(() => {
     setHighlight(0);
   }, [query, songs]);
 
   React.useEffect(() => {
-    if (!open) return;
+    if (!open || filtered.length === 0) return;
     const row = listRef.current?.children[highlight] as HTMLElement | undefined;
     row?.scrollIntoView({ block: "nearest" });
-  }, [open, highlight]);
+  }, [open, highlight, filtered.length]);
 
   function close() {
     setOpen(false);
@@ -78,32 +110,95 @@ export function SongPicker<Song extends SongPickerSong>({
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      if (open) setHighlight((index) => Math.min(filtered.length - 1, index + 1));
-      else setOpen(true);
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setHighlight((index) => Math.max(0, index - 1));
-    } else if (event.key === "Enter") {
-      const song = filtered[highlight];
-      if (open && song) {
+    if (event.nativeEvent.isComposing) return;
+
+    switch (event.key) {
+      case "ArrowDown":
         event.preventDefault();
-        choose(song);
+        if (!open) {
+          setOpen(true);
+          setHighlight(0);
+        } else if (filtered.length > 0) {
+          setHighlight((index) => Math.min(filtered.length - 1, index + 1));
+        }
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        if (!open) {
+          setOpen(true);
+          setHighlight(Math.max(0, filtered.length - 1));
+        } else if (filtered.length > 0) {
+          setHighlight((index) => Math.max(0, index - 1));
+        }
+        break;
+      case "Home":
+        if (open && filtered.length > 0) {
+          event.preventDefault();
+          setHighlight(0);
+        }
+        break;
+      case "End":
+        if (open && filtered.length > 0) {
+          event.preventDefault();
+          setHighlight(filtered.length - 1);
+        }
+        break;
+      case "Enter": {
+        if (!open) {
+          event.preventDefault();
+          setOpen(true);
+          setHighlight(0);
+          break;
+        }
+        const song = filtered[highlight];
+        if (song) {
+          event.preventDefault();
+          choose(song);
+        }
+        break;
       }
-    } else if (event.key === "Escape") {
-      close();
+      case "Escape":
+        if (open || query) {
+          event.preventDefault();
+          close();
+        }
+        break;
+      default:
+        break;
     }
   }
 
   const selectedLabel = `${selected.title}${songBadge?.(selected) ?? ""}`;
   const statusText =
-    status === "loading" ? "DB加载中…" : status === "error" ? "DB不可用（使用内置示例）" : null;
+    status === "loading"
+      ? "Song database loading…"
+      : status === "error"
+        ? "Song database unavailable — using bundled samples"
+        : null;
+  const resultStatusText = open
+    ? totalMatches === 0
+      ? "No matching songs."
+      : totalMatches > MAX_ROWS
+        ? `${totalMatches} songs found; showing the first ${MAX_ROWS}.`
+        : `${totalMatches} songs found.`
+    : "";
+  const liveStatusText = [statusText, resultStatusText].filter(Boolean).join(" ");
 
   return (
-    <label className="control songpicker">
-      <span>Song</span>
+    <div className="control songpicker">
+      <span id={labelId}>Song</span>
       <input
+        id={inputId}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-activedescendant={activeOptionId}
+        aria-labelledby={labelId}
+        aria-describedby={liveStatusText ? statusId : undefined}
+        aria-busy={status === "loading"}
+        autoComplete="off"
         value={open ? query : selectedLabel}
         placeholder={selectedLabel}
         onFocus={() => {
@@ -118,23 +213,61 @@ export function SongPicker<Song extends SongPickerSong>({
         }}
         onKeyDown={onKeyDown}
       />
-      {statusText ? <span className="songpicker-status">{statusText}</span> : null}
+      {statusText ? (
+        <span className="songpicker-status-row">
+          <span className="songpicker-status" aria-hidden="true">{statusText}</span>
+          {status === "error" && onRetry ? (
+            <button
+              type="button"
+              className="songpicker-retry"
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={onRetry}
+            >
+              Retry
+            </button>
+          ) : null}
+        </span>
+      ) : null}
+      <span
+        id={statusId}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        style={SCREEN_READER_ONLY}
+      >
+        {liveStatusText}
+      </span>
       {open ? (
-        <ul className="songpicker-list" ref={listRef}>
+        <ul
+          className="songpicker-list"
+          id={listId}
+          ref={listRef}
+          role="listbox"
+          aria-labelledby={labelId}
+          aria-busy={status === "loading"}
+        >
           {filtered.length === 0 ? (
-            <li className="songpicker-empty">无匹配歌曲</li>
+            <li
+              className="songpicker-empty"
+              role="option"
+              aria-disabled="true"
+              aria-selected="false"
+            >
+              No matching songs
+            </li>
           ) : (
             filtered.map((song, index) => (
               <li
                 key={songKey(song)}
+                id={optionId(song)}
+                role="option"
+                aria-selected={songKey(song) === selectedKey}
                 className={`songpicker-row${index === highlight ? " active" : ""}`}
-                // mousedown (not click) + preventDefault: select before the
-                // input's blur closes the list, without stealing its focus.
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  choose(song);
-                }}
-                onMouseEnter={() => setHighlight(index)}
+                // Keep focus on the combobox so its active-descendant model
+                // remains intact, then select through the regular click path.
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => choose(song)}
+                onPointerEnter={() => setHighlight(index)}
               >
                 <img
                   className="songpicker-thumb"
@@ -155,6 +288,6 @@ export function SongPicker<Song extends SongPickerSong>({
           )}
         </ul>
       ) : null}
-    </label>
+    </div>
   );
 }

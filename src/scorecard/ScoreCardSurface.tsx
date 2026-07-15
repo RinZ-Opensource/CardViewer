@@ -1,5 +1,4 @@
 import React from "react";
-import { ThemeToggle } from "../ThemeToggle";
 import { exportNodeAsPng, renderNodeToPng } from "../exportPng";
 import {
   CHUNI_MUSICBOX_EXPORT_WIDTH,
@@ -92,12 +91,12 @@ const GAMES: Array<{ key: ScoreCardGame; label: string }> = [
 
 /** chuni/ongeki each render one of two cards: playing panel or select card. */
 const CARD_TYPES: Array<{ key: "panel" | "score"; label: string }> = [
-  { key: "panel", label: "信息面板" },
-  { key: "score", label: "成绩卡" },
+  { key: "panel", label: "Play panel" },
+  { key: "score", label: "Music card" },
 ];
 
-/** Playing-panel cards are hidden for now (score cards only); components kept. */
-const SHOW_PANEL_CARDS = false;
+/** Both implemented card families are user-selectable in the online workbench. */
+const SHOW_PANEL_CARDS = true;
 
 /** Active card design-space size; the stage auto-fit zoom uses this. */
 function designSize(
@@ -196,6 +195,7 @@ function defaultState(): MaiScoreState {
   const song = MAI_SAMPLE_SONGS[0];
   return {
     songId: song?.id ?? 0,
+    songDbBacked: false,
     difficulty: "expert",
     achievement: "100.9950",
     dxScore: "2589",
@@ -209,6 +209,7 @@ function defaultChuniState(): ChuniScoreState {
   const song = CHUNI_SAMPLE_SONGS[0];
   return {
     songId: song?.id ?? 0,
+    songDbBacked: false,
     difficulty: "master",
     level: "13+",
     track: "1",
@@ -234,6 +235,7 @@ function defaultOngekiState(): OngekiScoreState {
   const song = ONGEKI_SAMPLE_SONGS[0];
   return {
     songId: song?.id ?? "0001",
+    songDbBacked: false,
     difficulty: "master",
     level: "13+",
     speed: "9.5",
@@ -281,6 +283,7 @@ export function ScoreCardSurface() {
     return SHOW_PANEL_CARDS ? stored : { ...stored, cardType: "musicbt" };
   });
   const [exportingPng, setExportingPng] = React.useState(false);
+  const [exportError, setExportError] = React.useState("");
   const captureRef = React.useRef<HTMLDivElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
   const [stageScale, setStageScale] = React.useState(1);
@@ -296,41 +299,86 @@ export function ScoreCardSurface() {
     ongeki: { status: "loading", songs: [] },
   });
   const songDbStarted = React.useRef<Set<ScoreCardGame>>(new Set());
+  const songDbRequestId = React.useRef<Record<ScoreCardGame, number>>({
+    mai: 0,
+    chuni: 0,
+    ongeki: 0,
+  });
+  const [songDbReload, setSongDbReload] = React.useState(0);
 
   // Kick each game's DB fetch the first time its tab is shown. An empty list
   // counts as a failure so the picker falls back to the bundled samples.
   React.useEffect(() => {
     if (songDbStarted.current.has(game)) return;
     songDbStarted.current.add(game);
+    const requestId = songDbRequestId.current[game] + 1;
+    songDbRequestId.current[game] = requestId;
+    const isCurrentRequest = () => songDbRequestId.current[game] === requestId;
     if (game === "mai") {
       loadMaiSongs().then(
-        (songs) =>
+        (songs) => {
+          if (!isCurrentRequest()) return;
           setSongDb((current) => ({
             ...current,
             mai: { status: songs.length > 0 ? "ready" : "error", songs },
-          })),
-        () => setSongDb((current) => ({ ...current, mai: { status: "error", songs: [] } })),
+          }));
+        },
+        () => {
+          if (!isCurrentRequest()) return;
+          setSongDb((current) => ({ ...current, mai: { status: "error", songs: [] } }));
+        },
       );
     } else if (game === "chuni") {
       loadChuniSongs().then(
-        (songs) =>
+        (songs) => {
+          if (!isCurrentRequest()) return;
           setSongDb((current) => ({
             ...current,
             chuni: { status: songs.length > 0 ? "ready" : "error", songs },
-          })),
-        () => setSongDb((current) => ({ ...current, chuni: { status: "error", songs: [] } })),
+          }));
+        },
+        () => {
+          if (!isCurrentRequest()) return;
+          setSongDb((current) => ({ ...current, chuni: { status: "error", songs: [] } }));
+        },
       );
     } else {
       loadOngekiSongs().then(
-        (songs) =>
+        (songs) => {
+          if (!isCurrentRequest()) return;
           setSongDb((current) => ({
             ...current,
             ongeki: { status: songs.length > 0 ? "ready" : "error", songs },
-          })),
-        () => setSongDb((current) => ({ ...current, ongeki: { status: "error", songs: [] } })),
+          }));
+        },
+        () => {
+          if (!isCurrentRequest()) return;
+          setSongDb((current) => ({ ...current, ongeki: { status: "error", songs: [] } }));
+        },
       );
     }
-  }, [game]);
+  }, [game, songDbReload]);
+
+  function retrySongDb(target: ScoreCardGame) {
+    songDbStarted.current.delete(target);
+    songDbRequestId.current[target] += 1;
+    setSongDb((current) => ({
+      ...current,
+      [target]: { status: "loading", songs: [] },
+    }));
+    setSongDbReload((current) => current + 1);
+  }
+
+  function resetCurrentCard() {
+    setExportError("");
+    if (game === "mai") {
+      setState(defaultState());
+    } else if (game === "chuni") {
+      setChuniState(defaultChuniState());
+    } else {
+      setOngekiState(defaultOngekiState());
+    }
+  }
 
   const design = designSize(game, chuniState.cardType, ongekiState.cardType);
 
@@ -341,7 +389,7 @@ export function ScoreCardSurface() {
       const rect = stage.getBoundingClientRect();
       setStageScale(
         Math.max(
-          0.5,
+          0.28,
           Math.min((rect.width - 48) / design.width, (rect.height - 48) / design.height, 2.4),
         ),
       );
@@ -401,8 +449,9 @@ export function ScoreCardSurface() {
   // after the DB lands.
   const maiSongs = songDb.mai.status === "ready" ? songDb.mai.songs : MAI_SAMPLE_SONGS;
   const song =
-    maiSongs.find((entry) => entry.id === state.songId) ??
+    (state.songDbBacked ? maiSongs.find((entry) => entry.id === state.songId) : undefined) ??
     MAI_SAMPLE_SONGS.find((entry) => entry.id === state.songId) ??
+    maiSongs.find((entry) => entry.id === state.songId) ??
     maiSongs[0] ??
     MAI_SAMPLE_SONGS[0];
   const chart =
@@ -412,15 +461,21 @@ export function ScoreCardSurface() {
     Number.parseInt(state.dxScoreMax, 10) || chart?.maxDxScore || 0;
   const chuniSongs = songDb.chuni.status === "ready" ? songDb.chuni.songs : CHUNI_SAMPLE_SONGS;
   const chuniSong =
-    chuniSongs.find((entry) => entry.id === chuniState.songId) ??
+    (chuniState.songDbBacked
+      ? chuniSongs.find((entry) => entry.id === chuniState.songId)
+      : undefined) ??
     CHUNI_SAMPLE_SONGS.find((entry) => entry.id === chuniState.songId) ??
+    chuniSongs.find((entry) => entry.id === chuniState.songId) ??
     chuniSongs[0] ??
     CHUNI_SAMPLE_SONGS[0];
   const ongekiSongs =
     songDb.ongeki.status === "ready" ? songDb.ongeki.songs : ONGEKI_SAMPLE_SONGS;
   const ongekiSong =
-    ongekiSongs.find((entry) => entry.id === ongekiState.songId) ??
+    (ongekiState.songDbBacked
+      ? ongekiSongs.find((entry) => entry.id === ongekiState.songId)
+      : undefined) ??
     ONGEKI_SAMPLE_SONGS.find((entry) => entry.id === ongekiState.songId) ??
+    ongekiSongs.find((entry) => entry.id === ongekiState.songId) ??
     ongekiSongs[0] ??
     ONGEKI_SAMPLE_SONGS[0];
 
@@ -449,7 +504,13 @@ export function ScoreCardSurface() {
   function selectMaiSong(next: MaiSong) {
     const difficulty = maiPreferredDifficulty(next, state.difficulty);
     // dxScoreMax cleared: the chart's own max takes over as the denominator.
-    setState((current) => ({ ...current, songId: next.id, difficulty, dxScoreMax: "" }));
+    setState((current) => ({
+      ...current,
+      songId: next.id,
+      songDbBacked: songDb.mai.status === "ready",
+      difficulty,
+      dxScoreMax: "",
+    }));
   }
 
   function selectMaiDifficulty(difficulty: MaiDifficulty) {
@@ -462,6 +523,7 @@ export function ScoreCardSurface() {
       ...current,
       ...chuniChartFields(next, difficulty),
       songId: next.id,
+      songDbBacked: songDb.chuni.status === "ready",
       difficulty,
     }));
   }
@@ -480,6 +542,7 @@ export function ScoreCardSurface() {
       ...current,
       ...ongekiChartFields(next, difficulty),
       songId: next.id,
+      songDbBacked: songDb.ongeki.status === "ready",
       difficulty,
     }));
   }
@@ -517,11 +580,13 @@ export function ScoreCardSurface() {
             ? ONGEKI_MUSICBT_EXPORT_WIDTH
             : ONGEKI_SCORECARD_EXPORT_WIDTH;
     try {
+      setExportError("");
       setExportingPng(true);
-      await new Promise((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve(null))),
-      );
       await exportNodeAsPng(target, exportName, exportWidth);
+    } catch (err) {
+      setExportError(
+        `Export failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     } finally {
       setExportingPng(false);
     }
@@ -534,21 +599,28 @@ export function ScoreCardSurface() {
   return (
     <main className="scorecard-shell">
       <aside className="scorecard-form">
-        <label className="control">
+        <div className="control">
           <span>Game</span>
-          <div className="segment">
+          <div className="segment" role="group" aria-label="Score card game">
             {GAMES.map((entry) => (
               <button
                 key={entry.key}
                 type="button"
                 className={game === entry.key ? "active" : ""}
+                aria-pressed={game === entry.key}
                 onClick={() => setGame(entry.key)}
               >
                 {entry.label}
               </button>
             ))}
           </div>
-        </label>
+        </div>
+
+        <div className="scorecard-form-actions">
+          <button type="button" className="ghost-button" onClick={resetCurrentCard}>
+            Reset current card
+          </button>
+        </div>
 
         {game === "mai" ? (
           <>
@@ -561,23 +633,25 @@ export function ScoreCardSurface() {
               songKey={(entry) => String(entry.id)}
               songBadge={(entry) => (entry.isDx ? "［DX］" : "［スタンダード］")}
               onSelect={selectMaiSong}
+              onRetry={() => retrySongDb("mai")}
             />
 
-            <label className="control">
+            <div className="control">
               <span>Difficulty</span>
-              <div className="segment">
+              <div className="segment" role="group" aria-label="maimai difficulty">
                 {song.charts.map((entry) => (
                   <button
                     key={entry.difficulty}
                     type="button"
                     className={state.difficulty === entry.difficulty ? "active" : ""}
+                    aria-pressed={state.difficulty === entry.difficulty}
                     onClick={() => selectMaiDifficulty(entry.difficulty)}
                   >
                     {MAI_DIFFICULTY_LABEL[entry.difficulty]}
                   </button>
                 ))}
               </div>
-            </label>
+            </div>
 
             <label className="control">
               <span>Achievement %</span>
@@ -646,9 +720,9 @@ export function ScoreCardSurface() {
             </h2>
 
             {SHOW_PANEL_CARDS ? (
-              <label className="control">
+              <div className="control">
                 <span>Card</span>
-                <div className="segment">
+                <div className="segment" role="group" aria-label="CHUNITHM card type">
                   {CARD_TYPES.map((entry) => (
                     <button
                       key={entry.key}
@@ -658,6 +732,9 @@ export function ScoreCardSurface() {
                           ? "active"
                           : ""
                       }
+                      aria-pressed={
+                        (chuniState.cardType === "musicbox") === (entry.key === "score")
+                      }
                       onClick={() =>
                         updateChuni("cardType", entry.key === "score" ? "musicbox" : "panel")
                       }
@@ -666,7 +743,7 @@ export function ScoreCardSurface() {
                     </button>
                   ))}
                 </div>
-              </label>
+              </div>
             ) : null}
 
             <SongPicker
@@ -675,11 +752,12 @@ export function ScoreCardSurface() {
               status={songDb.chuni.status}
               songKey={(entry) => String(entry.id)}
               onSelect={selectChuniSong}
+              onRetry={() => retrySongDb("chuni")}
             />
 
-            <label className="control">
+            <div className="control">
               <span>Difficulty</span>
-              <div className="segment">
+              <div className="segment" role="group" aria-label="CHUNITHM difficulty">
                 {/* The music box has no TUTORIAL pattern. */}
                 {(chuniState.cardType === "musicbox"
                   ? CHUNI_BOX_DIFFICULTY_ORDER
@@ -689,6 +767,7 @@ export function ScoreCardSurface() {
                     key={difficulty}
                     type="button"
                     className={chuniState.difficulty === difficulty ? "active" : ""}
+                    aria-pressed={chuniState.difficulty === difficulty}
                     disabled={!chuniHasChart(chuniSong, difficulty)}
                     onClick={() => selectChuniDifficulty(difficulty)}
                   >
@@ -696,7 +775,7 @@ export function ScoreCardSurface() {
                   </button>
                 ))}
               </div>
-            </label>
+            </div>
 
             {chuniState.difficulty === "worldsend" ? (
               <>
@@ -889,9 +968,9 @@ export function ScoreCardSurface() {
             </h2>
 
             {SHOW_PANEL_CARDS ? (
-              <label className="control">
+              <div className="control">
                 <span>Card</span>
-                <div className="segment">
+                <div className="segment" role="group" aria-label="O.N.G.E.K.I. card type">
                   {CARD_TYPES.map((entry) => (
                     <button
                       key={entry.key}
@@ -901,6 +980,9 @@ export function ScoreCardSurface() {
                           ? "active"
                           : ""
                       }
+                      aria-pressed={
+                        (ongekiState.cardType === "musicbt") === (entry.key === "score")
+                      }
                       onClick={() =>
                         updateOngeki("cardType", entry.key === "score" ? "musicbt" : "panel")
                       }
@@ -909,7 +991,7 @@ export function ScoreCardSurface() {
                     </button>
                   ))}
                 </div>
-              </label>
+              </div>
             ) : null}
 
             <SongPicker
@@ -918,16 +1000,18 @@ export function ScoreCardSurface() {
               status={songDb.ongeki.status}
               songKey={(entry) => entry.id}
               onSelect={selectOngekiSong}
+              onRetry={() => retrySongDb("ongeki")}
             />
 
-            <label className="control">
+            <div className="control">
               <span>Difficulty</span>
-              <div className="segment">
+              <div className="segment" role="group" aria-label="O.N.G.E.K.I. difficulty">
                 {ONGEKI_DIFFICULTY_ORDER.map((difficulty) => (
                   <button
                     key={difficulty}
                     type="button"
                     className={ongekiState.difficulty === difficulty ? "active" : ""}
+                    aria-pressed={ongekiState.difficulty === difficulty}
                     disabled={!ongekiHasChart(ongekiSong, difficulty)}
                     onClick={() => selectOngekiDifficulty(difficulty)}
                   >
@@ -935,7 +1019,7 @@ export function ScoreCardSurface() {
                   </button>
                 ))}
               </div>
-            </label>
+            </div>
 
             <label className="control">
               <span>Level (e.g. 13+)</span>
@@ -1122,7 +1206,6 @@ export function ScoreCardSurface() {
 
       <section className="scorecard-preview">
         <div className="scorecard-toolbar">
-          <ThemeToggle />
           <button
             type="button"
             className="scorecard-export"
@@ -1132,6 +1215,11 @@ export function ScoreCardSurface() {
             {exportingPng ? "Exporting…" : "Export PNG"}
           </button>
         </div>
+        {exportError ? (
+          <div className="scorecard-export-error" role="alert">
+            {exportError}
+          </div>
+        ) : null}
         <div className="scorecard-stage" ref={stageRef}>
           {/* CSS zoom (not transform:scale): text re-rasterizes at the zoomed
               size, so glyph spacing stays even at fractional fit factors. */}

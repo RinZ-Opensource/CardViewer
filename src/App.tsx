@@ -1,12 +1,12 @@
 import React from "react";
 import { EditorPanel } from "./EditorPanel";
 import { exportNodeAsPng } from "./exportPng";
-import { ThemeToggle } from "./ThemeToggle";
 import { applyEdits } from "./cardData";
-import { effectiveCardEdits } from "./cardEdits";
+import { effectiveCardEdits, SHARED_PLAYER_EDITS_KEY } from "./cardEdits";
 import { buildFilterConfig, cardMatchesFilters, uniqueOptions } from "./cardFilters";
+import { isSupportedCardRecord } from "./cardSupport";
 import { PreviewStage, selectedAssetSignature, usesPrimaryImageDataUrl } from "./cards";
-import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT, CARD_WIDTH, OfficialFontContext, TmpFontContext } from "./constants";
+import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT, CARD_WIDTH, DEPLOYMENT_MODE, OfficialFontContext, TmpFontContext } from "./constants";
 import { useCardEdits, useCardListViewport, useOfficialFonts, useScanResult, useSelectedAssetDataUrls, useSelectedImageDataUrl, useThumbnailLoader } from "./hooks";
 import { THUMBNAIL_BUFFER_ROWS } from "./imageLoader";
 import { CardRecord, ViewMode } from "./types";
@@ -20,12 +20,12 @@ export function App() {
   const [exportingPng, setExportingPng] = React.useState(false);
   const { cardListRef, cardListViewport, updateCardListScroll } = useCardListViewport();
   const { officialFonts, tmpFont } = useOfficialFonts();
-  const { edits, updateCardField, updatePlayerField, resetCardEdits } = useCardEdits();
-  const { scanResult, status, error, setError, loading } = useScanResult(setSelectedId);
+  const { edits, updateCardField, updatePlayerField, resetCardEdits, resetPlayerEdits } = useCardEdits();
+  const { scanResult, status, source, error, setError, loading, retry } = useScanResult(setSelectedId);
 
   const cards = scanResult?.cards ?? [];
   const displayCards = React.useMemo(
-    () => cards.filter((card) => card.recordType === "Card"),
+    () => cards.filter(isSupportedCardRecord),
     [cards],
   );
   const games = React.useMemo(
@@ -104,6 +104,7 @@ export function App() {
       let changed = false;
       const next: Record<string, string> = {};
       const availableKeys = new Set(["game", ...filterConfig.map((filter) => filter.key)]);
+      if (current.game) next.game = current.game;
       for (const filter of filterConfig) {
         const value = current[filter.key];
         if (!value) continue;
@@ -173,6 +174,84 @@ export function App() {
   }, [filteredCards, visibleEnd, visibleStart]);
   const cardListHeight = filteredCards.length * CARD_ROW_HEIGHT;
   const thumbCache = useThumbnailLoader(thumbnailCards);
+  const selectedIndex = selected
+    ? filteredCards.findIndex((card) => card.dataName === selected.dataName)
+    : -1;
+  const selectedOptionId =
+    selectedIndex >= virtualStart && selectedIndex < virtualEnd
+      ? `card-option-${selectedIndex}`
+      : undefined;
+  const hasSearchOrFacet =
+    query.trim().length > 0 ||
+    Object.keys(cardFilters).some((key) => key !== "game" && Boolean(cardFilters[key]));
+
+  React.useEffect(() => {
+    const list = cardListRef.current;
+    if (!list) return;
+    const maxScrollTop = Math.max(0, cardListHeight - list.clientHeight);
+    if (list.scrollTop > maxScrollTop) {
+      list.scrollTop = 0;
+      updateCardListScroll();
+    }
+  }, [cardListHeight, cardListRef, updateCardListScroll]);
+
+  function selectCardAt(index: number) {
+    if (filteredCards.length === 0) return;
+    const nextIndex = Math.max(0, Math.min(filteredCards.length - 1, index));
+    const card = filteredCards[nextIndex];
+    setSelectedId(card.dataName);
+
+    const list = cardListRef.current;
+    if (!list) return;
+    const rowTop = nextIndex * CARD_ROW_HEIGHT;
+    const rowBottom = rowTop + CARD_ROW_HEIGHT;
+    if (rowTop < list.scrollTop) {
+      list.scrollTop = rowTop;
+    } else if (rowBottom > list.scrollTop + list.clientHeight) {
+      list.scrollTop = rowBottom - list.clientHeight;
+    }
+    updateCardListScroll();
+  }
+
+  function onCardListKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.altKey || event.ctrlKey || event.metaKey || filteredCards.length === 0) return;
+    const currentIndex = selectedIndex >= 0 ? selectedIndex : 0;
+    const pageSize = Math.max(1, Math.floor(cardListViewport.height / CARD_ROW_HEIGHT));
+    let nextIndex: number | null = null;
+    switch (event.key) {
+      case "ArrowDown":
+        nextIndex = currentIndex + 1;
+        break;
+      case "ArrowUp":
+        nextIndex = currentIndex - 1;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = filteredCards.length - 1;
+        break;
+      case "PageDown":
+        nextIndex = currentIndex + pageSize;
+        break;
+      case "PageUp":
+        nextIndex = currentIndex - pageSize;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    selectCardAt(nextIndex);
+  }
+
+  function clearSearchAndFacets() {
+    setQuery("");
+    setCardFilters((current) => {
+      const next: Record<string, string> = {};
+      if (current.game) next.game = current.game;
+      return next;
+    });
+  }
 
   async function exportCardPng() {
     // Capture .card-face (not just .official-card) so the holo is included for
@@ -192,7 +271,7 @@ export function App() {
         CARD_WIDTH,
       );
     } catch (err) {
-      setError(`Export failed: ${String(err)}`);
+      setError(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setExportingPng(false);
     }
@@ -222,15 +301,18 @@ export function App() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search printed text"
+              aria-label="Search cards by printed text"
               className="search-input"
             />
           </div>
           {games.length > 0 ? (
-            <div className="segment">
+            <div className="segment" role="group" aria-label="Game">
               {games.map((game) => (
                 <button
                   key={game.value}
+                  type="button"
                   className={(cardFilters.game || games[0]?.value) === game.value ? "active" : ""}
+                  aria-pressed={(cardFilters.game || games[0]?.value) === game.value}
                   onClick={() => setCardFilters({ game: game.value })}
                 >
                   {game.label}
@@ -238,6 +320,23 @@ export function App() {
               ))}
             </div>
           ) : null}
+          <div
+            className={`data-source-status${source === "mock" || source === "error" ? " degraded" : ""}`}
+            role="status"
+            aria-live="polite"
+          >
+            <span>{status}</span>
+            {scanResult ? (
+              <small>
+                {filteredCards.length.toLocaleString()} of {displayCards.length.toLocaleString()} supported cards
+              </small>
+            ) : null}
+            {source === "mock" || source === "error" ? (
+              <button type="button" className="ghost-button" onClick={retry} disabled={loading}>
+                Retry manifest
+              </button>
+            ) : null}
+          </div>
           <div className="filter-grid" aria-label="Card filters">
             {filterConfig.map((filter) => (
               <label className="filter-control" key={filter.key}>
@@ -270,22 +369,49 @@ export function App() {
 
         <section
           className="card-list"
-          aria-label="cards"
+          role="listbox"
+          tabIndex={0}
+          aria-label={`Cards, ${filteredCards.length.toLocaleString()} results`}
+          aria-activedescendant={selectedOptionId}
           ref={cardListRef}
           onScroll={updateCardListScroll}
+          onKeyDown={onCardListKeyDown}
         >
-          <div className="card-list-spacer" style={{ height: cardListHeight }}>
-            <div
-              className="card-list-window"
-              style={{ transform: `translateY(${virtualStart * CARD_ROW_HEIGHT}px)` }}
-            >
-              {virtualCards.map((card) => {
+          {filteredCards.length === 0 && !loading ? (
+            <div className="card-list-empty" role="status">
+              <strong>{displayCards.length === 0 ? "No supported cards available" : "No matching cards"}</strong>
+              <span>
+                {displayCards.length === 0
+                  ? "Retry the online manifest or check the deployment data source."
+                  : "Adjust the search or filters to show more results."}
+              </span>
+              {hasSearchOrFacet ? (
+                <button type="button" className="ghost-button" onClick={clearSearchAndFacets}>
+                  Clear search and filters
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <div className="card-list-spacer" style={{ height: cardListHeight }}>
+              <div
+                className="card-list-window"
+                style={{ transform: `translateY(${virtualStart * CARD_ROW_HEIGHT}px)` }}
+              >
+              {virtualCards.map((card, windowIndex) => {
+                const cardIndex = virtualStart + windowIndex;
                 const merged = applyEdits(card, effectiveCardEdits(edits, card));
                 const active = selected?.dataName === card.dataName;
                 const thumb = thumbCache[card.dataName];
                 return (
                   <button
                     key={`${card.game}-${card.dataName}`}
+                    id={`card-option-${cardIndex}`}
+                    type="button"
+                    role="option"
+                    tabIndex={-1}
+                    aria-selected={active}
+                    aria-posinset={cardIndex + 1}
+                    aria-setsize={filteredCards.length}
                     className={`card-row ${active ? "active" : ""}`}
                     onClick={() => setSelectedId(card.dataName)}
                   >
@@ -302,8 +428,9 @@ export function App() {
                   </button>
                 );
               })}
+              </div>
             </div>
-          </div>
+          )}
         </section>
       </aside>
 
@@ -316,15 +443,30 @@ export function App() {
                 <span className="preview-spinner" role="status" aria-label={status || "Loading"} title={status} />
               ) : null}
             </div>
-            <p className="preview-subtitle">{selected ? `${selected.game} / ${selected.dataName}` : "Scan a package"}</p>
+            <p className="preview-subtitle">
+              {selected
+                ? `${selected.game} / ${selected.dataName}`
+                : loading
+                  ? "Loading online card data"
+                  : "No card matches the current data and filters"}
+            </p>
           </div>
           <div className="preview-actions">
-            <ThemeToggle />
-            <div className="segment compact">
-              <button className={viewMode === "2d" ? "active" : ""} onClick={() => setViewMode("2d")}>
+            <div className="segment compact" role="group" aria-label="Preview mode">
+              <button
+                type="button"
+                className={viewMode === "2d" ? "active" : ""}
+                aria-pressed={viewMode === "2d"}
+                onClick={() => setViewMode("2d")}
+              >
                 2D
               </button>
-              <button className={viewMode === "3d" ? "active" : ""} onClick={() => setViewMode("3d")}>
+              <button
+                type="button"
+                className={viewMode === "3d" ? "active" : ""}
+                aria-pressed={viewMode === "3d"}
+                onClick={() => setViewMode("3d")}
+              >
                 3D
               </button>
             </div>
@@ -339,14 +481,26 @@ export function App() {
             mode={viewMode}
             captureRef={cardCaptureRef}
           />
-          <EditorPanel
-            card={selectedBase}
-            edits={selectedEdits}
-            onChange={(fieldKey, value) => { if (selected) updateCardField(selected, fieldKey, value); }}
-            onPlayerChange={(fieldKey, value) => { if (selected) updatePlayerField(fieldKey, value); }}
-            onReset={() => { if (selected) resetCardEdits(selected); }}
-            canReset={Boolean(selectedCardEdits && Object.keys(selectedCardEdits).length > 0)}
-          />
+          {DEPLOYMENT_MODE === "private" ? (
+            <EditorPanel
+              card={selectedBase}
+              edits={selectedEdits}
+              onChange={(fieldKey, value) => { if (selected) updateCardField(selected, fieldKey, value); }}
+              onPlayerChange={(fieldKey, value) => { if (selected) updatePlayerField(fieldKey, value); }}
+              onReset={() => { if (selected) resetCardEdits(selected); }}
+              onResetPlayer={resetPlayerEdits}
+              canReset={Boolean(selectedCardEdits && Object.keys(selectedCardEdits).length > 0)}
+              canResetPlayer={Boolean(
+                edits[SHARED_PLAYER_EDITS_KEY] &&
+                Object.keys(edits[SHARED_PLAYER_EDITS_KEY]).length > 0
+              )}
+            />
+          ) : (
+            <aside className="editor-panel empty public-editor-notice">
+              Editing is unavailable in the public asset build because that renderer does not
+              apply print fields.
+            </aside>
+          )}
         </div>
       </section>
       {error ? (

@@ -404,18 +404,21 @@
     flex-direction: column;
     min-height: 100dvh;
     height: auto;
+    /* Reserve scrollable space behind the fixed export action so the final
+       editor/list controls can always be brought fully above it. */
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
 
   .workspace {
-    order: 1;
+    order: 2;
     padding: 14px;
     gap: 12px;
   }
 
   .sidebar {
-    order: 2;
+    order: 1;
     display: grid;
-    grid-template-rows: auto minmax(260px, 42dvh);
+    grid-template-rows: auto auto;
     gap: 12px;
     padding: 0 14px 14px;
     border-right: 0;
@@ -503,8 +506,70 @@
   }
 
   .card-list {
-    min-height: 260px;
-    height: 42dvh;
+    min-height: 240px;
+    height: clamp(240px, 36dvh, 360px);
+    max-height: 360px;
+  }
+
+  .search-input,
+  .filter-control select,
+  .sidebar .segment button {
+    min-height: 44px;
+  }
+
+  .search-input,
+  .filter-control select {
+    height: 44px;
+  }
+
+  .export-fab {
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    min-height: 48px;
+    padding: 12px 18px;
+  }
+
+  .error-toast {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 700px) {
+  /* The persistent surface switch is part of both mobile workbenches. */
+  .surface-nav {
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .surface-brand {
+    display: none;
+  }
+
+  .surface-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .surface-actions > .segment {
+    flex: 1;
+  }
+
+  .surface-actions > .segment button {
+    flex: 1;
+  }
+
+  .surface-nav .segment button {
+    min-height: 44px;
+  }
+
+  .data-source-status {
+    flex-wrap: wrap;
+  }
+
+  .data-source-status small {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
   }
 }
 
@@ -514,7 +579,7 @@
   }
 
   .sidebar {
-    grid-template-rows: auto minmax(260px, 46dvh);
+    grid-template-rows: auto auto;
     padding: 0 10px 12px;
   }
 
@@ -573,11 +638,18 @@
   .card-row {
     --thumb-w: 42px;
     gap: 9px;
-    min-height: 72px;
+    height: 82px;
+    min-height: 82px;
   }
 
   .thumb-slot {
     height: 59px;
+  }
+
+  .card-list {
+    min-height: 220px;
+    height: clamp(220px, 34dvh, 300px);
+    max-height: 300px;
   }
 
   .edit-json pre {

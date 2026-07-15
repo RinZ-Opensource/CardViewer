@@ -4,7 +4,9 @@ import { CardRecord, OnlineManifestIndex, OnlineManifestShard, ScanResult } from
 // Cap concurrent shard fetches and bound each request, so a many-shard manifest
 // can't open hundreds of connections or hang on a stalled response.
 export const SHARD_FETCH_CONCURRENCY = 6;
-export const SHARD_FETCH_TIMEOUT_MS = 30_000;
+export const MANIFEST_FETCH_TIMEOUT_MS = 30_000;
+// Kept as an alias for callers/tests that referenced the old shard-only name.
+export const SHARD_FETCH_TIMEOUT_MS = MANIFEST_FETCH_TIMEOUT_MS;
 
 export async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, signal ? { signal } : undefined);
@@ -14,13 +16,33 @@ export async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T
   return (await response.json()) as T;
 }
 
-async function fetchJsonWithTimeout<T>(url: string, timeoutMs = SHARD_FETCH_TIMEOUT_MS): Promise<T> {
+async function fetchJsonWithTimeout<T>(
+  url: string,
+  timeoutMs = MANIFEST_FETCH_TIMEOUT_MS,
+  signal?: AbortSignal,
+): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const abortFromParent = () => controller.abort();
+  if (signal?.aborted) {
+    controller.abort();
+  } else {
+    signal?.addEventListener("abort", abortFromParent, { once: true });
+  }
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
   try {
     return await fetchJson<T>(url, controller.signal);
+  } catch (err) {
+    if (timedOut) {
+      throw new Error(`${url} timed out after ${timeoutMs}ms`, { cause: err });
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener("abort", abortFromParent);
   }
 }
 
@@ -53,8 +75,9 @@ export function siblingManifestUrl(manifestUrl: string, fileName: string) {
 }
 
 export function resolveManifestHref(href: string, manifestUrl: string) {
-  const base = typeof window === "undefined" ? "http://localhost/" : manifestUrl;
-  return new URL(href, base).toString();
+  const pageBase = typeof window === "undefined" ? "http://localhost/" : window.location.href;
+  const absoluteManifestUrl = new URL(manifestUrl, pageBase);
+  return new URL(href, absoluteManifestUrl).toString();
 }
 
 export function scanResultFromIndex(index: OnlineManifestIndex, cards: CardRecord[]): ScanResult {
@@ -70,23 +93,42 @@ export function scanResultFromIndex(index: OnlineManifestIndex, cards: CardRecor
 export async function loadStaticScanResult(
   onPartial?: (result: ScanResult, loadedCards: number, totalCards: number) => void,
 ) {
-  const indexUrl = STATIC_MANIFEST_URL.endsWith("cards.index.json")
+  const staticPath = STATIC_MANIFEST_URL.split(/[?#]/, 1)[0];
+  const staticUrlIsIndex = staticPath.endsWith("cards.index.json");
+  const indexUrl = staticUrlIsIndex
     ? STATIC_MANIFEST_URL
     : siblingManifestUrl(STATIC_MANIFEST_URL, "cards.index.json");
+  const legacyUrl = staticUrlIsIndex
+    ? siblingManifestUrl(STATIC_MANIFEST_URL, "cards.json")
+    : STATIC_MANIFEST_URL;
+  let acceptPartial = true;
+  let shardController: AbortController | null = null;
   try {
-    const index = await fetchJson<OnlineManifestIndex>(indexUrl);
+    const index = await fetchJsonWithTimeout<OnlineManifestIndex>(indexUrl);
     if (!index.shards.length) return scanResultFromIndex(index, []);
 
     // Fetch all shards concurrently (capped by mapWithConcurrency); the first
     // drives an early partial render, and order is preserved for a stable merge.
+    shardController = new AbortController();
     const shardResults = await mapWithConcurrency(
       index.shards,
       SHARD_FETCH_CONCURRENCY,
       async (shard, i) => {
-        const result = await fetchJsonWithTimeout<OnlineManifestShard>(
-          resolveManifestHref(shard.href, indexUrl),
-        );
-        if (i === 0) {
+        let result: OnlineManifestShard;
+        try {
+          result = await fetchJsonWithTimeout<OnlineManifestShard>(
+            resolveManifestHref(shard.href, indexUrl),
+            MANIFEST_FETCH_TIMEOUT_MS,
+            shardController?.signal,
+          );
+        } catch (err) {
+          // Stop the other workers immediately. Besides avoiding wasted requests,
+          // this prevents shard 0 from publishing a late partial result after the
+          // caller has already entered the legacy-manifest fallback.
+          shardController?.abort();
+          throw err;
+        }
+        if (i === 0 && acceptPartial && !shardController?.signal.aborted) {
           onPartial?.(scanResultFromIndex(index, result.cards), result.cards.length, index.totalCards);
         }
         return result;
@@ -95,10 +137,11 @@ export async function loadStaticScanResult(
     const cards = shardResults.flatMap((shard) => shard.cards);
     return scanResultFromIndex(index, cards);
   } catch (err) {
+    acceptPartial = false;
+    shardController?.abort();
     // Fall back to a single legacy (non-sharded) manifest, but surface the
     // original error so real failures aren't silently masked by the fallback.
     console.warn("Sharded manifest load failed; trying legacy manifest", err);
-    return fetchJson<ScanResult>(STATIC_MANIFEST_URL);
+    return fetchJsonWithTimeout<ScanResult>(legacyUrl);
   }
 }
-

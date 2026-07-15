@@ -61,6 +61,8 @@ export type ChuniStartBanner = "gamestart" | "ready" | "linkstart";
 
 export interface ChuniScoreState {
   songId: number;
+  /** Distinguishes an explicit online-DB selection from a bundled sample with the same id. */
+  songDbBacked?: boolean;
   difficulty: ChuniDifficulty;
   /** Display level, e.g. "13" or "13+" (normal charts only). */
   level: string;

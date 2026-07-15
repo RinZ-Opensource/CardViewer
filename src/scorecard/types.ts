@@ -50,6 +50,8 @@ export interface MaiSong {
 
 export interface MaiScoreState {
   songId: number;
+  /** Distinguishes an explicit online-DB selection from a bundled sample with the same id. */
+  songDbBacked?: boolean;
   difficulty: MaiDifficulty;
   /** Achievement percentage as entered, e.g. "100.9950". */
   achievement: string;

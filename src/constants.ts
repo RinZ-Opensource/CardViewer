@@ -7,7 +7,8 @@ export const EXPLICIT_STATIC_MANIFEST_URL = import.meta.env.VITE_CARD_MANIFEST_U
 export const STATIC_MANIFEST_URL = EXPLICIT_STATIC_MANIFEST_URL || "/official/generated/cards.json";
 export const CARD_TILT_X_MAX = 26;
 export const CARD_TILT_Y_MAX = 34;
-export const CARD_ROW_HEIGHT = 82;
+// Virtualized list pitch: rendered row height (82px) + window gap (7px).
+export const CARD_ROW_HEIGHT = 89;
 export const CARD_LIST_OVERSCAN = 6;
 export const DEPLOYMENT_MODE: DeploymentMode =
   import.meta.env.VITE_DEPLOYMENT_MODE === "public" ? "public" : "private";
@@ -93,4 +94,3 @@ export function officialAsset(name: string) {
 export function officialData(name: string) {
   return `${OFFICIAL_ASSET_ROOT}${name}`;
 }
-

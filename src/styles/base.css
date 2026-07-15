@@ -56,6 +56,9 @@
   --ui-text-heading: #263037;
   --ui-text-strong: #111111;
   --ui-surface: #ffffff;
+  /* Opaque floating/panel surface. Keep as a semantic alias so overlays and
+     form controls do not accidentally become transparent in either theme. */
+  --ui-panel-bg: var(--ui-surface);
   --ui-sidebar-bg: #f9fbfb;
   --ui-tile-bg: #edf3f2;
   --ui-toggle-bg: #f8faf9;
@@ -66,7 +69,12 @@
   --ui-input-border: #cfd8dc;
   --ui-accent: #0b6f70;
   --ui-accent-strong: #007d80;
-  --ui-accent-hover: #00696c;
+  /* Filled actions need their own foreground pair; --ui-accent remains the
+     brighter interaction/focus colour used on borders and indicators. */
+  --ui-accent-solid: #0b6f70;
+  --ui-accent-solid-hover: #00696c;
+  --ui-on-accent: #ffffff;
+  --ui-accent-hover: var(--ui-accent-solid-hover);
   --ui-accent-ring: rgba(11, 111, 112, 0.12);
   --ui-accent-soft: #dceeed;
   --ui-ghost-bg: #e8eef0;
@@ -110,7 +118,12 @@
   --ui-input-border: #364046;
   --ui-accent: #18a7a2;
   --ui-accent-strong: #1cb6b0;
-  --ui-accent-hover: #149c97;
+  /* White on the brighter dark-theme accent is below 3:1. Use a deeper solid
+     teal for filled buttons while retaining the bright accent for focus. */
+  --ui-accent-solid: #0d7774;
+  --ui-accent-solid-hover: #096b68;
+  --ui-on-accent: #ffffff;
+  --ui-accent-hover: var(--ui-accent-solid-hover);
   --ui-accent-ring: rgba(36, 198, 192, 0.24);
   --ui-accent-soft: #123a39;
   --ui-ghost-bg: #283037;
@@ -154,6 +167,27 @@ html.theme-anim *::after {
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation: none;
+  }
+
+  /* theme.ts normally avoids .theme-anim for reduced-motion users. This is a
+     CSS backstop for system-theme changes and any future callers. */
+  html.theme-anim,
+  html.theme-anim *,
+  html.theme-anim *::before,
+  html.theme-anim *::after {
+    transition: none !important;
+  }
+
+  /* Stop persistent decorative motion (including holo keyframes declared in
+     other style sheets) and collapse finite UI transitions to one frame. */
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
   }
 }
 
@@ -240,6 +274,7 @@ button {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   background: var(--ui-shell-bg);
 }
 
@@ -254,15 +289,30 @@ button {
 }
 
 .surface-brand {
+  margin: 0;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--ui-text-muted);
 }
 
+.surface-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .surface-body {
   flex: 1;
   min-height: 0;
+}
+
+.surface-pane {
+  height: 100%;
+}
+
+.surface-pane[hidden] {
+  display: none;
 }
 
 .app-shell {
@@ -289,6 +339,42 @@ button {
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-card);
   background: var(--ui-surface);
+}
+
+.data-source-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-control);
+  background: var(--ui-toggle-bg);
+  color: var(--ui-text-muted);
+  font-size: 11px;
+}
+
+.data-source-status > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-source-status small {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.data-source-status.degraded {
+  border-color: color-mix(in srgb, var(--ui-danger) 48%, var(--ui-border));
+  color: var(--ui-danger);
+}
+
+.data-source-status .ghost-button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 8px;
 }
 
 .scan-panel {
@@ -365,8 +451,8 @@ small,
 }
 
 .primary-button {
-  background: var(--ui-accent);
-  color: #fff;
+  background: var(--ui-accent-solid);
+  color: var(--ui-on-accent);
 }
 
 .ghost-button {
@@ -505,8 +591,8 @@ small,
 
 .export-fab {
   position: fixed;
-  right: 28px;
-  bottom: 28px;
+  right: calc(28px + env(safe-area-inset-right, 0px));
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
   z-index: 70;
   display: inline-flex;
   align-items: center;
@@ -514,8 +600,8 @@ small,
   padding: 16px 28px;
   border: none;
   border-radius: 999px;
-  background: var(--ui-accent-strong);
-  color: #fff;
+  background: var(--ui-accent-solid);
+  color: var(--ui-on-accent);
   font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -531,7 +617,7 @@ small,
 }
 
 .export-fab:hover {
-  background: var(--ui-accent-hover);
+  background: var(--ui-accent-solid-hover);
   transform: translateY(-2px);
   box-shadow: 0 10px 26px rgba(0, 125, 128, 0.3);
 }
@@ -634,6 +720,36 @@ small,
   min-height: 0;
   overflow: auto;
   padding-right: 4px;
+  border-radius: var(--radius-control);
+  outline: none;
+}
+
+.card-list:focus-visible {
+  box-shadow: 0 0 0 3px var(--ui-accent-ring);
+}
+
+.card-list-empty {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  min-height: 220px;
+  padding: 24px;
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  text-align: center;
+}
+
+.card-list-empty strong {
+  color: var(--ui-text-heading);
+  font-size: 14px;
+}
+
+.card-list-empty span {
+  max-width: 34ch;
+  font-size: 12px;
 }
 
 .card-list-spacer {
@@ -656,7 +772,10 @@ small,
   grid-template-columns: var(--thumb-w) minmax(0, 1fr) auto;
   align-items: center;
   gap: 11px;
-  min-height: 75px;
+  /* Keep the virtualizer contract explicit: 82px row + 7px window gap =
+     CARD_ROW_HEIGHT (89px) in constants.ts. */
+  height: 82px;
+  min-height: 82px;
   width: 100%;
   padding: 8px 10px 8px 8px;
   border: 1px solid var(--ui-border-strong);
@@ -803,7 +922,7 @@ small,
 
 @media (prefers-reduced-motion: reduce) {
   .preview-spinner {
-    animation-duration: 1.8s;
+    animation: none;
   }
 }
 

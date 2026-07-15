@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { assetLayerLoadPriority, visibleAssetLayers } from "./cards";
 import { maiLinkedPrintEdits } from "./cardData";
 import { PLAYER_EDIT_KEYS, SHARED_PLAYER_EDITS_KEY, sharedPlayerEdits } from "./cardEdits";
+import { isSupportedCardRecord } from "./cardSupport";
 import { DEFAULT_PACKAGE_ROOT, EDIT_STORAGE_KEY, USE_OFFICIAL_ASSETS, canInvokeTauri } from "./constants";
 import { loadOfficialFonts, loadOfficialTmpFont } from "./fonts";
 import { isStaticAssetPath, readCachedImageDataUrl } from "./imageLoader";
@@ -43,12 +44,13 @@ export function useOfficialFonts() {
 // `setSelectedId` is threaded in so a completed load can seed the selection.
 export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction<string>>) {
   const [scanResult, setScanResult] = React.useState<ScanResult | null>(null);
-  const [packageRoot, setPackageRoot] = React.useState(DEFAULT_PACKAGE_ROOT);
   const [status, setStatus] = React.useState("Ready");
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(true);
-  const autoLoadStartedRef = React.useRef(false);
+  const [source, setSource] = React.useState<"loading" | "manifest" | "tauri" | "mock" | "error">("loading");
+  const [reloadToken, setReloadToken] = React.useState(0);
   const loadSequenceRef = React.useRef(0);
+  const packageRoot = DEFAULT_PACKAGE_ROOT;
 
   React.useEffect(() => {
     if (!error) return;
@@ -57,20 +59,17 @@ export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction
   }, [error]);
 
   React.useEffect(() => {
-    if (autoLoadStartedRef.current) return;
-    autoLoadStartedRef.current = true;
-
     const scanPackage = async () => {
       setError("");
       setLoading(true);
+      setSource("loading");
       const tauriAvailable = canInvokeTauri();
       const loadId = loadSequenceRef.current + 1;
       loadSequenceRef.current = loadId;
       const isCurrentLoad = () => loadSequenceRef.current === loadId;
       const applyScanResult = (result: ScanResult) => {
-        const nextDisplayCards = result.cards.filter((card) => card.recordType === "Card");
+        const nextDisplayCards = result.cards.filter(isSupportedCardRecord);
         setScanResult(result);
-        setPackageRoot(result.packageRoot || packageRoot);
         setSelectedId((current) =>
           nextDisplayCards.some((card) => card.dataName === current)
             ? current
@@ -90,14 +89,19 @@ export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction
           });
           if (!isCurrentLoad()) return;
           applyScanResult(result);
+          setSource("manifest");
           setStatus(`Loaded ${result.cards.length.toLocaleString()} exported records`);
           return;
-        } catch {
+        } catch (manifestError) {
           if (!tauriAvailable) {
             const result = mockScanResult(packageRoot);
             if (!isCurrentLoad()) return;
+            console.warn("Exported manifest unavailable; using bundled samples", manifestError);
             applyScanResult(result);
-            setStatus("Browser preview data loaded");
+            setSource("mock");
+            setStatus(
+              `Manifest unavailable — showing ${result.cards.length.toLocaleString()} bundled sample records`,
+            );
             return;
           }
           setStatus("Manifest unavailable; scanning package");
@@ -106,10 +110,12 @@ export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction
         const result = await invoke<ScanResult>("scan_package", { packageRoot });
         if (!isCurrentLoad()) return;
         applyScanResult(result);
+        setSource("tauri");
         setStatus(`Loaded ${result.cards.length.toLocaleString()} records`);
       } catch (err) {
         if (!isCurrentLoad()) return;
         setError(String(err));
+        setSource("error");
         setStatus("Scan failed");
       } finally {
         if (isCurrentLoad()) setLoading(false);
@@ -117,9 +123,13 @@ export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction
     };
 
     void scanPackage();
-  }, [packageRoot, setSelectedId]);
+  }, [reloadToken, setSelectedId]);
 
-  return { scanResult, status, error, setError, loading };
+  const retry = React.useCallback(() => {
+    setReloadToken((current) => current + 1);
+  }, []);
+
+  return { scanResult, status, source, error, setError, loading, retry };
 }
 
 // Owns the persisted print-edit state and the mutations against it. Per-card
@@ -186,7 +196,16 @@ export function useCardEdits() {
     });
   }, []);
 
-  return { edits, updateCardField, updatePlayerField, resetCardEdits };
+  const resetPlayerEdits = React.useCallback(() => {
+    setEdits((prev) => {
+      if (!prev[SHARED_PLAYER_EDITS_KEY]) return prev;
+      const next = { ...prev };
+      delete next[SHARED_PLAYER_EDITS_KEY];
+      return next;
+    });
+  }, []);
+
+  return { edits, updateCardField, updatePlayerField, resetCardEdits, resetPlayerEdits };
 }
 
 // Tracks the card list's scroll position and height (via ResizeObserver) for the
@@ -323,6 +342,27 @@ export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
   const thumbPendingRef = React.useRef<Set<string>>(new Set());
   // Insertion order of cached keys, used to evict oldest-first (FIFO).
   const thumbOrderRef = React.useRef<string[]>([]);
+  const desiredThumbKeysRef = React.useRef<Set<string>>(new Set());
+  const loadedThumbsRef = React.useRef<Array<{ dataName: string; dataUrl: string }>>([]);
+  const pendingFrameRef = React.useRef(0);
+  const mountedRef = React.useRef(false);
+
+  // Keep this current during render, before an already-running request can
+  // settle. Results from an older effect are still useful when its key remains
+  // in the caller's latest thumbnail window.
+  desiredThumbKeysRef.current = new Set(thumbnailCards.map((card) => card.dataName));
+
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (pendingFrameRef.current) {
+        window.cancelAnimationFrame(pendingFrameRef.current);
+        pendingFrameRef.current = 0;
+      }
+      loadedThumbsRef.current = [];
+    };
+  }, []);
 
   React.useEffect(() => {
     thumbCacheRef.current = thumbCache;
@@ -348,17 +388,19 @@ export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
 
     if (!pendingLoads.length) return;
 
-    let cancelled = false;
-    let pendingFrame = 0;
-    let loadedThumbs: Array<{ dataName: string; dataUrl: string }> = [];
     const flushLoadedThumbs = () => {
-      pendingFrame = 0;
-      const nextEntries = loadedThumbs;
-      loadedThumbs = [];
+      pendingFrameRef.current = 0;
+      if (!mountedRef.current) {
+        loadedThumbsRef.current = [];
+        return;
+      }
+      const nextEntries = loadedThumbsRef.current;
+      loadedThumbsRef.current = [];
       setThumbCache((prev) => {
         let next = prev;
         const order = thumbOrderRef.current;
         for (const entry of nextEntries) {
+          if (!desiredThumbKeysRef.current.has(entry.dataName)) continue;
           if (next[entry.dataName]) continue;
           if (next === prev) next = { ...prev };
           next[entry.dataName] = entry.dataUrl;
@@ -374,21 +416,19 @@ export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
       });
     };
     const queueLoadedThumb = (entry: { dataName: string; dataUrl: string }) => {
-      loadedThumbs.push(entry);
-      if (!pendingFrame) pendingFrame = window.requestAnimationFrame(flushLoadedThumbs);
+      if (!mountedRef.current || !desiredThumbKeysRef.current.has(entry.dataName)) return;
+      loadedThumbsRef.current.push(entry);
+      if (!pendingFrameRef.current) {
+        pendingFrameRef.current = window.requestAnimationFrame(flushLoadedThumbs);
+      }
     };
 
     pendingLoads.forEach((load) => {
       load.then((entry) => {
-        if (cancelled || !entry) return;
+        if (!entry) return;
         queueLoadedThumb(entry);
       });
     });
-
-    return () => {
-      cancelled = true;
-      if (pendingFrame) window.cancelAnimationFrame(pendingFrame);
-    };
   }, [thumbnailCards]);
 
   return thumbCache;

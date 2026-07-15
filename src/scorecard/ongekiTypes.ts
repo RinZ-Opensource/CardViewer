@@ -57,6 +57,8 @@ export type OngekiAttribute = "fire" | "aqua" | "leaf";
 
 export interface OngekiScoreState {
   songId: string;
+  /** Distinguishes an explicit online-DB selection from a bundled sample with the same id. */
+  songDbBacked?: boolean;
   difficulty: OngekiDifficulty;
   /**
    * Display level, e.g. "13" or "13+". The game shows the truncated integer of

@@ -27,12 +27,17 @@ export function LayerImage({
   scale?: number;
 }) {
   const [currentSrc, setCurrentSrc] = React.useState(src);
+  const [loadState, setLoadState] = React.useState<"pending" | "ready" | "error">("pending");
   React.useEffect(() => {
     setCurrentSrc(src);
+    setLoadState("pending");
   }, [src]);
   const onError = React.useCallback(() => {
     if (fallbackSrc && currentSrc !== fallbackSrc) {
       setCurrentSrc(fallbackSrc);
+      setLoadState("pending");
+    } else {
+      setLoadState("error");
     }
   }, [currentSrc, fallbackSrc]);
 
@@ -42,6 +47,9 @@ export function LayerImage({
       src={currentSrc}
       alt=""
       decoding="async"
+      data-export-state={loadState}
+      data-export-error={loadState === "error" ? "A card image failed to load." : undefined}
+      onLoad={() => setLoadState("ready")}
       onError={onError}
       style={unityRect(x, y, w, h, { rotation, scale })}
     />
@@ -111,35 +119,62 @@ export function LayerCanvasText({
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const text = reactText(children);
+  const renderKey = JSON.stringify([
+    text,
+    fontFamily,
+    fontSize,
+    fontWeight,
+    alignment,
+    color,
+    lineSpacing,
+    fitHorizontal,
+    characterSpacing,
+    w,
+    h,
+  ]);
+  const [readyKey, setReadyKey] = React.useState("");
+  const [failedKey, setFailedKey] = React.useState("");
 
   React.useEffect(() => {
     let cancelled = false;
+    setReadyKey("");
+    setFailedKey("");
     const draw = async () => {
-      await waitForCanvasFont(fontFamily, fontSize);
-      if (cancelled) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      renderCanvasText(canvas, text, {
-        w,
-        h,
-        fontFamily,
-        fontSize,
-        fontWeight,
-        alignment,
-        color,
-        lineSpacing,
-        fitHorizontal,
-        characterSpacing,
-      });
+      try {
+        await waitForCanvasFont(fontFamily, fontSize);
+        if (cancelled) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        renderCanvasText(canvas, text, {
+          w,
+          h,
+          fontFamily,
+          fontSize,
+          fontWeight,
+          alignment,
+          color,
+          lineSpacing,
+          fitHorizontal,
+          characterSpacing,
+        });
+        setReadyKey(renderKey);
+      } catch {
+        if (!cancelled) setFailedKey(renderKey);
+      }
     };
     draw();
     return () => {
       cancelled = true;
     };
-  }, [alignment, characterSpacing, color, fitHorizontal, fontFamily, fontSize, fontWeight, h, lineSpacing, text, w]);
+  }, [alignment, characterSpacing, color, fitHorizontal, fontFamily, fontSize, fontWeight, h, lineSpacing, renderKey, text, w]);
 
   return (
-    <div className={`official-canvas-text ${className}`} style={unityRect(x, y, w, h, { rotation, scale })}>
+    <div
+      className={`official-canvas-text ${className}`}
+      data-export-state={readyKey === renderKey ? "ready" : failedKey === renderKey ? "error" : "pending"}
+      data-export-error={failedKey === renderKey ? "A canvas text layer failed to render." : undefined}
+      style={unityRect(x, y, w, h, { rotation, scale })}
+    >
       <canvas className="official-text-canvas" ref={canvasRef} aria-hidden="true" />
     </div>
   );
@@ -348,7 +383,11 @@ export function LayerTmpText({
   }
 
   return (
-    <div className={`official-tmp-text ${className}`} style={unityRect(x, y, w, h, { rotation, scale })}>
+    <div
+      className={`official-tmp-text ${className}`}
+      data-export-state={!text || canvasReady || fallbackReady ? "ready" : "pending"}
+      style={unityRect(x, y, w, h, { rotation, scale })}
+    >
       <span
         className="official-tmp-fallback"
         style={{
@@ -562,11 +601,14 @@ export function LayerQr({
   h: number;
 }) {
   const [dataUrl, setDataUrl] = React.useState("");
+  const [generationError, setGenerationError] = React.useState(false);
   const sourceKey =
     typeof source === "string" ? source : Array.from(source[0]?.data ?? []).join(",");
 
   React.useEffect(() => {
     let cancelled = false;
+    setDataUrl("");
+    setGenerationError(false);
     QRCode.toDataURL(source || "CARDVIEWER", {
       errorCorrectionLevel: "M",
       version: typeof source === "string" ? undefined : 1,
@@ -581,7 +623,10 @@ export function LayerQr({
         if (!cancelled) setDataUrl(url);
       })
       .catch(() => {
-        if (!cancelled) setDataUrl("");
+        if (!cancelled) {
+          setDataUrl("");
+          setGenerationError(true);
+        }
       });
     return () => {
       cancelled = true;
@@ -589,9 +634,13 @@ export function LayerQr({
   }, [sourceKey]);
 
   return (
-    <div className="official-qr" style={unityRect(x, y, w, h)}>
+    <div
+      className="official-qr"
+      data-export-state={dataUrl ? "ready" : generationError ? "error" : "pending"}
+      data-export-error={generationError ? "The QR code failed to render." : undefined}
+      style={unityRect(x, y, w, h)}
+    >
       {dataUrl ? <img src={dataUrl} alt="" /> : null}
     </div>
   );
 }
-

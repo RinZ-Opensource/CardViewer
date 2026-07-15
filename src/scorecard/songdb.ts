@@ -25,6 +25,7 @@ export type SongDbGame = "maimai" | "chunithm" | "ongeki";
 export type SongDbStatus = "loading" | "ready" | "error";
 
 const OTOGEDB_JSDELIVR_ROOT = "https://cdn.jsdelivr.net/gh/zvuc/otoge-db@master";
+const SONGDB_FETCH_TIMEOUT_MS = 20_000;
 
 function workerBase(): string | undefined {
   const base = import.meta.env.VITE_SONGDB_BASE_URL;
@@ -109,18 +110,38 @@ type RawEntry = Record<string, string | undefined>;
 
 const songCache = new Map<SongDbGame, Promise<unknown>>();
 
+async function fetchSongDbEntries(game: SongDbGame): Promise<RawEntry[]> {
+  const url = songdbDataUrl(game);
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, SONGDB_FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`songdb ${game}: HTTP ${response.status}`);
+    return (await response.json()) as RawEntry[];
+  } catch (err) {
+    if (timedOut) {
+      throw new Error(
+        `songdb ${game}: timed out after ${SONGDB_FETCH_TIMEOUT_MS}ms`,
+        { cause: err },
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function loadNormalized<Song>(
   game: SongDbGame,
   normalize: (entries: RawEntry[]) => Song[],
 ): Promise<Song[]> {
   let pending = songCache.get(game) as Promise<Song[]> | undefined;
   if (!pending) {
-    pending = fetch(songdbDataUrl(game))
-      .then((response) => {
-        if (!response.ok) throw new Error(`songdb ${game}: HTTP ${response.status}`);
-        return response.json() as Promise<RawEntry[]>;
-      })
-      .then(normalize);
+    pending = fetchSongDbEntries(game).then(normalize);
     // Drop failed loads from the cache so a later tab switch can retry.
     pending.catch(() => songCache.delete(game));
     songCache.set(game, pending);
