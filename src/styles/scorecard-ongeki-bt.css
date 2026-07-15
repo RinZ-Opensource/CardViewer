@@ -1,0 +1,260 @@
+/* ---------------------------------------------------------------------------
+ * O.N.G.E.K.I. music-select MusicBt card (ANM_SWH_MusicBt.prefab)
+ * Design space: the 278x458 PAT_DF_base plate; the capture root is padded
+ * (16px left/right/bottom for the Lunatic plate glow, 22px top for the boss
+ * VS block) to 310x496 so overhanging art survives the PNG export. All
+ * plate-relative coordinates come from
+ * scripts/scorecard-extract/ongeki_musicbt_tree.{json,txt}.
+ * ------------------------------------------------------------------------- */
+
+.ongeki-musicbt-card {
+  position: relative;
+  width: 310px;
+  height: 496px;
+  font-kerning: none;
+}
+
+.ongeki-musicbt-card img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Plate coordinate space: (16,22) inside the padded root. */
+.omb-plate-space {
+  position: absolute;
+  left: 16px;
+  top: 22px;
+  width: 278px;
+  height: 458px;
+}
+
+/* PAT_DF_base: Basic..Master art is 278x458; Lunatic 310x490 renders centred
+   (setNativeSize) so it overhangs 16px on every side. */
+.omb-plate {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 278px;
+  height: 458px;
+}
+
+.omb-plate.lunatic {
+  left: -16px;
+  top: -16px;
+  width: 310px;
+  height: 490px;
+}
+
+/* DMY_jacket: 220x220, stretched (Image type Simple, no preserveAspect). */
+.omb-jacket {
+  position: absolute;
+  left: 29px;
+  top: 136px;
+  width: 220px;
+  height: 220px;
+}
+
+/* TXT_MusicName: SegaMaruGothic_32px size 24, UpperCenter, white. */
+.omb-title {
+  position: absolute;
+  left: 9px;
+  top: 85.8px;
+  width: 260px;
+  height: 28px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  line-height: 1;
+  font-family: var(--font-mai-maru, "Yu Gothic", sans-serif);
+  font-size: 24px;
+  font-weight: normal;
+  color: #fff;
+  white-space: nowrap;
+}
+
+/* TXT_ArtistName: SegaKakuGothic_16px size 12, UpperCenter, #8B8B8B (the
+   prefab uses the kaku face here, unlike the rest of the card). */
+.omb-artist {
+  position: absolute;
+  left: 9px;
+  top: 113.9px;
+  width: 260px;
+  height: 18px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  line-height: 1;
+  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
+  font-size: 12px;
+  font-weight: normal;
+  color: #8b8b8b;
+  white-space: nowrap;
+}
+
+/* MU3UICounter glyphs: white sheet cells positioned inline. The counters
+   multiply grayscale vertex colours onto the white ink, which is exactly a
+   brightness() filter (export-safe, unlike mask-image). */
+.omb-glyph {
+  position: absolute;
+}
+
+/* NUM_MusicLevel colour (0.176) = #2D2D2D. */
+.omb-ink-level {
+  filter: brightness(0.176);
+}
+
+/* Battle/Technical/OverDamage counter colour (0.196) = #323232. */
+.omb-ink-score {
+  filter: brightness(0.196);
+}
+
+/* NUM_PScore / NUM_PScore_MAX colour (0.279) = #474747. */
+.omb-ink-pscore {
+  filter: brightness(0.279);
+}
+
+/* NUM_PScore_MAX alpha 0.588. */
+.omb-pscore-max {
+  opacity: 0.588;
+}
+
+/* NUM_MusicLevel Footer '+': 34x34 art drawn 22x22; left set inline
+   (number right edge + 11 - 14 rightOffset - half width). */
+.omb-level-plus {
+  position: absolute;
+  top: 24.2px;
+  width: 22px;
+  height: 22px;
+}
+
+/* Boss/VS block (NUL_VS_Chara), overhangs the plate top edge. */
+.omb-boss-gauge {
+  position: absolute;
+  left: 165.8px;
+  top: -21.7px;
+  width: 140px;
+  height: 126px;
+}
+
+/* DMY_Card_icon: 256x256 rect at 0.33 scale; the CharaAttribute mask is
+   approximated with the clip-path set inline in the component. */
+.omb-boss-icon {
+  position: absolute;
+  left: 193.96px;
+  top: -18.44px;
+  width: 84.48px;
+  height: 84.48px;
+}
+
+.omb-boss-vs {
+  position: absolute;
+  left: 201px;
+  top: -18.2px;
+  width: 68px;
+  height: 30px;
+}
+
+.omb-boss-lv-base {
+  position: absolute;
+  left: 198.23px;
+  top: 53.35px;
+  width: 73.75px;
+  height: 29.7px;
+}
+
+.omb-boss-attr {
+  position: absolute;
+  left: 201.5px;
+  top: 54.6px;
+  width: 28px;
+  height: 28px;
+}
+
+/* NUM_CharaLv Header "Lv." (rendered with the counter's 0.8 scale). */
+.omb-boss-lv-header {
+  position: absolute;
+  left: 212.9px;
+  top: 61.3px;
+  width: 24px;
+  height: 20.8px;
+}
+
+/* Platinum score block (NUL_PScore). Base pre-baked from the 9-slice. */
+.omb-pscore-base {
+  position: absolute;
+  left: 155.5px;
+  top: 310.9px;
+  width: 122px;
+  height: 52px;
+}
+
+/* slash: plain 1.5x10 image, colour #9C9686, unity rotZ -25 = css 25deg. */
+.omb-pscore-slash {
+  position: absolute;
+  left: 220.75px;
+  top: 329px;
+  width: 1.5px;
+  height: 10px;
+  background: #9c9686;
+  transform: rotate(25deg);
+}
+
+/* PAT_Platinum_Star: 108x24 art at 0.6 scale. */
+.omb-pstar {
+  position: absolute;
+  left: 184.1px;
+  top: 339.8px;
+  width: 64.8px;
+  height: 14.4px;
+}
+
+/* NUM_OverDamage '%' Footer (repositions off the fixed right edge, so it is
+   static), tinted like the counter. */
+.omb-percent {
+  position: absolute;
+  left: 70.58px;
+  top: 414.8px;
+  width: 18px;
+  height: 19px;
+}
+
+/* Badge row art (setNativeSize, centred in 60x60 boxes); rect set inline. */
+.omb-badge {
+  position: absolute;
+}
+
+/* TXT_NoteDesigner: SegaMaruGothic_16px size 10, UpperLeft, white. */
+.omb-notes {
+  position: absolute;
+  left: 92px;
+  top: 441px;
+  width: 126px;
+  height: 10px;
+  display: flex;
+  align-items: flex-start;
+  line-height: 1;
+  font-family: var(--font-mai-maru, "Yu Gothic", sans-serif);
+  font-size: 10px;
+  font-weight: normal;
+  color: #fff;
+  white-space: nowrap;
+}
+
+/* Rights strip: pivot (0,0.5) at x=275 grows right, hanging off the card
+   (focused-state overlay; clipped by the PNG export). Base pre-baked from
+   the 26x48 9-slice; art height 48 stretched onto the 54.7px cast box. */
+.omb-rights-base {
+  position: absolute;
+  left: 275px;
+  top: 404.35px;
+  width: 378px;
+  height: 54.7px;
+}
+
+.omb-rights-text {
+  position: absolute;
+  left: 285.2px;
+  top: 409.3px;
+  width: 364px;
+  height: 44.8px;
+}

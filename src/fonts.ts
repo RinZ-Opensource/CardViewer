@@ -40,14 +40,19 @@ export function installPrivateFontFaces() {
 }
 @font-face {
   font-family: "CardViewer NewRodinDB";
-  src: url("/fonts/private/FOT-NewRodinN-DB.ttf") format("truetype");
+  /* -unhinted: same broken small-ppem TrueType hinting as the EB weight. */
+  src: url("/fonts/private/FOT-NewRodinN-DB-unhinted.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "CardViewer NewRodinNEB";
-  src: url("/fonts/private/FOT-NewRodinN-EB.ttf") format("truetype");
+  /* -unhinted: the original file's TrueType hinting bytecode is broken at
+     small ppem (S rasterizes as $, strokes collapse unevenly at ~12px).
+     Outlines are fine, so we ship a copy with hinting stripped (fontTools
+     subset --no-hinting); regenerate from FOT-NewRodinN-EB.ttf if replaced. */
+  src: url("/fonts/private/FOT-NewRodinN-EB-unhinted.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -67,8 +72,10 @@ html[data-deployment-mode="private"] {
   --font-official-number: "CardViewer NewRodin", "Impact", "Arial Black", sans-serif;
   --font-mai-kaku: "CardViewer SegaKakuDB", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-mai-rodin: "CardViewer NewRodinDB", "CardViewer NewRodin", "Arial Black", sans-serif;
+  /* NewRodinN v2-EB (the exact game face, unhinted copy) first; Pro EB as
+     fallback. */
   --font-mai-rodin-eb: "CardViewer NewRodinNEB", "CardViewer NewRodin", "Arial Black", sans-serif;
-  --font-mai-maru: "CardViewer MaruDB", "CardViewer SegaMaruDB", "Yu Gothic", "Meiryo", sans-serif;
+  --font-mai-maru: "CardViewer SegaMaruDB", "CardViewer MaruDB", "CardViewer Zen Maru", "Yu Gothic", "Meiryo", sans-serif;
 }`;
   document.head.append(style);
 }

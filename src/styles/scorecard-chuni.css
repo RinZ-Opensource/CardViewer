@@ -1,0 +1,183 @@
+/* ---------------------------------------------------------------------------
+ * CHUNITHM playing-screen music-info panel
+ * Design space: CHU_UI_Playing_00_v10.srd, PAT_base_left's 586x182 box at
+ * frame (1334,0). All coordinates are panel-relative CSS px from
+ * scripts/scorecard-extract/chuni_musicinfo_tree.{json,txt}.
+ * ------------------------------------------------------------------------- */
+
+.chuni-scorecard {
+  position: relative;
+  width: 586px;
+  height: 182px;
+  font-kerning: none;
+}
+
+.chuni-scorecard img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Difficulty-coloured base (PAT_base_left, 7 patterns). */
+.csc-base {
+  position: absolute;
+  inset: 0;
+  width: 586px;
+  height: 182px;
+}
+
+/* Black option bar with baked スピード設定/ミラー設定 labels (C_judge_base_01). */
+.csc-option-bar {
+  position: absolute;
+  left: 28px;
+  top: 0;
+  width: 489px;
+  height: 36px;
+}
+
+/* Option-row content (speed digits / SONIC / mirror) carries material or
+   vertex colour A255 R200 G200 B200; a multiply on these white sprites is
+   exactly brightness(200/255). */
+.csc-option-dim {
+  filter: brightness(0.784);
+}
+
+.csc-sonic {
+  position: absolute;
+  left: 174px;
+  top: 13px;
+  width: 54px;
+  height: 16px;
+}
+
+/* NUM_speed glyphs: 12x14 digit cells; the 6x8 decimal dot is bottom-aligned
+   on the digit row (atlas rows 41..55 vs 47..55 -> +6px top). Left inline. */
+.csc-speed-digit {
+  position: absolute;
+  top: 13px;
+  width: 12px;
+  height: 14px;
+}
+
+.csc-speed-dot {
+  position: absolute;
+  top: 19px;
+  width: 6px;
+  height: 8px;
+}
+
+.csc-mirror {
+  position: absolute;
+  left: 434px;
+  top: 13px;
+  width: 36px;
+  height: 16px;
+}
+
+/* Jacket: CIMG stretches the source (300x300 dummy) onto the 116x116 quad. */
+.csc-jacket {
+  position: absolute;
+  left: 39px;
+  top: 51px;
+  width: 116px;
+  height: 116px;
+}
+
+/* Title (T_music_title): 24pt SEGA KakuGothic DB sheet x0.9 scale = 21.6px,
+   bottom-left pivot at y139; ink RGB(50,50,40) with the FontParam (2,2) white
+   shadow. noWrapPutMode 4 (marquee) is statically compressed via FitText. */
+.csc-title {
+  position: absolute;
+  left: 168px;
+  top: 115px;
+  width: 340px;
+  height: 24px;
+  display: flex;
+  align-items: flex-end;
+  line-height: 1;
+  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
+  font-size: 21.6px;
+  font-weight: normal;
+  color: #323228;
+  text-shadow: 2px 2px 0 #fff;
+  white-space: nowrap;
+}
+
+/* Artist (T_music_artist): 14pt sheet x1.0, bottom-left pivot, RGB(90,90,80),
+   no shadow. */
+.csc-artist {
+  position: absolute;
+  left: 168px;
+  top: 143px;
+  width: 340px;
+  height: 16px;
+  display: flex;
+  align-items: flex-end;
+  line-height: 1;
+  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
+  font-size: 14px;
+  font-weight: normal;
+  color: #5a5a50;
+  white-space: nowrap;
+}
+
+/* Level digits (crops 78..87): native 28x42 cells; left set inline. */
+.csc-lv-digit {
+  position: absolute;
+  top: 72px;
+  width: 28px;
+  height: 42px;
+}
+
+.csc-plus {
+  position: absolute;
+  left: 486px;
+  top: 65px;
+  width: 18px;
+  height: 18px;
+}
+
+/* Track digits (crops 68..77): 14x18 cells, left-anchored after the baked
+   "TRACK"; left set inline. */
+.csc-track-digit {
+  position: absolute;
+  top: 47px;
+  width: 14px;
+  height: 18px;
+}
+
+/* WORLD'S END star strip: left edge fixed at 431 while width follows the star
+   count (native crop width, set inline). */
+.csc-we-star {
+  position: absolute;
+  left: 431px;
+  top: 44px;
+  height: 16px;
+}
+
+/* WE kanji (T_..._world_end): 60pt cast x node scale 0.7 = 42px box, single
+   monospaced char. The cast has four distinct corner vertex colours — TL green
+   (31,133,20), TR yellow (172,176,0), BR magenta (194,14,126), BL blue
+   (40,72,158) assuming TL,TR,BR,BL vertex order (order not recoverable from
+   the dump) — approximated with corner-fading gradients over their average,
+   clipped to the glyph. */
+.csc-we-kanji {
+  position: absolute;
+  left: 444px;
+  top: 66px;
+  width: 42px;
+  height: 42px;
+  line-height: 42px;
+  text-align: center;
+  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
+  font-size: 42px;
+  font-weight: normal;
+  color: transparent;
+  background-color: rgb(109, 99, 76);
+  background-image:
+    linear-gradient(to bottom right, rgb(31, 133, 20), rgba(31, 133, 20, 0) 70%),
+    linear-gradient(to bottom left, rgb(172, 176, 0), rgba(172, 176, 0, 0) 70%),
+    linear-gradient(to top left, rgb(194, 14, 126), rgba(194, 14, 126, 0) 70%),
+    linear-gradient(to top right, rgb(40, 72, 158), rgba(40, 72, 158, 0) 70%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}

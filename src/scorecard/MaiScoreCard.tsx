@@ -1,108 +1,87 @@
 import React from "react";
+import { FitText } from "./FitText";
 import {
-  GlyphSheet,
   MAI_COMBO_SPRITE,
   MAI_DIFF_SUFFIX,
-  MAI_LEVEL_GLYPHS,
   MAI_LEVEL_SHEET,
   MAI_RANK_SPRITE,
-  MAI_STAR_SPRITE,
+  MAI_STAR_BASE,
   MAI_SYNC_SPRITE,
   maiSprite,
 } from "./maiAssets";
 import { formatAchievement, maiDxStars, maiRankForAchievement } from "./maiScore";
+import { jacketImgProps } from "./songdb";
 import { MaiChart, MaiScoreState, MaiSong } from "./types";
 
 /**
- * Design space: MusicChainCard.prefab UI_Main (284x464) plus 6px headroom so
- * the bookmark tab can sit raised above the frame like the in-game active
- * card. The body wrapper offsets all base-relative coordinates by +6.
+ * Design space: TrackStartProcess.prefab MusicBase (420x636) — the "entering
+ * game" score card (UI_TST_* sprites), NOT the song-select MusicChainCard.
+ * The frame sits at y54 inside a 420x690 canvas so the bookmark tab/plate can
+ * rise 54px above the frame top. Coordinates inside .msc-body are frame-relative
+ * (frame at 0,0); the tab/plate use negative tops.
+ * Runtime behavior (text formats, star layout, visibility gates) mirrors
+ * TimelineRoot.Initialise / TrackStartMonitor.SetTrackStart / SpriteCounter.
  */
-export const MAI_SCORECARD_WIDTH = 284;
-export const MAI_SCORECARD_HEIGHT = 470;
-/** Export at 3x so the 284px-wide base sprite still reads crisply. */
+export const MAI_SCORECARD_WIDTH = 420;
+export const MAI_SCORECARD_HEIGHT = 690;
+/** Export at 3x so text and sprites survive typical chat-app downscaling. */
 export const MAI_SCORECARD_EXPORT_WIDTH = MAI_SCORECARD_WIDTH * 3;
 
-interface RectDigitsProps {
-  sheet: GlyphSheet;
-  src: string;
-  text: string;
-  /** Unity render scale: design px per texture px (e.g. SpriteCounter 0.85). */
-  scale: number;
-  /** Extra horizontal gap between glyphs in design px. */
-  gap?: number;
-  className?: string;
-}
+/** Top-left of each glyph's 48x60 cell in the UI_NUM_MLevel_xx atlas (192x240). */
+const LEVEL_CELLS: Record<string, [number, number]> = {
+  "0": [0, 0], "1": [48, 0], "2": [96, 0], "3": [144, 0],
+  "4": [0, 60], "5": [48, 60], "6": [96, 60], "7": [144, 60],
+  "8": [0, 120], "9": [48, 120], "+": [96, 120], "-": [144, 120],
+  ",": [0, 180], ".": [48, 180],
+};
 
 /**
- * Renders text from a sprite sheet using tight glyph rects, preserving each
- * glyph's vertical offset within its sheet cell (so "+" stays superscript).
+ * SpriteCounter cell centers in frame coordinates. Levels >9 use the 3-cell
+ * LvNum00 counter (pivot x354, pitch 48, per-cell RelativePosition +21/0/-19.5,
+ * "+" raised 5px); levels <=9 use the 2-cell LvNum0 (pivot x364, pitch 47,
+ * RelativePosition 0/-18). Glyphs always render at the native 48x60 cell size;
+ * the string is space-padded to the cell count, so "13" never re-centers.
  */
-function RectDigits({ sheet, src, text, scale, gap = 2, className }: RectDigitsProps) {
+const LEVEL_LAYOUT_DOUBLE: Array<[number, number]> = [
+  [327, 386],
+  [354, 386],
+  [382.5, 381],
+];
+const LEVEL_LAYOUT_SINGLE: Array<[number, number]> = [
+  [340.5, 386],
+  [369.5, 381],
+];
+
+interface LevelCounterProps {
+  /** Display level, e.g. "7", "7+", "13", "13+". */
+  level: string;
+  /** UI_NUM_MLevel_xx sheet url for the chart's difficulty. */
+  src: string;
+}
+
+function LevelCounter({ level, src }: LevelCounterProps) {
+  const levelNum = Number.parseInt(level, 10);
+  const cells = Number.isFinite(levelNum) && levelNum > 9 ? LEVEL_LAYOUT_DOUBLE : LEVEL_LAYOUT_SINGLE;
   return (
-    <span className={`rect-digits ${className ?? ""}`} style={{ height: sheet.cellHeight * scale }}>
-      {Array.from(text).map((glyph, index) => {
-        const rect = sheet.glyphs[glyph];
-        if (!rect) return null;
-        const [x, y, w, h] = rect;
-        const offsetInCell = y % sheet.cellHeight;
+    <>
+      {cells.map(([cx, cy], index) => {
+        const glyph = level[index];
+        const cell = glyph ? LEVEL_CELLS[glyph] : undefined;
+        if (!cell) return null;
         return (
           <span
             key={index}
+            className="msc-lv-cell"
             style={{
-              width: w * scale,
-              height: h * scale,
-              marginLeft: index > 0 ? gap : 0,
-              marginTop: offsetInCell * scale,
+              left: cx - 24,
+              top: cy - 30,
               backgroundImage: `url("${src}")`,
-              backgroundPosition: `${-x * scale}px ${-y * scale}px`,
-              backgroundSize: `${sheet.textureWidth * scale}px ${sheet.textureHeight * scale}px`,
+              backgroundPosition: `${-cell[0]}px ${-cell[1]}px`,
             }}
           />
         );
       })}
-    </span>
-  );
-}
-
-interface FitTextProps {
-  maxWidth: number;
-  className?: string;
-  children: React.ReactNode;
-}
-
-/** Squeezes overflowing text horizontally (the game scrolls; we compress). */
-function FitText({ maxWidth, className, children }: FitTextProps) {
-  const ref = React.useRef<HTMLSpanElement | null>(null);
-  const [scale, setScale] = React.useState(1);
-  const [fontsReady, setFontsReady] = React.useState(false);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    document.fonts?.ready?.then(() => {
-      if (!cancelled) setFontsReady(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  React.useLayoutEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    element.style.transform = "none";
-    const width = element.scrollWidth;
-    setScale(width > maxWidth ? maxWidth / width : 1);
-  }, [children, maxWidth, fontsReady]);
-
-  return (
-    <span
-      ref={ref}
-      className={className}
-      style={{ transform: `scaleX(${scale})`, transformOrigin: "center" }}
-    >
-      {children}
-    </span>
+    </>
   );
 }
 
@@ -124,80 +103,58 @@ export function MaiScoreCard({ song, chart, state, maxDxScore, captureRef }: Mai
   const [achievementInt, achievementFrac = "0000"] = achievement.split(".");
   // Empty achievement input = unplayed: blank plates, no score rows.
   const played = state.achievement.trim().length > 0;
+  // The game hides the whole DXSCORE row when there is no score OR dxScore==0.
+  const showDx = played && dxScore > 0;
+  // DX-score stars are sprite-swapped by tier: 1-2 green, 3-4 orange, 5 gold.
+  const starTier = stars >= 5 ? "03" : stars >= 3 ? "02" : "01";
+  // Notes designer: "-" only stands in for an empty name on BASIC/ADVANCED.
+  const designer =
+    chart.notesDesigner ||
+    (chart.difficulty === "basic" || chart.difficulty === "advanced" ? "-" : "");
+  // BPM is rendered zero-padded to 3 digits ("BPM 075"), "???" when unknown.
+  const bpmText = song.bpm >= 0 ? String(Math.trunc(song.bpm)).padStart(3, "0") : "???";
 
   return (
     <div className="mai-scorecard" ref={captureRef}>
-      {/* Bookmark tab, raised 6px above the base like the active in-game card:
-          DX bump left (Tab_01), Standard bump right (Tab_02). */}
-      <img
-        className="msc-tab"
-        src={maiSprite(`UI_MSS_MBase_${suffix}_${song.isDx ? "Tab_01" : "Tab_02"}`)}
-        alt=""
-      />
-      <img
-        className={`msc-pill ${song.isDx ? "at-left" : "at-right"}`}
-        src={maiSprite(song.isDx ? "UI_MSS_Infoicon_DeluxeMode" : "UI_MSS_Infoicon_StandardMode")}
-        alt={song.isDx ? "でらっくす" : "スタンダード"}
-      />
-
       <div className="msc-body">
-        <img className="msc-base" src={maiSprite(`UI_MSS_MBase_${suffix}`)} alt="" />
+        {/* Frame: baked jacket window, EXPERT wordmark, navy title band, white
+            info panel and the pale clear-circles. */}
+        <img className="msc-base" src={maiSprite(`UI_TST_MBase_${suffix}`)} alt="" />
 
-        {/* White-section backplates: navy when played, light blanks otherwise */}
-        {played ? (
-          <>
-            <span className="msc-box msc-box-achievement navy" />
-            <span className="msc-box msc-box-rank navy" />
-            <span className="msc-box msc-box-dxscore navy" />
-            <span className="msc-box msc-box-dxscore-max" />
-          </>
-        ) : (
-          <>
-            <span className="msc-box msc-box-achievement-blank" />
-            <span className="msc-box msc-box-rank-blank" />
-          </>
-        )}
+        {/* Bookmark tab + mode plate, first children like the prefab (only the
+            LONG badge may overlap them): でらっくす (DX) sits left, スタンダード
+            (Standard) mirrors the tab bump and sits right, same height. */}
+        <img className={`msc-tab ${song.isDx ? "" : "mirrored"}`} src={maiSprite(`UI_TST_MBase_${suffix}_Tab`)} alt="" />
         <img
-          className="msc-designer-label"
-          src={maiSprite("UI_MSS_MBase_Text_NotesDesigner")}
-          alt="NOTES DESIGNER"
+          className={`msc-pill ${song.isDx ? "at-left" : "at-right"}`}
+          src={maiSprite(song.isDx ? "UI_TST_Infoicon_DeluxeMode" : "UI_TST_Infoicon_StandardMode")}
+          alt={song.isDx ? "でらっくす" : "スタンダード"}
         />
-        {played ? (
-          <img
-            className="msc-dxscore-label"
-            src={maiSprite("UI_MSS_MBase_Text_DXscore")}
-            alt="DX SCORE"
-          />
-        ) : null}
 
-        <img className="msc-jacket" src={song.jacketUrl} alt="" decoding="async" />
+        <img
+          className="msc-jacket"
+          {...jacketImgProps(song.jacketUrl, song.jacketFallbacks)}
+          alt=""
+          decoding="async"
+        />
 
-        {/* Difficulty banner + level */}
-        <img className="msc-diff-banner" src={maiSprite(`UI_MSS_MBase_${suffix}_Text`)} alt={chart.difficulty} />
-        <img className="msc-lv-base" src={maiSprite(`UI_MSS_MBase_LvBase_${suffix}`)} alt="" />
-        <RectDigits
-          className="msc-lv-glyph"
-          sheet={MAI_LEVEL_GLYPHS}
-          src={levelSheet}
-          text="L"
-          scale={0.8}
-        />
-        <RectDigits
-          className="msc-lv-value"
-          sheet={MAI_LEVEL_GLYPHS}
-          src={levelSheet}
-          text={chart.level}
-          scale={0.85}
-        />
+        {/* Level plate + "Lv" mark (atlas cell 14) + SpriteCounter cells */}
+        <img className="msc-lv-base" src={maiSprite(`UI_TST_MBase_LV_${suffix}`)} alt="" />
+        <span className="msc-lv-mark" style={{ backgroundImage: `url("${levelSheet}")` }} />
+        <LevelCounter level={chart.level} src={levelSheet} />
 
         <div className="msc-title">
-          <FitText maxWidth={240}>{song.title}</FitText>
+          <FitText maxWidth={386}>{song.title}</FitText>
         </div>
         <div className="msc-artist">
-          <FitText maxWidth={240}>{song.artist}</FitText>
+          <FitText maxWidth={386}>{song.artist}</FitText>
         </div>
 
-        {/* Achievement + rank row */}
+        {/* Achievement + rank backing always show (navy Box_01 played, gray Box_03
+            empty). The DXSCORE row only exists when there's a nonzero DX score. */}
+        <span className={`msc-box msc-box-achievement ${played ? "" : "blank"}`} />
+        <span className={`msc-box msc-box-rank ${played ? "" : "blank"}`} />
+
         {played ? (
           <>
             <span className="msc-ach msc-ach-int">{achievementInt}</span>
@@ -207,43 +164,59 @@ export function MaiScoreCard({ song, chart, state, maxDxScore, captureRef }: Mai
           </>
         ) : null}
 
-        {/* Badge medals */}
-        {played && state.comboBadge !== "none" ? (
-          <img className="msc-medal msc-medal-combo" src={maiSprite(MAI_COMBO_SPRITE[state.comboBadge])} alt={state.comboBadge} />
-        ) : (
-          <img className="msc-medal-blank msc-medal-combo-blank" src={maiSprite("UI_MSS_MBase_Icon_Blank")} alt="" />
-        )}
-        {played && state.syncBadge !== "none" ? (
-          <img className="msc-medal msc-medal-sync" src={maiSprite(MAI_SYNC_SPRITE[state.syncBadge])} alt={state.syncBadge} />
-        ) : (
-          <img className="msc-medal-blank msc-medal-sync-blank" src={maiSprite("UI_MSS_MBase_Icon_Blank")} alt="" />
-        )}
-
-        {/* DX score row + star pips (hidden when unplayed) */}
-        {played ? (
+        {showDx ? (
           <>
-            <span className="msc-dx-value">{dxScore.toLocaleString()}</span>
+            <span className="msc-box msc-box-dxscore" />
+            {stars > 0 ? (
+              <span
+                className="msc-box-star"
+                style={{
+                  width: MAI_STAR_BASE[stars].width,
+                  backgroundImage: `url("${maiSprite(MAI_STAR_BASE[stars].sprite)}")`,
+                }}
+              />
+            ) : null}
+            <span className="msc-dxscore-label">DXSCORE</span>
+            <span className="msc-dx-value">{dxScore}</span>
             <span className="msc-dx-slash">/</span>
-            <span className="msc-dx-max">{maxDxScore > 0 ? maxDxScore.toLocaleString() : "----"}</span>
-            <span className="msc-stars">
-              {Array.from({ length: 5 }, (_, index) => (
-                <span
-                  key={index}
-                  className={`msc-star-pip ${index < stars ? "earned" : ""}`}
-                  style={{
-                    WebkitMaskImage: `url("${maiSprite(MAI_STAR_SPRITE)}")`,
-                    maskImage: `url("${maiSprite(MAI_STAR_SPRITE)}")`,
-                  }}
-                />
-              ))}
-            </span>
+            <span className="msc-dx-max">{maxDxScore > 0 ? maxDxScore : "----"}</span>
+            {stars > 0 ? (
+              <span className="msc-stars">
+                {Array.from({ length: stars }, (_, index) => (
+                  <img key={index} className="msc-star" src={maiSprite(`UI_MSS_DXScore_Star_${starTier}`)} alt="" />
+                ))}
+              </span>
+            ) : null}
           </>
         ) : null}
 
-        <FitText maxWidth={162} className="msc-designer-name">
-          {chart.notesDesigner || "-"}
+        {/* Notes designer + BPM (labels are TMP text on this card, not sprites) */}
+        <span className="msc-designer-label">NOTES DESIGNER</span>
+        <FitText maxWidth={243} origin="left" className="msc-designer-name">
+          {designer}
         </FitText>
-        <span className="msc-bpm">BPM {song.bpm}</span>
+        <span className="msc-bpm">BPM {bpmText}</span>
+
+        {/* Combo / sync medals: real when a badge is set, gray placeholder circle
+            otherwise (the game swaps in Icon_Blank, never hides the nodes). */}
+        <img
+          className="msc-medal msc-medal-combo"
+          src={maiSprite(played && state.comboBadge !== "none" ? MAI_COMBO_SPRITE[state.comboBadge] : "UI_MSS_MBase_Icon_Blank")}
+          alt=""
+        />
+        <img
+          className="msc-medal msc-medal-sync"
+          src={maiSprite(played && state.syncBadge !== "none" ? MAI_SYNC_SPRITE[state.syncBadge] : "UI_MSS_MBase_Icon_Blank")}
+          alt=""
+        />
+
+        {/* LONG-version badge, last sibling in the prefab so it tops the tab. */}
+        {song.isLong ? (
+          <span className="msc-long">
+            <img className="msc-long-base" src={maiSprite("UI_CMN_Long_base_big")} alt="" />
+            <img className="msc-long-text" src={maiSprite("UI_CMN_Long_text_big")} alt="LONG" />
+          </span>
+        ) : null}
       </div>
     </div>
   );

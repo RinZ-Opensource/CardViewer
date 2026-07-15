@@ -46,6 +46,115 @@
   flex-wrap: wrap;
 }
 
+/* Checkbox rows (chuni/ongeki option toggles): undo the text-input chrome the
+   shared .control input rule would give the checkbox. */
+.scorecard-form .control.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.scorecard-form .control.inline input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--ui-accent, #3b82f6);
+}
+
+/* Difficulties the selected DB song has no chart for. */
+.scorecard-form .segment button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------------------
+ * Song picker (searchable DB dropdown shared by the three game forms)
+ * ------------------------------------------------------------------------- */
+
+.scorecard-form .songpicker {
+  position: relative;
+}
+
+.songpicker-status {
+  font-size: 11px;
+  color: var(--ui-text-muted);
+}
+
+/* Anchored under the whole .control label (input + status line). */
+.songpicker-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 30;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-panel-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.songpicker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.songpicker-row.active {
+  background: var(--ui-accent, #3b82f6);
+}
+
+.songpicker-thumb {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--ui-ghost-bg);
+}
+
+.songpicker-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.songpicker-title {
+  font-size: 12px;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.songpicker-artist {
+  font-size: 11px;
+  color: var(--ui-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.songpicker-row.active .songpicker-title,
+.songpicker-row.active .songpicker-artist {
+  color: #fff;
+}
+
+.songpicker-empty {
+  padding: 10px;
+  font-size: 12px;
+  color: var(--ui-text-muted);
+}
+
 .scorecard-preview {
   display: flex;
   flex-direction: column;
@@ -81,26 +190,26 @@
   min-height: 0;
 }
 
-/* Scales the design-space card up for on-screen preview (factor set from JS to
- * fit the stage); export captures the unscaled inner node so PNG output stays
- * in design pixels x pixelRatio. */
+/* Scales the design-space card up for on-screen preview (CSS zoom factor set
+ * from JS to fit the stage — zoom re-rasterizes text at the target size so
+ * glyph spacing stays even, unlike transform:scale); export captures the
+ * unzoomed inner node so PNG output stays in design pixels x pixelRatio. */
 .scorecard-zoom {
-  transform-origin: center;
   flex: 0 0 auto;
 }
 
 /* ---------------------------------------------------------------------------
- * maimai DX music-select detail card
- * Design space: MusicChainCard.prefab UI_Main (284x464) inside a 284x470
- * canvas; .msc-body sits at top:6 so the bookmark tab renders raised 6px
- * like the active in-game card. Coordinates inside .msc-body convert the
- * prefab RectTransforms: left = cx + 142 - w/2, top = 232 - (cy + h/2).
+ * maimai DX "entering game" (TrackStart) score card
+ * Design space: TrackStartProcess.prefab MusicBase (420x636). The frame sits at
+ * top:54 inside a 420x690 canvas so the bookmark tab + mode plate can rise 54px
+ * above the frame top. Coordinates inside .msc-body are frame-relative (frame at
+ * 0,0); the tab/plate use negative tops.
  * ------------------------------------------------------------------------- */
 
 .mai-scorecard {
   position: relative;
-  width: 284px;
-  height: 470px;
+  width: 420px;
+  height: 690px;
   font-kerning: none;
 }
 
@@ -110,276 +219,181 @@
   -webkit-user-drag: none;
 }
 
-/* --- bookmark tab (raised layer, outside .msc-body) --- */
-
-.msc-tab {
-  position: absolute;
-  left: 0;
-  top: 2.9px;
-  width: 284px;
-  height: 68px;
-}
-
-.msc-pill {
-  position: absolute;
-  width: 116px;
-  top: 16.9px;
-}
-
-.msc-pill.at-left {
-  left: 24px;
-}
-
-.msc-pill.at-right {
-  left: 144px;
-}
-
 .msc-body {
   position: absolute;
   left: 0;
-  top: 6px;
-  width: 284px;
-  height: 464px;
+  top: 54px;
+  width: 420px;
+  height: 636px;
 }
 
 .msc-base {
   position: absolute;
   inset: 0;
-  width: 284px;
-  height: 464px;
+  width: 420px;
+  height: 636px;
 }
 
-/* --- white-section backplates: navy Box_01/Box_02 when played,
-       light Box_03 blanks when unplayed --- */
-
-.msc-box {
-  position: absolute;
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
-}
-
-.msc-box.navy {
-  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_01.png");
-}
-
-.msc-box-achievement {
-  left: 22px;
-  top: 364.1px;
-  width: 106px;
-  height: 28px;
-}
-
-.msc-box-rank {
-  left: 122px;
-  top: 364.1px;
-  width: 60px;
-  height: 28px;
-}
-
-.msc-box-dxscore {
-  left: 22px;
-  top: 386.5px;
-  width: 160px;
-  height: 25px;
-}
-
-.msc-box-dxscore-max {
-  left: 97px;
-  top: 387px;
-  width: 85px;
-  height: 36px;
-  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_02.png");
-}
-
-.msc-box-achievement-blank {
-  left: 23px;
-  top: 365.1px;
-  width: 104px;
-  height: 26px;
-  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_03.png");
-}
-
-.msc-box-rank-blank {
-  left: 123px;
-  top: 365.1px;
-  width: 58px;
-  height: 26px;
-  background-image: url("/official/scorecard/mai/UI_MSS_MBase_Box_03.png");
-}
-
-.msc-designer-label {
-  position: absolute;
-  left: 20.5px;
-  top: 405.1px;
-  width: 96px;
-  height: 16px;
-}
-
-.msc-dxscore-label {
-  position: absolute;
-  left: 32.6px;
-  top: 391px;
-  width: 70.4px;
-  height: 16px;
-}
+/* --- jacket at the prefab RectTransform (50,43). The Jacket node carries a
+       UI.Outline (black, EffectDistance 2,-2) = a 2px black rim on all four
+       sides; box-shadow reproduces it and also swallows the 1px offset of the
+       frame's baked window (authored at 51,42). --- */
 
 .msc-jacket {
   position: absolute;
-  left: 42px;
-  top: 75px;
-  width: 200px;
-  height: 200px;
+  left: 50px;
+  top: 43px;
+  width: 320px;
+  height: 320px;
   object-fit: cover;
-  /* prefab IMG_Jacket carries a UI Outline component, not a drop shadow */
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 0 0 2px #000;
 }
 
-/* --- difficulty banner + level --- */
-
-.msc-diff-banner {
-  position: absolute;
-  left: 22px;
-  top: 277px;
-  width: 240px;
-}
+/* --- level plate + "Lv" mark + number --- */
 
 .msc-lv-base {
   position: absolute;
-  left: 143px;
-  top: 234px;
-  width: 124px;
-  height: 76px;
+  left: 223px;
+  top: 307px;
+  width: 180px;
+  height: 112px;
 }
 
-.rect-digits {
-  display: inline-flex;
-  align-items: flex-start;
-}
-
-.rect-digits > span {
-  display: inline-block;
+/* "Lv" mark = full 48x60 atlas cell 14 (image 96,180). background url inline. */
+.msc-lv-mark {
+  position: absolute;
+  left: 272px;
+  top: 354px;
+  width: 48px;
+  height: 60px;
   background-repeat: no-repeat;
+  background-size: 192px 240px;
+  background-position: -96px -180px;
 }
 
-.msc-lv-glyph {
+/* Level digits: native 48x60 atlas cells, absolutely placed at the
+   SpriteCounter cell centers (position + bg url set inline per glyph). */
+.msc-lv-cell {
   position: absolute;
-  left: 173.8px;
-  top: 248.8px;
+  width: 48px;
+  height: 60px;
+  background-repeat: no-repeat;
+  background-size: 192px 240px;
 }
 
-.msc-lv-value {
-  position: absolute;
-  left: 188px;
-  top: 253.5px;
-  width: 120px;
-  justify-content: center;
-}
-
-/* --- title / artist --- */
+/* --- title / artist (NewRodin EB / MaruGothic DB, white, centred) --- */
 
 .msc-title {
   position: absolute;
-  left: 22px;
-  top: 307.5px;
-  width: 240px;
-  height: 25px;
+  left: 17px;
+  top: 431.5px;
+  width: 386px;
+  height: 33px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   font-family: var(--font-mai-rodin-eb, "Arial Black", sans-serif);
-  font-size: 16px;
+  font-size: 20px;
+  line-height: 1.03;
   font-weight: normal;
   white-space: nowrap;
 }
 
 .msc-artist {
   position: absolute;
-  left: 22px;
-  top: 340.4px;
-  width: 240px;
-  height: 18px;
+  left: 17px;
+  top: 480px;
+  width: 386px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   font-family: var(--font-mai-maru, "Yu Gothic", sans-serif);
-  font-size: 11px;
+  font-size: 16px;
+  line-height: 1.03;
   font-weight: normal;
   white-space: nowrap;
 }
 
-/* --- achievement row (NewRodin EB gold on the navy box) --- */
+/* --- backing boxes: Box_01/Box_03 are flat rounded rects (sprite: 24x24,
+       box inset 2px, corner radius ~4.5px, solid #225192 / #E9EAED). Drawn
+       natively in CSS — a 9-slice border-image showed seams between the
+       border/center quads under fractional zoom. Navy when played, gray
+       placeholder when empty. --- */
+
+.msc-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid transparent;
+  border-radius: 6.5px;
+  background: #225192;
+  background-clip: padding-box;
+}
+
+.msc-box.blank {
+  background-color: #e9eaed;
+}
+
+.msc-box-achievement { left: 23.5px; top: 517px; width: 161px; height: 30px; }
+.msc-box-rank { left: 184.5px; top: 517px; width: 85px; height: 30px; }
+.msc-box-dxscore { left: 23.5px; top: 547px; width: 247px; height: 30px; }
+
+/* Star backing (Box_02): drawn over the dxscore bar; its transparent top-left
+   notch shows the bar through it (a stepped L). Right-pivoted like the game:
+   the right edge stays at x272 while width + image follow the star count
+   (MAI_STAR_BASE inline style; images pre-sliced offline so a single quad
+   renders — CSS border-image seamed under fractional zoom). */
+.msc-box-star {
+  position: absolute;
+  right: 148px;
+  top: 567px;
+  height: 32px;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+/* --- achievement row (NewRodin EB gold #F2C600) --- */
 
 .msc-ach {
   position: absolute;
-  top: 368px;
-  height: 20px;
-  line-height: 20px;
+  /* TMP rect top is 518.5; -0.8px centers the digits' optical box on the navy
+     box center (CSS half-leading sits the glyphs slightly lower than TMP). */
+  top: 517.7px;
+  height: 27px;
+  line-height: 27px;
   font-family: var(--font-mai-rodin-eb, "Arial Black", sans-serif);
-  font-size: 13px;
+  font-size: 20px;
   font-weight: normal;
-  color: #f2c805;
+  color: #f2c600;
 }
 
-.msc-ach-int {
-  left: 0;
-  width: 59px;
-  text-align: right;
-}
-
-.msc-ach-dec {
-  left: 57.9px;
-}
-
-.msc-ach-pct {
-  left: 104px;
-  width: 20px;
-  text-align: center;
-}
+.msc-ach-int { left: 26px; width: 56px; text-align: right; }
+.msc-ach-dec { left: 81.5px; }
+.msc-ach-pct { left: 157px; width: 22px; text-align: center; }
 
 .msc-rank {
   position: absolute;
-  left: 128px;
-  top: 368.4px;
-  height: 19.2px;
+  left: 197px;
+  top: 520px;
+  width: 60px;
+  height: 24px;
 }
 
-/* --- badge medals (48px per user calibration; prefab box is 53) --- */
+/* --- DX score row (DXSCORE label is green NewRodin text; numbers Maru white) --- */
 
-.msc-medal {
+.msc-dxscore-label {
   position: absolute;
-  width: 48px;
-  height: 48px;
+  left: 33.5px;
+  top: 548.5px;
+  height: 25px;
+  line-height: 25px;
+  font-family: var(--font-mai-rodin-eb, "Arial Black", sans-serif);
+  font-size: 18px;
+  font-weight: normal;
+  color: #34db39;
 }
-
-.msc-medal-combo {
-  left: 176px;
-  top: 363px;
-}
-
-.msc-medal-sync {
-  left: 217px;
-  top: 363px;
-}
-
-.msc-medal-blank {
-  position: absolute;
-  width: 48px;
-  height: 48px;
-}
-
-.msc-medal-combo-blank {
-  left: 177px;
-  top: 364px;
-}
-
-.msc-medal-sync-blank {
-  left: 218px;
-  top: 364px;
-}
-
-/* --- DX score row (MaruGothic DB white on the navy boxes) --- */
 
 .msc-dx-value,
 .msc-dx-slash,
@@ -391,81 +405,128 @@
   white-space: nowrap;
 }
 
-.msc-dx-value {
-  right: 145px;
-  top: 391.5px;
-  font-size: 12px;
-  line-height: 15px;
-}
+.msc-dx-value { right: 214.5px; top: 551.5px; font-size: 18px; line-height: 21px; }
+.msc-dx-slash { left: 204.5px; top: 555.5px; width: 11px; font-size: 15px; line-height: 17px; text-align: center; }
+/* TMP autosizes the max up to 16pt (the prefab's 13.4 is just the editor value
+   for the "99,999" placeholder); real 4-digit maxima fit the 48px rect at 16.
+   top 555 puts its baseline on the value's (551.5 + 1.5 + 16 = 555 + 14). */
+.msc-dx-max { right: 156.5px; top: 555px; font-size: 16px; line-height: 16px; }
 
-.msc-dx-slash {
-  left: 139px;
-  width: 8px;
-  top: 392.5px;
-  font-size: 10px;
-  line-height: 14px;
-  text-align: center;
-}
-
-.msc-dx-max {
-  right: 107px;
-  top: 392.5px;
-  font-size: 10px;
-  line-height: 14px;
-}
-
-/* --- DX star pips: 5 always, earned orange / unearned blue-gray --- */
+/* --- DX stars: earned only, tier-coloured sprite. HorizontalLayoutGroup
+       spacing -5, MiddleRight: 24px pips at 19px pitch, right edge fixed at
+       x268, vertically centred on y583 (boxes y571..595). --- */
 
 .msc-stars {
   position: absolute;
-  left: 124px;
-  top: 405px;
+  right: 152px;
+  top: 571px;
   display: flex;
-  gap: 1px;
 }
 
-.msc-star-pip {
-  width: 12px;
-  height: 12px;
-  background-color: #8a9dd3;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-}
+.msc-star { width: 24px; height: 24px; margin-left: -5px; }
+.msc-star:first-child { margin-left: 0; }
 
-.msc-star-pip.earned {
-  background-color: #f8b534;
-}
+/* --- notes designer + BPM (labels are TMP text on this card) --- */
 
-/* --- designer / BPM footer --- */
+.msc-designer-label {
+  position: absolute;
+  left: 28.5px;
+  top: 572.5px;
+  height: 25px;
+  line-height: 25px;
+  font-family: var(--font-mai-rodin-eb, "Arial Black", sans-serif);
+  font-size: 12px;
+  font-weight: normal;
+  color: #225192;
+}
 
 .msc-designer-name {
   position: absolute;
-  left: 26px;
-  top: 419px;
-  height: 15px;
-  line-height: 15px;
+  left: 25.4px;
+  top: 599px;
+  height: 16px;
+  line-height: 16px;
   font-family: var(--font-mai-maru, "Yu Gothic", sans-serif);
-  font-size: 12px;
+  font-size: 16px;
   font-weight: normal;
-  color: #113f80;
+  color: #225192;
   white-space: nowrap;
 }
 
 .msc-bpm {
   position: absolute;
-  left: 195px;
-  top: 419px;
-  height: 15px;
-  line-height: 15px;
+  left: 291.5px;
+  top: 598.5px;
+  width: 93px;
+  height: 17px;
+  line-height: 17px;
+  text-align: center;
   font-family: var(--font-mai-maru, "Yu Gothic", sans-serif);
-  font-size: 12px;
+  font-size: 18px;
   font-weight: normal;
-  color: #353535;
+  color: #434343;
   white-space: nowrap;
+}
+
+/* --- combo / sync medals (80x80) --- */
+
+.msc-medal {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+}
+
+.msc-medal-combo { left: 262px; top: 511px; }
+.msc-medal-sync { left: 329px; top: 511px; }
+
+/* --- bookmark tab + mode plate: rise above the frame top --- */
+
+.msc-tab {
+  position: absolute;
+  left: 0;
+  top: -54px;
+  width: 420px;
+  height: 96px;
+}
+
+/* Standard songs: the plate sits on the right, so mirror the tab bump to match. */
+.msc-tab.mirrored {
+  transform: scaleX(-1);
+}
+
+.msc-pill {
+  position: absolute;
+  width: 200px;
+  height: 64px;
+  top: -51px;
+}
+
+.msc-pill.at-left { left: 13px; }
+.msc-pill.at-right { left: 207px; }
+
+/* --- LONG-version badge (UI_Long_Icon_big 144x72 at 9,25; base at alpha .953,
+       text child offset -0.3px like the prefab) --- */
+
+.msc-long {
+  position: absolute;
+  left: 9px;
+  top: 25px;
+  width: 144px;
+  height: 72px;
+}
+
+.msc-long-base {
+  position: absolute;
+  inset: 0;
+  opacity: 0.953;
+}
+
+.msc-long-text {
+  position: absolute;
+  left: -0.3px;
+  top: 0;
+  width: 144px;
+  height: 72px;
 }
 
 .scorecard-empty {

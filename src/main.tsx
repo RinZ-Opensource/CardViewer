@@ -5,6 +5,10 @@ import "./styles/card.css";
 import "./styles/holo.css";
 import "./styles/ui.css";
 import "./styles/scorecard.css";
+import "./styles/scorecard-chuni.css";
+import "./styles/scorecard-chuni-box.css";
+import "./styles/scorecard-ongeki.css";
+import "./styles/scorecard-ongeki-bt.css";
 import { installPrivateFontFaces } from "./fonts";
 import { AppShell } from "./AppShell";
 

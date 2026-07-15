@@ -61,49 +61,17 @@ export const MAI_SYNC_SPRITE: Record<Exclude<MaiSyncBadge, "none">, string> = {
 };
 
 /**
- * DX-score star pip colors from MusicChainCard's _starColors:
- * earned = orange, unearned = blue-gray. Pips use the star silhouette as a
- * CSS mask so both states come from one sprite.
+ * Star_Base (UI_TST_MBase_Box_02, 40x32, 9-slice borders L25/R14) pre-sliced
+ * per star count at the game's animated widths (DXScore_01..05 sizeDelta.x),
+ * baked to PNGs by scripts (see private-assets). Single images because CSS
+ * border-image draws separate quads that seam under fractional zoom and
+ * html-to-image drops border-image urls from PNG exports.
  */
-export const MAI_STAR_EARNED = "#f8b534";
-export const MAI_STAR_UNEARNED = "#8a9dd3";
-export const MAI_STAR_SPRITE = "UI_MSS_DXScore_Star_02";
-
-export interface GlyphSheet {
-  /** Full texture size. */
-  textureWidth: number;
-  textureHeight: number;
-  /** Grid cell height (glyph vertical offsets are preserved within cells). */
-  cellHeight: number;
-  /** Tight glyph rects [x, y, w, h] in texture px (alpha-thresholded). */
-  glyphs: Record<string, [number, number, number, number]>;
-}
-
-/**
- * UI_NUM_MLevel_XX: 192x240 sheet backing the UI_CMN_MusicLevel_* sprites the
- * game feeds to SpriteCounter (48x60 grid). Rects are tight crops so glyphs
- * render at Unity's visible size; "+" keeps its superscript offset, "L" is
- * the "Lv" glyph.
- */
-export const MAI_LEVEL_GLYPHS: GlyphSheet = {
-  textureWidth: 192,
-  textureHeight: 240,
-  cellHeight: 60,
-  glyphs: {
-    "0": [3, 5, 40, 52],
-    "1": [55, 6, 27, 50],
-    "2": [101, 5, 37, 51],
-    "3": [147, 5, 39, 52],
-    "4": [3, 66, 40, 49],
-    "5": [52, 66, 39, 51],
-    "6": [99, 65, 40, 52],
-    "7": [149, 66, 37, 50],
-    "8": [3, 125, 40, 52],
-    "9": [51, 125, 40, 52],
-    "+": [106, 122, 27, 27],
-    "-": [157, 141, 23, 13],
-    ",": [17, 210, 15, 21],
-    ".": [65, 211, 14, 14],
-    "L": [102, 207, 38, 29],
-  },
+export const MAI_STAR_BASE: Record<number, { width: number; sprite: string }> = {
+  1: { width: 40, sprite: "UI_TST_MBase_Box_02_star1" },
+  2: { width: 59, sprite: "UI_TST_MBase_Box_02_star2" },
+  3: { width: 79, sprite: "UI_TST_MBase_Box_02_star3" },
+  4: { width: 96, sprite: "UI_TST_MBase_Box_02_star4" },
+  5: { width: 115, sprite: "UI_TST_MBase_Box_02_star5" },
 };
+

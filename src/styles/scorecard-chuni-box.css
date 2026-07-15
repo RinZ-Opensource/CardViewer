@@ -1,0 +1,218 @@
+/* ---------------------------------------------------------------------------
+ * CHUNITHM music-select music box (CHU_UI_Select_musicbox_00)
+ * Design space: the 454x610 decide frame; the neutral 438x584 card base sits
+ * at (8,13). Coordinates are frame-relative CSS px from
+ * scripts/scorecard-extract/chuni_musicbox_tree.{json,txt}.
+ * ------------------------------------------------------------------------- */
+
+.chuni-musicbox-card {
+  position: relative;
+  width: 454px;
+  height: 610px;
+  font-kerning: none;
+}
+
+.chuni-musicbox-card img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* C_music_box_base_00: difficulty-coloured base, 6 patterns. */
+.cmb-base {
+  position: absolute;
+  left: 8px;
+  top: 13px;
+  width: 438px;
+  height: 584px;
+}
+
+/* C_music_box_jacket_body: 300x300 quad (ChgTex_MusicJacket). */
+.cmb-jacket {
+  position: absolute;
+  left: 77px;
+  top: 54px;
+  width: 300px;
+  height: 300px;
+}
+
+/* T_music_box_title: 32pt SEGA KakuGothic DB x0.9 = 28.8px, centre pivot,
+   ink #323228, no shadow (FontParam shadow 0/0). Marquee statically
+   compressed via FitText. */
+.cmb-title {
+  position: absolute;
+  left: 27px;
+  top: 419px;
+  width: 400px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* The game's RFO bitmap glyphs sit lower in the cast box than CSS centering
+     of the vector face; nudge down to match (same fix as the maimai digits). */
+  transform: translateY(5px);
+  line-height: 1;
+  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
+  font-size: 28.8px;
+  font-weight: normal;
+  color: #323228;
+  white-space: nowrap;
+}
+
+/* T_music_box_artist: 18pt x0.8 = 14.4px, top-centre, #5A5A50. */
+.cmb-artist {
+  position: absolute;
+  left: 27px;
+  top: 467px;
+  width: 400px;
+  height: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  /* Bitmap-font baseline nudge, see .cmb-title. */
+  transform: translateY(4px);
+  line-height: 1;
+  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
+  font-size: 14.4px;
+  font-weight: normal;
+  color: #5a5a50;
+  white-space: nowrap;
+}
+
+/* C_level_base: navy LEVEL box (normal) or cream box (WE), 80x88. */
+.cmb-level-base {
+  position: absolute;
+  left: 30px;
+  top: 344px;
+  width: 80px;
+  height: 88px;
+}
+
+/* C_level_num digits: native 40x52 cells; left set inline (29px pitch). */
+.cmb-level-digit {
+  position: absolute;
+  top: 374px;
+  width: 40px;
+  height: 52px;
+}
+
+/* C_level_plus: fixed 26x28 spot, not appended after the digits. */
+.cmb-level-plus {
+  position: absolute;
+  left: 81px;
+  top: 364px;
+  width: 26px;
+  height: 28px;
+}
+
+/* C_level_star: mid-left anchored strip, width follows the star count. */
+.cmb-we-star {
+  position: absolute;
+  left: 33px;
+  top: 348px;
+  height: 16px;
+}
+
+/* T_..._world_end: 60pt cast x0.8 scale = 48px single monospaced kanji,
+   white, centred in the 54.4px box over the cream WE base. */
+.cmb-we-kanji {
+  position: absolute;
+  left: 38.8px;
+  top: 365.8px;
+  width: 54.4px;
+  height: 54.4px;
+  line-height: 54.4px;
+  text-align: center;
+  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
+  font-size: 48px;
+  font-weight: normal;
+  color: #fff;
+}
+
+/* Achievement badge rows, all 134x26. */
+.cmb-badge {
+  position: absolute;
+  width: 134px;
+  height: 26px;
+}
+
+.cmb-badge-success {
+  left: 24px;
+  top: 501px;
+}
+
+.cmb-badge-rank {
+  left: 160px;
+  top: 501px;
+}
+
+.cmb-badge-combo {
+  left: 296px;
+  top: 501px;
+}
+
+.cmb-badge-fchain {
+  left: 24px;
+  top: 529px;
+}
+
+/* C_score_num glyphs: 16x20 digit / 8x20 comma cells on 14/6px advances
+   (digit sprites overlap their neighbours by 2px, as in the CNUM). */
+.cmb-score-glyph {
+  position: absolute;
+  height: 20px;
+}
+
+/* C_bpm_num: 12x14 cells (digit 3's crop is 11px wide); pre-baked #313C4E. */
+.cmb-bpm-digit {
+  position: absolute;
+  top: 566px;
+  height: 14px;
+}
+
+/* C_notesdesigner_txt pat0: "NOTES DESIGNER:" strip, natural 148x24 (the
+   CSLI's extra edge slices are fully transparent). */
+.cmb-notes-label {
+  position: absolute;
+  left: 22px;
+  top: 562px;
+  width: 148px;
+  height: 24px;
+}
+
+/* T_notesdesigner_name: 14pt, mid-left, #313C4E. */
+.cmb-notes-name {
+  position: absolute;
+  left: 152px;
+  top: 562px;
+  width: 200px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  /* Bitmap-font baseline nudge, see .cmb-title. */
+  transform: translateY(3px);
+  line-height: 1;
+  font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
+  font-size: 14px;
+  font-weight: normal;
+  color: #313c4e;
+  white-space: nowrap;
+}
+
+/* Confirm state (A_start_in rest pose): pre-baked decide frame + banner.
+   The idle alpha pulse (A_start_eff) is skipped so exports are deterministic. */
+.cmb-decide-frame {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 454px;
+  height: 610px;
+}
+
+/* PAT_start_txt: 422x138 art stretched onto the 424x138 cast box. */
+.cmb-start-banner {
+  position: absolute;
+  left: 15px;
+  top: 199px;
+  width: 424px;
+  height: 138px;
+}

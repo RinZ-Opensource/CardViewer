@@ -1,0 +1,16 @@
+# cardviewer-songdb: otoge-db mirror for the score-card song picker.
+# See README.md for bucket binding, secret setup and deploy steps.
+name = "cardviewer-songdb"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+
+# Daily metadata refresh (04:17 JST); jackets are mirrored lazily on request.
+[triggers]
+crons = ["17 19 * * *"]
+
+[[r2_buckets]]
+binding = "SONGDB"
+# The existing CardViewer bucket (APAC; also serves official/generated/... via
+# the cv-assets.wahleak.net custom domain). The worker only reads/writes keys
+# under the songdb/ prefix, so it coexists with the objects already there.
+bucket_name = "cardviewer-assets"

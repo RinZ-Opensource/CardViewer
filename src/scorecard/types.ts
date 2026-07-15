@@ -40,7 +40,11 @@ export interface MaiSong {
   genreId: number;
   /** True for でらっくす charts, false for スタンダード. */
   isDx: boolean;
+  /** Long-version music (longMusic == 1): shows the LONG badge over the frame. */
+  isLong?: boolean;
   jacketUrl: string;
+  /** Lower-tier jacket URLs tried in order when jacketUrl 404s (songdb.ts). */
+  jacketFallbacks?: string[];
   charts: MaiChart[];
 }
 
