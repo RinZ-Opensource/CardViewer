@@ -80,3 +80,29 @@ Files must be named after the otoge-db jacket file (the hashed
 the `/hd-jackets/{game}/{file}` lookup matches. Game-extracted jackets under
 `private-assets/official/scorecard/{game}/` use game-native names
 (`jacket_11818.png`, `UI_Jacket_0001.png`, ...) and need renaming/mapping first.
+
+## Score-card official asset tier
+
+The deployed Pages Function already serves the shared R2 bucket below
+`/official/*`. Score cards therefore use a same-origin, versioned override
+before the optional songdb Worker and jsDelivr fallbacks:
+
+```text
+official/scorecard/mai/jackets/jacket-map.json
+official/scorecard/mai/jackets/v1/<otoge-image-file>
+official/scorecard/chuni/jackets/jacket-map.json
+official/scorecard/chuni/jackets/v1/<otoge-image-file>
+official/scorecard/ongeki/jackets/jacket-map.json
+official/scorecard/ongeki/jackets/v1/<otoge-image-file>
+official/scorecard/ongeki/boss/boss-map.json
+official/scorecard/ongeki/boss/v1/UI_Card_Icon_<id>.png
+```
+
+Prepare the three jacket bundles with
+`scripts/scorecard-extract/prepare_hd_jackets.py`; export the ONGEKI opponent
+mapping and original icons with
+`scripts/scorecard-extract/export_ongeki_boss_assets.py`. Both tools support
+`--verify-only`. Generate deterministic `wrangler r2 bulk put` manifests with
+`scripts/cloudflare/prepare_r2_bulk_manifest.mjs` and upload each image type
+with its matching content type. Upload the small JSON manifests last so a new
+version is never advertised before its images are present.

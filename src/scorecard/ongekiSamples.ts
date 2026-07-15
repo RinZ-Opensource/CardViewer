@@ -1,4 +1,4 @@
-import { ongekiJacket } from "./ongekiAssets";
+import { ongekiBossIcon, ongekiJacket } from "./ongekiAssets";
 import { OngekiSong } from "./ongekiTypes";
 
 /**
@@ -13,23 +13,35 @@ export const ONGEKI_SAMPLE_SONGS: OngekiSong[] = [
     title: "Sample Song 0001",
     artist: "Placeholder Artist",
     jacketUrl: ongekiJacket("0001"),
+    officialMusicId: "0001",
+    bossCardId: 1,
+    bossIconUrl: ongekiBossIcon(1),
   },
   {
     id: "0036",
     title: "Sample Song 0036",
     artist: "Placeholder Artist",
     jacketUrl: ongekiJacket("0036"),
+    officialMusicId: "0036",
+    bossCardId: 100005,
+    bossIconUrl: ongekiBossIcon(100005),
   },
   {
     id: "0063",
     title: "Sample Song 0063",
     artist: "Placeholder Artist",
     jacketUrl: ongekiJacket("0063"),
+    officialMusicId: "0063",
+    bossCardId: 100005,
+    bossIconUrl: ongekiBossIcon(100005),
   },
   {
     id: "0064",
     title: "Sample Song 0064",
     artist: "Placeholder Artist",
     jacketUrl: ongekiJacket("0064"),
+    officialMusicId: "0064",
+    bossCardId: 100014,
+    bossIconUrl: ongekiBossIcon(100014),
   },
 ];

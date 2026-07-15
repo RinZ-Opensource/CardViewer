@@ -1246,7 +1246,13 @@ export function ScoreCardSurface() {
                 <ChuniScoreCard song={chuniSong} state={chuniState} captureRef={captureRef} />
               )
             ) : ongekiState.cardType === "musicbt" ? (
-              <OngekiMusicBtCard song={ongekiSong} state={ongekiState} captureRef={captureRef} />
+              <OngekiMusicBtCard
+                song={ongekiSong}
+                state={ongekiState}
+                bossIconUrl={ongekiSong.bossIconUrl}
+                bossIconFallbacks={ongekiSong.bossIconFallbacks}
+                captureRef={captureRef}
+              />
             ) : (
               <OngekiScoreCard song={ongekiSong} state={ongekiState} captureRef={captureRef} />
             )}

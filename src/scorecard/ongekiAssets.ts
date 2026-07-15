@@ -18,6 +18,11 @@ export function ongekiJacket(id: string) {
   return ongekiSprite(`UI_Jacket_${id}`);
 }
 
+/** Full 256x256 opponent CardIcon exported from the official game data. */
+export function ongekiBossIcon(id: number, version = 1) {
+  return `${ONGEKI_SCORECARD_ROOT}/boss/v${version}/UI_Card_Icon_${String(id).padStart(6, "0")}.png`;
+}
+
 export const ONGEKI_DIFFICULTY_ORDER: OngekiDifficulty[] = [
   "basic",
   "advanced",

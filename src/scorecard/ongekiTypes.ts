@@ -31,6 +31,14 @@ export interface OngekiSong {
   bossLevel?: number;
   /** Boss attribute; unset when the DB says MULTI or nothing. */
   bossAttribute?: OngekiAttribute;
+  /** Official Music.xml Name/id when this SongDB row has an authoritative match. */
+  officialMusicId?: string;
+  /** Official Music.xml BossCard/id for the per-song opponent card. */
+  bossCardId?: number;
+  /** Versioned full-size CardIcon served from the official asset tier. */
+  bossIconUrl?: string;
+  /** Ordered fallbacks used when the mapped CardIcon is unavailable. */
+  bossIconFallbacks?: string[];
 }
 
 /** Which ongeki card the surface renders: playing-screen panel or music-select MusicBt. */

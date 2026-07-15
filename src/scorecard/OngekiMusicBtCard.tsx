@@ -316,6 +316,8 @@ interface OngekiMusicBtCardProps {
   jacketUrl?: string;
   /** Boss card icon (runtime CardIcon); defaults to the dummy jacket art. */
   bossIconUrl?: string;
+  /** Ordered fallbacks for a mapped boss CardIcon. */
+  bossIconFallbacks?: string[];
   /**
    * MusicRights strip (focused songs with musicRightsId != 0 only). It hangs
    * off the card's right edge per the prefab, so the PNG export clips it.
@@ -329,6 +331,7 @@ export function OngekiMusicBtCard({
   state,
   jacketUrl,
   bossIconUrl,
+  bossIconFallbacks,
   showRights,
   captureRef,
 }: OngekiMusicBtCardProps) {
@@ -401,7 +404,15 @@ export function OngekiMusicBtCard({
         <img
           className="omb-boss-icon"
           style={{ clipPath: BOSS_ICON_CLIP }}
-          src={bossIconUrl || ongekiSprite(ONGEKI_BT_DEFAULT_BOSS_ICON)}
+          {...jacketImgProps(
+            bossIconUrl || ongekiSprite(ONGEKI_BT_DEFAULT_BOSS_ICON),
+            bossIconUrl
+              ? [
+                  ...(bossIconFallbacks ?? []),
+                  ongekiSprite(ONGEKI_BT_DEFAULT_BOSS_ICON),
+                ]
+              : undefined,
+          )}
           alt=""
           decoding="async"
         />

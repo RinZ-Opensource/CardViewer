@@ -1,7 +1,7 @@
 import type { ReactEventHandler } from "react";
 import { CHUNI_DUMMY_JACKET } from "./chuniAssets";
 import { ChuniChart, ChuniDifficulty, ChuniScoreState, ChuniSong } from "./chuniTypes";
-import { ongekiJacket } from "./ongekiAssets";
+import { ongekiBossIcon, ongekiJacket } from "./ongekiAssets";
 import {
   OngekiChart,
   OngekiDifficulty,
@@ -26,6 +26,13 @@ export type SongDbStatus = "loading" | "ready" | "error";
 
 const OTOGEDB_JSDELIVR_ROOT = "https://cdn.jsdelivr.net/gh/zvuc/otoge-db@master";
 const SONGDB_FETCH_TIMEOUT_MS = 20_000;
+const OFFICIAL_ASSET_FETCH_TIMEOUT_MS = 5_000;
+
+const OFFICIAL_SCORECARD_DIR: Record<SongDbGame, string> = {
+  maimai: "mai",
+  chunithm: "chuni",
+  ongeki: "ongeki",
+};
 
 function workerBase(): string | undefined {
   const base = import.meta.env.VITE_SONGDB_BASE_URL;
@@ -64,13 +71,15 @@ function jacketChain(
   game: SongDbGame,
   file: string,
   localDummy?: string,
+  officialOverride?: string,
 ): { jacketUrl: string; jacketFallbacks: string[] } {
   const mirrored = songdbJacketUrl(game, file);
   const hd = songdbHdJacketUrl(game, file);
   const tail = localDummy ? [localDummy, PLACEHOLDER_JACKET] : [PLACEHOLDER_JACKET];
-  return hd
-    ? { jacketUrl: hd, jacketFallbacks: [mirrored, ...tail] }
-    : { jacketUrl: mirrored, jacketFallbacks: tail };
+  const urls = [officialOverride, hd, mirrored, ...tail].filter(
+    (url, index, all): url is string => Boolean(url) && all.indexOf(url) === index,
+  );
+  return { jacketUrl: urls[0], jacketFallbacks: urls.slice(1) };
 }
 
 /**
@@ -108,6 +117,110 @@ export function jacketImgProps(
 /** music-ex.json rows are flat string maps (numbers included). */
 type RawEntry = Record<string, string | undefined>;
 
+interface OfficialJacketMap {
+  version: number;
+  game: SongDbGame;
+  images: Record<string, { width: number; height: number }>;
+}
+
+interface OngekiBossMapEntry {
+  musicId: string;
+  bossCardId: number;
+}
+
+interface OngekiBossMap {
+  version: number;
+  songs: Record<string, OngekiBossMapEntry>;
+}
+
+interface SupplementalAssets {
+  jackets?: OfficialJacketMap;
+  ongekiBosses?: OngekiBossMap;
+}
+
+const JACKET_FILE = /^[A-Za-z0-9_.-]+\.(png|jpg|jpeg|webp)$/i;
+const officialAssetsCache = new Map<SongDbGame, Promise<SupplementalAssets>>();
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+async function fetchOptionalJson(url: string): Promise<unknown | undefined> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OFFICIAL_ASSET_FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return undefined;
+    return await response.json();
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function parseOfficialJacketMap(value: unknown, game: SongDbGame): OfficialJacketMap | undefined {
+  if (!isRecord(value) || value.game !== game || !Number.isInteger(value.version)) return undefined;
+  const version = Number(value.version);
+  if (version < 1 || !isRecord(value.images)) return undefined;
+  const images: OfficialJacketMap["images"] = {};
+  for (const [file, rawImage] of Object.entries(value.images)) {
+    if (!JACKET_FILE.test(file) || !isRecord(rawImage)) return undefined;
+    const width = Number(rawImage.width);
+    const height = Number(rawImage.height);
+    if (!Number.isInteger(width) || width < 1 || !Number.isInteger(height) || height < 1) {
+      return undefined;
+    }
+    images[file] = { width, height };
+  }
+  return { version, game, images };
+}
+
+function parseOngekiBossMap(value: unknown): OngekiBossMap | undefined {
+  if (!isRecord(value) || !Number.isInteger(value.version) || !isRecord(value.songs)) {
+    return undefined;
+  }
+  const version = Number(value.version);
+  if (version < 1) return undefined;
+  const songs: OngekiBossMap["songs"] = {};
+  for (const [sortOrder, rawEntry] of Object.entries(value.songs)) {
+    if (!/^\d+$/.test(sortOrder) || !isRecord(rawEntry)) return undefined;
+    const musicId = String(rawEntry.musicId ?? "");
+    const bossCardId = Number(rawEntry.bossCardId);
+    if (!/^\d{4}$/.test(musicId) || !Number.isInteger(bossCardId) || bossCardId < 1) {
+      return undefined;
+    }
+    songs[sortOrder] = { musicId, bossCardId };
+  }
+  return { version, songs };
+}
+
+function officialJacketUrl(
+  game: SongDbGame,
+  file: string,
+  map: OfficialJacketMap | undefined,
+): string | undefined {
+  if (!map?.images[file]) return undefined;
+  return `/official/scorecard/${OFFICIAL_SCORECARD_DIR[game]}/jackets/v${map.version}/${encodeURIComponent(file)}`;
+}
+
+function loadSupplementalAssets(game: SongDbGame): Promise<SupplementalAssets> {
+  let pending = officialAssetsCache.get(game);
+  if (pending) return pending;
+  const scorecardDir = OFFICIAL_SCORECARD_DIR[game];
+  pending = Promise.all([
+    fetchOptionalJson(`/official/scorecard/${scorecardDir}/jackets/jacket-map.json`),
+    game === "ongeki"
+      ? fetchOptionalJson("/official/scorecard/ongeki/boss/boss-map.json")
+      : Promise.resolve(undefined),
+  ]).then(([rawJackets, rawBosses]) => ({
+    jackets: parseOfficialJacketMap(rawJackets, game),
+    ongekiBosses: game === "ongeki" ? parseOngekiBossMap(rawBosses) : undefined,
+  }));
+  officialAssetsCache.set(game, pending);
+  return pending;
+}
+
 const songCache = new Map<SongDbGame, Promise<unknown>>();
 
 async function fetchSongDbEntries(game: SongDbGame): Promise<RawEntry[]> {
@@ -137,11 +250,13 @@ async function fetchSongDbEntries(game: SongDbGame): Promise<RawEntry[]> {
 
 function loadNormalized<Song>(
   game: SongDbGame,
-  normalize: (entries: RawEntry[]) => Song[],
+  normalize: (entries: RawEntry[], assets: SupplementalAssets) => Song[],
 ): Promise<Song[]> {
   let pending = songCache.get(game) as Promise<Song[]> | undefined;
   if (!pending) {
-    pending = fetchSongDbEntries(game).then(normalize);
+    pending = Promise.all([fetchSongDbEntries(game), loadSupplementalAssets(game)]).then(
+      ([entries, assets]) => normalize(entries, assets),
+    );
     // Drop failed loads from the cache so a later tab switch can retry.
     pending.catch(() => songCache.delete(game));
     songCache.set(game, pending);
@@ -200,7 +315,7 @@ function maiCharts(entry: RawEntry, prefix: "lev" | "dx_lev"): MaiChart[] {
   return charts;
 }
 
-function normalizeMai(entries: RawEntry[]): MaiSong[] {
+function normalizeMai(entries: RawEntry[], assets: SupplementalAssets): MaiSong[] {
   const songs: MaiSong[] = [];
   for (const entry of entries) {
     if (!entry.title || !entry.image_url) continue;
@@ -215,7 +330,12 @@ function normalizeMai(entries: RawEntry[]): MaiSong[] {
       bpm: parseIntField(entry.bpm) ?? -1,
       genre: entry.catcode ?? "",
       genreId: MAI_GENRE_ID[entry.catcode ?? ""] ?? 0,
-      ...jacketChain("maimai", entry.image_url),
+      ...jacketChain(
+        "maimai",
+        entry.image_url,
+        undefined,
+        officialJacketUrl("maimai", entry.image_url, assets.jackets),
+      ),
     };
     // A row can carry both chart sets; split so the DX/Standard tab art stays
     // per-song. otoge-db has no numeric song id, so sort*10+variant is ours.
@@ -241,7 +361,7 @@ const CHUNI_DIFF_FIELD: Array<[ChuniDifficulty, string]> = [
   ["ultima", "ult"],
 ];
 
-function normalizeChuni(entries: RawEntry[]): ChuniSong[] {
+function normalizeChuni(entries: RawEntry[], assets: SupplementalAssets): ChuniSong[] {
   const songs: ChuniSong[] = [];
   for (const entry of entries) {
     if (!entry.title || !entry.image) continue;
@@ -272,7 +392,12 @@ function normalizeChuni(entries: RawEntry[]): ChuniSong[] {
       id,
       title: entry.title,
       artist: entry.artist ?? "",
-      ...jacketChain("chunithm", entry.image, CHUNI_DUMMY_JACKET),
+      ...jacketChain(
+        "chunithm",
+        entry.image,
+        CHUNI_DUMMY_JACKET,
+        officialJacketUrl("chunithm", entry.image, assets.jackets),
+      ),
       charts,
       bpm: parseIntField(entry.bpm),
       weKanji: weKanji || undefined,
@@ -298,7 +423,7 @@ const ONGEKI_DIFF_FIELD: Array<[OngekiDifficulty, string]> = [
   ["lunatic", "lnt"],
 ];
 
-function normalizeOngeki(entries: RawEntry[]): OngekiSong[] {
+function normalizeOngeki(entries: RawEntry[], assets: SupplementalAssets): OngekiSong[] {
   const songs: OngekiSong[] = [];
   for (const entry of entries) {
     if (!entry.title || !entry.image_url || !entry.id) continue;
@@ -319,11 +444,17 @@ function normalizeOngeki(entries: RawEntry[]): OngekiSong[] {
     }
     if (Object.keys(charts).length === 0) continue;
     const attribute = (entry.enemy_type ?? "").toLowerCase();
+    const boss = assets.ongekiBosses?.songs[entry.id];
     songs.push({
       id: entry.id,
       title: entry.title,
       artist: entry.artist ?? "",
-      ...jacketChain("ongeki", entry.image_url, ongekiJacket("0000")),
+      ...jacketChain(
+        "ongeki",
+        entry.image_url,
+        ongekiJacket("0000"),
+        officialJacketUrl("ongeki", entry.image_url, assets.jackets),
+      ),
       charts,
       bpm: parseIntField(entry.bpm),
       bossLevel: parseIntField(entry.enemy_lv),
@@ -333,6 +464,9 @@ function normalizeOngeki(entries: RawEntry[]): OngekiSong[] {
         attribute === "fire" || attribute === "aqua" || attribute === "leaf"
           ? attribute
           : undefined,
+      officialMusicId: boss?.musicId,
+      bossCardId: boss?.bossCardId,
+      bossIconUrl: boss ? ongekiBossIcon(boss.bossCardId, assets.ongekiBosses?.version) : undefined,
     });
   }
   return songs;
