@@ -97,6 +97,9 @@ const CARD_TYPES: Array<{ key: "panel" | "score"; label: string }> = [
 
 /** Panel-style cards stay implemented, but are hidden until their UX is ready. */
 const SHOW_PANEL_CARDS = false;
+/** Keep unfinished/destructive workbench actions visible but unavailable. */
+const SCORECARD_RESET_ENABLED = false;
+const SCORECARD_EXPORT_ENABLED = false;
 
 /** Active card design-space size; the stage auto-fit zoom uses this. */
 function designSize(
@@ -617,7 +620,12 @@ export function ScoreCardSurface() {
         </div>
 
         <div className="scorecard-form-actions">
-          <button type="button" className="ghost-button" onClick={resetCurrentCard}>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={resetCurrentCard}
+            disabled={!SCORECARD_RESET_ENABLED}
+          >
             Reset current card
           </button>
         </div>
@@ -1210,7 +1218,7 @@ export function ScoreCardSurface() {
             type="button"
             className="scorecard-export"
             onClick={exportPng}
-            disabled={exportingPng}
+            disabled={!SCORECARD_EXPORT_ENABLED || exportingPng}
           >
             {exportingPng ? "Exporting…" : "Export PNG"}
           </button>
