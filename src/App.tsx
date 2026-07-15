@@ -323,23 +323,20 @@ export function App() {
               ))}
             </div>
           ) : null}
-          <div
-            className={`data-source-status${source === "mock" || source === "error" ? " degraded" : ""}`}
-            role="status"
-            aria-live="polite"
-          >
-            <span>{status}</span>
-            {scanResult ? (
-              <small>
-                {filteredCards.length.toLocaleString()} of {displayCards.length.toLocaleString()} supported cards
-              </small>
-            ) : null}
-            {source === "mock" || source === "error" ? (
-              <button type="button" className="ghost-button" onClick={retry} disabled={loading}>
-                Retry manifest
-              </button>
-            ) : null}
-          </div>
+          {loading || source === "mock" || source === "error" ? (
+            <div
+              className={`data-source-status${source === "mock" || source === "error" ? " degraded" : ""}`}
+              role="status"
+              aria-live="polite"
+            >
+              <span>{status}</span>
+              {source === "mock" || source === "error" ? (
+                <button type="button" className="ghost-button" onClick={retry} disabled={loading}>
+                  Retry manifest
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           <div className="filter-grid" aria-label="Card filters">
             {filterConfig.map((filter) => (
               <label className="filter-control" key={filter.key}>
