@@ -169,8 +169,8 @@ export function PrintFieldControl({
   if (field.key === "serialId") {
     return (
       <div className="control">
-        <label htmlFor={serialInputId}>
-          <span>{field.label}</span>
+        <label className="control-label" htmlFor={serialInputId}>
+          {field.label}
         </label>
         <span className="input-with-action">
           {input}

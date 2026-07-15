@@ -434,6 +434,7 @@ p,
 small,
 .field-label,
 .control span,
+.control-label,
 .preview-meta,
 .edit-json summary {
   color: var(--ui-text-muted);
