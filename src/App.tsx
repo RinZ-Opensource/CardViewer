@@ -11,6 +11,9 @@ import { useCardEdits, useCardListViewport, useOfficialFonts, useScanResult, use
 import { THUMBNAIL_BUFFER_ROWS } from "./imageLoader";
 import { CardRecord, ViewMode } from "./types";
 
+/** Keep the unfinished CardViewer export workflow out of the UI for now. */
+const SHOW_CARD_EXPORT = false;
+
 export function App() {
   const [selectedId, setSelectedId] = React.useState<string>("");
   const [query, setQuery] = React.useState("");
@@ -509,7 +512,7 @@ export function App() {
         </div>
       ) : null}
 
-      {selected ? (
+      {SHOW_CARD_EXPORT && selected ? (
         <button
           type="button"
           className="export-fab"
