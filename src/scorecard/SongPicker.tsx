@@ -48,7 +48,8 @@ const SCREEN_READER_ONLY: React.CSSProperties = {
 /**
  * Searchable song dropdown shared by the three score-card forms: type to
  * filter title+artist, arrows + Enter to pick, Escape to close. Closed, the
- * input shows the selected song; focusing it clears for a fresh search.
+ * input shows the selected song; focusing or re-clicking it clears for a
+ * fresh search while keeping the current selection as the placeholder.
  */
 export function SongPicker<Song extends SongPickerSong>({
   songs,
@@ -102,6 +103,12 @@ export function SongPicker<Song extends SongPickerSong>({
   function close() {
     setOpen(false);
     setQuery("");
+  }
+
+  function beginSearch() {
+    setOpen(true);
+    setQuery("");
+    setHighlight(0);
   }
 
   function choose(song: Song) {
@@ -201,11 +208,13 @@ export function SongPicker<Song extends SongPickerSong>({
         autoComplete="off"
         value={open ? query : selectedLabel}
         placeholder={selectedLabel}
-        onFocus={() => {
-          setOpen(true);
-          setQuery("");
-          setHighlight(0);
+        onPointerDown={(event) => {
+          // Selecting an option deliberately keeps focus on this input. A
+          // subsequent click therefore has no focus event, so reopen and
+          // clear the visible value from pointer-down as well.
+          if (event.button === 0 && !open) beginSearch();
         }}
+        onFocus={beginSearch}
         onBlur={close}
         onChange={(event) => {
           setQuery(event.target.value);

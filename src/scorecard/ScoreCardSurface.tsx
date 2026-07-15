@@ -95,8 +95,8 @@ const CARD_TYPES: Array<{ key: "panel" | "score"; label: string }> = [
   { key: "score", label: "Music card" },
 ];
 
-/** Both implemented card families are user-selectable in the online workbench. */
-const SHOW_PANEL_CARDS = true;
+/** Panel-style cards stay implemented, but are hidden until their UX is ready. */
+const SHOW_PANEL_CARDS = false;
 
 /** Active card design-space size; the stage auto-fit zoom uses this. */
 function designSize(
