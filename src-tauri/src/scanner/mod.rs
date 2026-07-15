@@ -94,11 +94,11 @@ mod config;
 mod types;
 mod xmlutil;
 
+use config::*;
 pub use types::{
     AssetLayer, CardRecord, MobilePackResult, OnlineExportResult, PrintField, PrintOption,
     ScanResult, ScanStats,
 };
-use config::*;
 use xmlutil::*;
 
 #[derive(Debug, Serialize)]
@@ -618,7 +618,8 @@ pub fn read_image_data_url_impl(path: String) -> Result<String, String> {
 }
 
 fn image_data_url_cache() -> &'static Mutex<ImageDataUrlCache> {
-    IMAGE_DATA_URL_CACHE.get_or_init(|| Mutex::new(ImageDataUrlCache::new(IMAGE_DATA_URL_CACHE_MAX_BYTES)))
+    IMAGE_DATA_URL_CACHE
+        .get_or_init(|| Mutex::new(ImageDataUrlCache::new(IMAGE_DATA_URL_CACHE_MAX_BYTES)))
 }
 
 fn allowed_content_roots() -> &'static Mutex<HashSet<PathBuf>> {
@@ -780,7 +781,16 @@ where
     // Replace MAI card thumbnails with base+character composites. Runs after the
     // manifests are written and rewrites the MAI thumbnailPath entries in place,
     // so re-running export no longer clobbers them back to the bare "_s" base.
-    composite_mai_thumbnails(&output_root, &public_base_url, &mut scan.warnings, &mut progress);
+    let has_mai_card_records = scan
+        .cards
+        .iter()
+        .any(|card| card.game == "MAI" && card.record_type == "Card");
+    composite_mai_thumbnails(
+        has_mai_card_records,
+        &output_root,
+        &public_base_url,
+        &mut progress,
+    )?;
     progress("Online export finished".to_string());
 
     Ok(OnlineExportResult {
@@ -1251,8 +1261,10 @@ impl OnlineAssetExporter {
             }
             Ok(ExportAssetKind::Unsupported) | Err(_) => {
                 self.skipped_asset_count += 1;
-                self.warnings
-                    .push(format!("Skipped asset {}: unsupported image payload", source_path.display()));
+                self.warnings.push(format!(
+                    "Skipped asset {}: unsupported image payload",
+                    source_path.display()
+                ));
                 return None;
             }
         }
@@ -3091,15 +3103,15 @@ fn parse_mai_card(
     let base_stem = type_id.map(|id| format!("ui_cardbase_{id:07}_{map_id:06}"));
     let chara_stem = Some(format!("ui_cardchara_{default_chara_id:06}"));
     let mask_stem = Some(format!("ui_cardcharamask_{default_chara_id:06}"));
-    let image_path = base_stem
-        .as_deref()
-        .and_then(|stem| resolve_content_asset_with_fallback_roots(
+    let image_path = base_stem.as_deref().and_then(|stem| {
+        resolve_content_asset_with_fallback_roots(
             stem,
             content_root,
             content_roots,
             "MAI",
             "assets_mai",
-        ));
+        )
+    });
     let thumbnail_path = base_stem.as_deref().and_then(|stem| {
         resolve_content_asset_with_fallback_roots(
             &format!("{stem}_s"),
@@ -3113,28 +3125,26 @@ fn parse_mai_card(
     if let Some(path) = image_path.clone() {
         asset_layers.push(asset_layer("maiBase", "MAI card base", path));
     }
-    if let Some(path) = chara_stem
-        .as_deref()
-        .and_then(|stem| resolve_content_asset_with_fallback_roots(
+    if let Some(path) = chara_stem.as_deref().and_then(|stem| {
+        resolve_content_asset_with_fallback_roots(
             stem,
             content_root,
             content_roots,
             "MAI",
             "assets_mai",
-        ))
-    {
+        )
+    }) {
         asset_layers.push(asset_layer("maiChara", "MAI character layer", path));
     }
-    if let Some(path) = mask_stem
-        .as_deref()
-        .and_then(|stem| resolve_content_asset_with_fallback_roots(
+    if let Some(path) = mask_stem.as_deref().and_then(|stem| {
+        resolve_content_asset_with_fallback_roots(
             stem,
             content_root,
             content_roots,
             "MAI",
             "assets_mai",
-        ))
-    {
+        )
+    }) {
         asset_layers.push(asset_layer("maiMask", "MAI holo character mask", path));
     }
     let ver_chara_id = format!("[maimaiDX]{}-{unique_id:04}", enable_version);
@@ -3144,8 +3154,8 @@ fn parse_mai_card(
         "MAI",
         "assets_mai",
     )
-        .map(|path| path_string(&path))
-        .unwrap_or_default();
+    .map(|path| path_string(&path))
+    .unwrap_or_default();
     let official_holo = mai_card_type_is_holo(type_id);
 
     Some(CardRecord {
@@ -4397,39 +4407,80 @@ fn write_extract_script(script_path: &Path) -> Result<(), String> {
 }
 
 fn composite_mai_thumbnails<F>(
+    has_mai_card_records: bool,
     output_root: &Path,
     public_base_url: &str,
-    warnings: &mut Vec<String>,
     progress: &mut F,
-) where
+) -> Result<(), String>
+where
     F: FnMut(String),
 {
+    if !has_mai_card_records {
+        progress("No MAI card records; skipping MAI composite thumbnails".to_string());
+        return Ok(());
+    }
+
+    let shard_path = output_root.join("cards.mai.json");
+    if !shard_path.is_file() {
+        return Err(format!(
+            "MAI card records were exported, but the MAI manifest shard is missing: {}",
+            shard_path.display()
+        ));
+    }
+
     progress("Compositing MAI card thumbnails (base + character)".to_string());
     let script_path = output_root
         .join(".tools")
         .join("generate_mai_composite_thumbnails.py");
-    if let Err(err) = write_tool_script(&script_path, MAI_COMPOSITE_SCRIPT, "MAI composite thumbnail")
-    {
-        warnings.push(err);
-        return;
-    }
+    write_tool_script(
+        &script_path,
+        MAI_COMPOSITE_SCRIPT,
+        "MAI composite thumbnail",
+    )?;
+
+    run_mai_composite_script(
+        &script_path,
+        output_root,
+        public_base_url,
+        &python_candidates(),
+    )
+}
+
+fn run_mai_composite_script(
+    script_path: &Path,
+    output_root: &Path,
+    public_base_url: &str,
+    candidates: &[String],
+) -> Result<(), String> {
     let mut errors = Vec::new();
-    for candidate in python_candidates() {
+    for candidate in candidates {
         let mut command = Command::new(&candidate);
         command
             .arg(&script_path)
             .arg(output_root)
             .arg(public_base_url);
-        match command.status() {
-            Ok(status) if status.success() => return,
-            Ok(status) => errors.push(format!("{candidate}: exited with {status}")),
+        match command.output() {
+            Ok(output) if output.status.success() => return Ok(()),
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let detail = if !stderr.is_empty() {
+                    stderr
+                } else if !stdout.is_empty() {
+                    stdout
+                } else {
+                    format!("exited with {}", output.status)
+                };
+                errors.push(format!("{candidate}: {detail}"));
+            }
             Err(err) => errors.push(format!("{candidate}: {err}")),
         }
     }
-    warnings.push(format!(
+
+    Err(format!(
         "MAI composite thumbnails were not generated. {}",
         errors.join(" | ")
-    ));
+    ))
 }
 
 fn write_thumbnail_script(script_path: &Path) -> Result<(), String> {
@@ -4885,10 +4936,7 @@ mod tests {
             .as_deref()
             .unwrap()
             .ends_with("assets_mai\\ui_cardbase_0000004_000001"));
-        assert!(card
-            .asset_layers
-            .iter()
-            .any(|layer| layer.key == "maiMask"));
+        assert!(card.asset_layers.iter().any(|layer| layer.key == "maiMask"));
         assert!(card.print_fields.iter().any(|field| {
             field.key == "maiAssetRoot" && field.value.ends_with("StreamingAssets\\assets_mai")
         }));
@@ -5056,6 +5104,274 @@ mod tests {
     fn detects_unityfs_payload() {
         assert!(is_unity_asset_bundle(b"UnityFS\0\0"));
         assert!(!is_unity_asset_bundle(&[0x89, b'P', b'N', b'G']));
+    }
+
+    #[test]
+    fn skips_mai_compositing_when_export_has_no_mai_cards() {
+        let root = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test-mai-composite-skip");
+        let _ = fs::remove_dir_all(&root);
+        let mut messages = Vec::new();
+
+        composite_mai_thumbnails(false, &root, "/official/generated", &mut |message| {
+            messages.push(message)
+        })
+        .unwrap();
+
+        assert!(!root.exists());
+        assert_eq!(
+            messages,
+            ["No MAI card records; skipping MAI composite thumbnails"]
+        );
+    }
+
+    #[test]
+    fn rejects_mai_compositing_when_manifest_shard_is_missing() {
+        let root = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test-mai-composite-missing-shard");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+
+        let error =
+            composite_mai_thumbnails(true, &root, "/official/generated", &mut |_| {}).unwrap_err();
+
+        assert!(error.contains("MAI manifest shard is missing"));
+        assert!(!root.join(".tools").exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn propagates_mai_composite_interpreter_failures() {
+        let root = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test-mai-composite-interpreter-failure");
+        let missing_interpreter = path_string(&root.join("missing-python.exe"));
+
+        let error = run_mai_composite_script(
+            &root.join("composite.py"),
+            &root,
+            "/official/generated",
+            std::slice::from_ref(&missing_interpreter),
+        )
+        .unwrap_err();
+
+        assert!(error.starts_with("MAI composite thumbnails were not generated."));
+        assert!(error.contains(&missing_interpreter));
+    }
+
+    #[test]
+    fn rejects_mai_cards_without_composite_inputs() {
+        let root = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test-mai-composite-missing-inputs");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let card = r#"{
+            "game": "MAI",
+            "recordType": "Card",
+            "dataName": "card-missing-inputs",
+            "printFields": []
+        }"#;
+        fs::write(root.join("cards.json"), format!(r#"{{"cards":[{card}]}}"#)).unwrap();
+        fs::write(
+            root.join("cards.mai.json"),
+            format!(r#"{{"cards":[{card}]}}"#),
+        )
+        .unwrap();
+        let script_path = root.join("composite.py");
+        write_tool_script(
+            &script_path,
+            MAI_COMPOSITE_SCRIPT,
+            "MAI composite thumbnail test",
+        )
+        .unwrap();
+
+        let error = run_mai_composite_script(
+            &script_path,
+            &root,
+            "/official/generated",
+            &python_candidates(),
+        )
+        .unwrap_err();
+
+        assert!(error.contains("missing typeId/mapId"));
+        assert!(!root
+            .join("assets")
+            .join("thumbs")
+            .join("mai")
+            .join("card_card-missing-inputs.webp")
+            .exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn rejects_mai_cards_with_a_missing_character_layer() {
+        let root = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test-mai-composite-missing-character");
+        let _ = fs::remove_dir_all(&root);
+        let assets = root.join("assets").join("mai");
+        fs::create_dir_all(&assets).unwrap();
+        let png = general_purpose::STANDARD
+            .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=")
+            .unwrap();
+        fs::write(assets.join("ui_cardbase_0000002_000001.png"), png).unwrap();
+        let card = r#"{
+            "game": "MAI",
+            "recordType": "Card",
+            "dataName": "card-missing-character",
+            "printFields": [
+                {"key": "typeId", "value": "2"},
+                {"key": "mapId", "value": "1"},
+                {"key": "charaId", "value": "101"}
+            ]
+        }"#;
+        fs::write(root.join("cards.json"), format!(r#"{{"cards":[{card}]}}"#)).unwrap();
+        fs::write(
+            root.join("cards.mai.json"),
+            format!(r#"{{"cards":[{card}]}}"#),
+        )
+        .unwrap();
+        let script_path = root.join("composite.py");
+        write_tool_script(
+            &script_path,
+            MAI_COMPOSITE_SCRIPT,
+            "MAI composite thumbnail test",
+        )
+        .unwrap();
+
+        let error = run_mai_composite_script(
+            &script_path,
+            &root,
+            "/official/generated",
+            &python_candidates(),
+        )
+        .unwrap_err();
+
+        assert!(error.contains("missing character layer"));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn atomically_replaces_and_invalidates_cached_mai_thumbnails() {
+        let root = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test-mai-composite-corrupt-thumbnail");
+        let _ = fs::remove_dir_all(&root);
+        let assets = root.join("assets").join("mai");
+        let thumbs = root.join("assets").join("thumbs").join("mai");
+        fs::create_dir_all(&assets).unwrap();
+        fs::create_dir_all(&thumbs).unwrap();
+        let png = general_purpose::STANDARD
+            .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=")
+            .unwrap();
+        fs::write(assets.join("ui_cardbase_0000002_000001.png"), &png).unwrap();
+        let output = thumbs.join("card_card-valid.webp");
+        fs::write(&output, b"not a webp").unwrap();
+        let card = r#"{
+            "game": "MAI",
+            "recordType": "Card",
+            "dataName": "card-valid",
+            "printFields": [
+                {"key": "typeId", "value": "2"},
+                {"key": "mapId", "value": "1"},
+                {"key": "charaId", "value": "0"}
+            ]
+        }"#;
+        fs::write(root.join("cards.json"), format!(r#"{{"cards":[{card}]}}"#)).unwrap();
+        fs::write(
+            root.join("cards.mai.json"),
+            format!(r#"{{"cards":[{card}]}}"#),
+        )
+        .unwrap();
+        let script_path = root.join("composite.py");
+        write_tool_script(
+            &script_path,
+            MAI_COMPOSITE_SCRIPT,
+            "MAI composite thumbnail test",
+        )
+        .unwrap();
+
+        run_mai_composite_script(
+            &script_path,
+            &root,
+            "/official/generated",
+            &python_candidates(),
+        )
+        .unwrap();
+
+        let image = fs::read(&output).unwrap();
+        assert!(image.len() > 12);
+        assert_eq!(&image[..4], b"RIFF");
+        assert_eq!(&image[8..12], b"WEBP");
+        let manifest: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(root.join("cards.json")).unwrap()).unwrap();
+        assert_eq!(
+            manifest["cards"][0]["thumbnailPath"],
+            "/official/generated/assets/thumbs/mai/card_card-valid.webp"
+        );
+        let cache_path = root.join(".tools").join("mai-composite-cache.json");
+        let cache_before = fs::read_to_string(&cache_path).unwrap();
+        let card_with_character = r#"{
+            "game": "MAI",
+            "recordType": "Card",
+            "dataName": "card-valid",
+            "printFields": [
+                {"key": "typeId", "value": "2"},
+                {"key": "mapId", "value": "1"},
+                {"key": "charaId", "value": "101"}
+            ]
+        }"#;
+        fs::write(
+            root.join("cards.json"),
+            format!(r#"{{"cards":[{card_with_character}]}}"#),
+        )
+        .unwrap();
+        fs::write(
+            root.join("cards.mai.json"),
+            format!(r#"{{"cards":[{card_with_character}]}}"#),
+        )
+        .unwrap();
+
+        let error = run_mai_composite_script(
+            &script_path,
+            &root,
+            "/official/generated",
+            &python_candidates(),
+        )
+        .unwrap_err();
+        assert!(error.contains("missing character layer"));
+        assert_eq!(fs::read(&output).unwrap(), image);
+        assert_eq!(fs::read_to_string(&cache_path).unwrap(), cache_before);
+
+        fs::write(assets.join("ui_cardchara_000101.png"), &png).unwrap();
+        run_mai_composite_script(
+            &script_path,
+            &root,
+            "/official/generated",
+            &python_candidates(),
+        )
+        .unwrap();
+        assert_ne!(fs::read_to_string(&cache_path).unwrap(), cache_before);
+        assert!(!fs::read_dir(&root).unwrap().any(|entry| entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .ends_with(".tmp")));
+        assert!(!fs::read_dir(&thumbs).unwrap().any(|entry| entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .ends_with(".tmp")));
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
