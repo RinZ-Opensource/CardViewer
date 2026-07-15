@@ -97,8 +97,9 @@ export function MaiScoreCard({ song, chart, state, maxDxScore, captureRef }: Mai
   const suffix = MAI_DIFF_SUFFIX[chart.difficulty];
   const achievement = formatAchievement(state.achievement);
   const rank = maiRankForAchievement(Number.parseFloat(achievement));
-  const dxScore = Number.parseInt(state.dxScore, 10) || 0;
-  const stars = maiDxStars(dxScore, maxDxScore);
+  const dxScore = Math.min(99_999, Math.max(0, Number.parseInt(state.dxScore, 10) || 0));
+  const safeMaxDxScore = Math.min(99_999, Math.max(0, Math.trunc(maxDxScore)));
+  const stars = maiDxStars(dxScore, safeMaxDxScore);
   const levelSheet = maiSprite(`UI_NUM_MLevel_${MAI_LEVEL_SHEET[chart.difficulty]}`);
   const [achievementInt, achievementFrac = "0000"] = achievement.split(".");
   // Empty achievement input = unplayed: blank plates, no score rows.
@@ -179,7 +180,9 @@ export function MaiScoreCard({ song, chart, state, maxDxScore, captureRef }: Mai
             <span className="msc-dxscore-label">DXSCORE</span>
             <span className="msc-dx-value">{dxScore}</span>
             <span className="msc-dx-slash">/</span>
-            <span className="msc-dx-max">{maxDxScore > 0 ? maxDxScore : "----"}</span>
+            <span className="msc-dx-max">
+              {safeMaxDxScore > 0 ? safeMaxDxScore : "----"}
+            </span>
             {stars > 0 ? (
               <span className="msc-stars">
                 {Array.from({ length: stars }, (_, index) => (

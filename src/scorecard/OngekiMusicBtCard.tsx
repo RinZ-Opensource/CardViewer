@@ -144,7 +144,7 @@ function intCounterGlyphs(value: number, opts: CounterOpts): Glyph[] {
  * with the integer digits.
  */
 function overDamageGlyphs(value: number, opts: CounterOpts): Glyph[] {
-  const clamped = Math.max(0, value);
+  const clamped = Math.min(9_999.99, Math.max(0, value));
   const intText = Math.trunc(clamped).toLocaleString("en-US");
   const decimals = Math.round((clamped % 1) * 100);
   const decText = String(Math.min(99, decimals)).padStart(2, "0");
@@ -337,7 +337,7 @@ export function OngekiMusicBtCard({
 }: OngekiMusicBtCardProps) {
   // MusicDataObject: level counter = trunc(fumenConst); '+' = isFumenConstPlus.
   const levelInt = Number.parseInt(state.level, 10);
-  const levelValue = Number.isFinite(levelInt) ? Math.max(0, levelInt) : 0;
+  const levelValue = Number.isFinite(levelInt) ? Math.min(99, Math.max(0, levelInt)) : 0;
   const isFumenConstPlus = state.level.includes("+");
   const levelGlyphs = intCounterGlyphs(levelValue, LEVEL_OPTS);
   // Footer '+': centre = run right edge + w/2 + rightOffset(-14) -> left-14.
@@ -347,12 +347,20 @@ export function OngekiMusicBtCard({
   // Unplayed ("" score): counters show 0 and the tech rank badge is hidden
   // (MusicResultObject hides rank None); battle/FB/FC lamps stay manual.
   const techPlayed = state.techScore.trim() !== "";
-  const techScore = techPlayed ? parseIntValue(state.techScore) : 0;
-  const battleScore = state.battleScore.trim() !== "" ? parseIntValue(state.battleScore) : 0;
+  const techScore = techPlayed ? Math.min(1_010_000, parseIntValue(state.techScore)) : 0;
+  const battleScore =
+    state.battleScore.trim() !== ""
+      ? Math.min(999_999_999, parseIntValue(state.battleScore))
+      : 0;
   const overDamage =
     state.overDamage.trim() !== "" ? Number.parseFloat(state.overDamage) || 0 : 0;
-  const pScore = state.platinumScore.trim() !== "" ? parseIntValue(state.platinumScore) : 0;
-  const pScoreMax = parseIntValue(state.platinumScoreMax);
+  const pScore =
+    state.platinumScore.trim() !== ""
+      ? Math.min(99_999, parseIntValue(state.platinumScore))
+      : 0;
+  const pScoreMax = Math.min(99_999, parseIntValue(state.platinumScoreMax));
+  const bossLevel = Math.min(999, parseIntValue(state.bossLevel));
+  const bpm = Math.min(999, parseIntValue(state.bpm));
   const starRank = ongekiPlatinumStarRank(pScore, pScoreMax);
 
   const lunatic = state.difficulty === "lunatic";
@@ -417,7 +425,7 @@ export function OngekiMusicBtCard({
           decoding="async"
         />
         {glyphImgs(
-          intCounterGlyphs(parseIntValue(state.bossLevel), CHARA_LV_OPTS),
+          intCounterGlyphs(bossLevel, CHARA_LV_OPTS),
           "omb-glyph",
         )}
         <img className="omb-boss-lv-header" src={ongekiSprite(ONGEKI_BT_CHARA_LV_HEADER)} alt="" />
@@ -454,7 +462,7 @@ export function OngekiMusicBtCard({
         {state.fcLamp !== "none" ? badgeImg(ONGEKI_BT_FC_AB_SPRITE[state.fcLamp], 250.7) : null}
 
         {/* BPM (white glyphs, node scale 0.64). */}
-        {glyphImgs(intCounterGlyphs(parseIntValue(state.bpm), BPM_OPTS), "omb-glyph")}
+        {glyphImgs(intCounterGlyphs(bpm, BPM_OPTS), "omb-glyph")}
 
         <div className="omb-notes">
           <FitText maxWidth={126} origin="left">

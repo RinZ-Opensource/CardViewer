@@ -194,6 +194,46 @@ function loadGame(): ScoreCardGame {
   return GAMES.some((game) => game.key === stored) ? (stored as ScoreCardGame) : "mai";
 }
 
+function sanitizeDigits(value: string, maxDigits: number, maxValue?: number): string {
+  const digits = value.normalize("NFKC").replace(/\D/g, "").slice(0, maxDigits);
+  if (digits === "" || maxValue === undefined) return digits;
+  return Number.parseInt(digits, 10) > maxValue ? String(maxValue) : digits;
+}
+
+function sanitizeLevel(value: string): string {
+  const normalized = value.normalize("NFKC");
+  const digits = normalized.replace(/\D/g, "").slice(0, 2);
+  return digits !== "" && normalized.includes("+") ? `${digits}+` : digits;
+}
+
+function sanitizeDecimal(value: string, integerDigits: number, fractionDigits: number): string {
+  const normalized = value.normalize("NFKC").replace(/[^\d.,]/g, "");
+  const lastDot = normalized.lastIndexOf(".");
+  const lastComma = normalized.lastIndexOf(",");
+  let decimalIndex = lastDot;
+
+  if (lastDot >= 0 && lastComma >= 0) {
+    decimalIndex = Math.max(lastDot, lastComma);
+  } else if (lastDot < 0 && lastComma >= 0) {
+    const trailingDigits = normalized.length - lastComma - 1;
+    decimalIndex = trailingDigits <= fractionDigits ? lastComma : -1;
+  }
+
+  if (decimalIndex < 0) {
+    return normalized.replace(/[.,]/g, "").slice(0, integerDigits);
+  }
+
+  const integer = normalized
+    .slice(0, decimalIndex)
+    .replace(/[.,]/g, "")
+    .slice(0, integerDigits);
+  const fraction = normalized
+    .slice(decimalIndex + 1)
+    .replace(/[.,]/g, "")
+    .slice(0, fractionDigits);
+  return `${integer}.${fraction}`;
+}
+
 function defaultState(): MaiScoreState {
   const song = MAI_SAMPLE_SONGS[0];
   return {
@@ -460,8 +500,10 @@ export function ScoreCardSurface() {
   const chart =
     song?.charts.find((entry) => entry.difficulty === state.difficulty) ??
     song?.charts[song.charts.length - 1];
-  const maxDxScore =
-    Number.parseInt(state.dxScoreMax, 10) || chart?.maxDxScore || 0;
+  const maxDxScore = Math.min(
+    99_999,
+    Math.max(0, Number.parseInt(state.dxScoreMax, 10) || chart?.maxDxScore || 0),
+  );
   const chuniSongs = songDb.chuni.status === "ready" ? songDb.chuni.songs : CHUNI_SAMPLE_SONGS;
   const chuniSong =
     (chuniState.songDbBacked
@@ -672,7 +714,9 @@ export function ScoreCardSurface() {
               <input
                 value={state.dxScore}
                 inputMode="numeric"
-                onChange={(event) => update("dxScore", event.target.value)}
+                onChange={(event) =>
+                  update("dxScore", sanitizeDigits(event.target.value, 5, 99_999))
+                }
               />
             </label>
 
@@ -682,7 +726,9 @@ export function ScoreCardSurface() {
                 value={state.dxScoreMax}
                 inputMode="numeric"
                 placeholder={chart.maxDxScore > 0 ? String(chart.maxDxScore) : "note count × 3"}
-                onChange={(event) => update("dxScoreMax", event.target.value)}
+                onChange={(event) =>
+                  update("dxScoreMax", sanitizeDigits(event.target.value, 5, 99_999))
+                }
               />
             </label>
 
@@ -812,7 +858,7 @@ export function ScoreCardSurface() {
                 <span>Level</span>
                 <input
                   value={chuniState.level}
-                  onChange={(event) => updateChuni("level", event.target.value)}
+                  onChange={(event) => updateChuni("level", sanitizeLevel(event.target.value))}
                 />
               </label>
             )}
@@ -864,7 +910,9 @@ export function ScoreCardSurface() {
                     value={chuniState.bestScore}
                     inputMode="numeric"
                     placeholder="1010000"
-                    onChange={(event) => updateChuni("bestScore", event.target.value)}
+                    onChange={(event) =>
+                      updateChuni("bestScore", sanitizeDigits(event.target.value, 7, 9_999_999))
+                    }
                   />
                 </label>
 
@@ -921,7 +969,9 @@ export function ScoreCardSurface() {
                   <input
                     value={chuniState.bpm}
                     inputMode="numeric"
-                    onChange={(event) => updateChuni("bpm", event.target.value)}
+                    onChange={(event) =>
+                      updateChuni("bpm", sanitizeDigits(event.target.value, 4, 9_999))
+                    }
                   />
                 </label>
 
@@ -1030,7 +1080,7 @@ export function ScoreCardSurface() {
               <span>Level (e.g. 13+)</span>
               <input
                 value={ongekiState.level}
-                onChange={(event) => updateOngeki("level", event.target.value)}
+                onChange={(event) => updateOngeki("level", sanitizeLevel(event.target.value))}
               />
             </label>
 
@@ -1081,7 +1131,12 @@ export function ScoreCardSurface() {
                     value={ongekiState.techScore}
                     inputMode="numeric"
                     placeholder="1010000"
-                    onChange={(event) => updateOngeki("techScore", event.target.value)}
+                    onChange={(event) =>
+                      updateOngeki(
+                        "techScore",
+                        sanitizeDigits(event.target.value, 7, 1_010_000),
+                      )
+                    }
                   />
                 </label>
 
@@ -1090,7 +1145,9 @@ export function ScoreCardSurface() {
                   <input
                     value={ongekiState.battleScore}
                     inputMode="numeric"
-                    onChange={(event) => updateOngeki("battleScore", event.target.value)}
+                    onChange={(event) =>
+                      updateOngeki("battleScore", sanitizeDigits(event.target.value, 9))
+                    }
                   />
                 </label>
 
@@ -1099,7 +1156,9 @@ export function ScoreCardSurface() {
                   <input
                     value={ongekiState.platinumScore}
                     inputMode="numeric"
-                    onChange={(event) => updateOngeki("platinumScore", event.target.value)}
+                    onChange={(event) =>
+                      updateOngeki("platinumScore", sanitizeDigits(event.target.value, 5))
+                    }
                   />
                 </label>
 
@@ -1108,7 +1167,9 @@ export function ScoreCardSurface() {
                   <input
                     value={ongekiState.platinumScoreMax}
                     inputMode="numeric"
-                    onChange={(event) => updateOngeki("platinumScoreMax", event.target.value)}
+                    onChange={(event) =>
+                      updateOngeki("platinumScoreMax", sanitizeDigits(event.target.value, 5))
+                    }
                   />
                 </label>
 
@@ -1117,7 +1178,9 @@ export function ScoreCardSurface() {
                   <input
                     value={ongekiState.overDamage}
                     inputMode="decimal"
-                    onChange={(event) => updateOngeki("overDamage", event.target.value)}
+                    onChange={(event) =>
+                      updateOngeki("overDamage", sanitizeDecimal(event.target.value, 4, 2))
+                    }
                   />
                 </label>
 
@@ -1167,7 +1230,9 @@ export function ScoreCardSurface() {
                   <input
                     value={ongekiState.bossLevel}
                     inputMode="numeric"
-                    onChange={(event) => updateOngeki("bossLevel", event.target.value)}
+                    onChange={(event) =>
+                      updateOngeki("bossLevel", sanitizeDigits(event.target.value, 3))
+                    }
                   />
                 </label>
 
@@ -1192,7 +1257,9 @@ export function ScoreCardSurface() {
                   <input
                     value={ongekiState.bpm}
                     inputMode="numeric"
-                    onChange={(event) => updateOngeki("bpm", event.target.value)}
+                    onChange={(event) =>
+                      updateOngeki("bpm", sanitizeDigits(event.target.value, 3))
+                    }
                   />
                 </label>
 
