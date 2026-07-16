@@ -2,9 +2,9 @@ import { maiJacket } from "./maiAssets";
 import { MaiSong } from "./types";
 
 /**
- * Bundled demo songs, extracted from the game data (SDEZ 1.65). Placeholder
- * until the song-database ingestion pipeline lands. maxDxScore is note
- * count x3; only known where taken from a verified score screenshot.
+ * Bundled offline fallbacks extracted from the game data (SDEZ 1.65). The
+ * complete song DB replaces these rows when it is reachable. maxDxScore is
+ * note count x3; only known where taken from a verified score screenshot.
  */
 export const MAI_SAMPLE_SONGS: MaiSong[] = [
   {

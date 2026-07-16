@@ -2,10 +2,10 @@ import { ongekiBossIcon, ongekiJacket } from "./ongekiAssets";
 import { OngekiSong } from "./ongekiTypes";
 
 /**
- * Demo entries for the four S jackets copied from the export (ids 0001, 0036,
- * 0063, 0064 — 0002-0004 do not exist in that export). The song database is
- * not ingested yet, so titles/artists are clearly-placeholder values; replace
- * with real names when the DB lands.
+ * Bundled offline fallbacks for the four jackets copied from the export (ids
+ * 0001, 0036, 0063, 0064 — 0002-0004 do not exist there). Placeholder labels
+ * make an unavailable song DB explicit; a successful load migrates to real
+ * rows automatically.
  */
 export const ONGEKI_SAMPLE_SONGS: OngekiSong[] = [
   {

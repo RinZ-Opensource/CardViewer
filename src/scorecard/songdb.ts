@@ -424,6 +424,37 @@ const ONGEKI_DIFF_FIELD: Array<[OngekiDifficulty, string]> = [
 ];
 
 function normalizeOngeki(entries: RawEntry[], assets: SupplementalAssets): OngekiSong[] {
+  const bossMap = assets.ongekiBosses;
+  const bossCountsByCharacter = new Map<
+    string,
+    Map<number, { boss: OngekiBossMapEntry; count: number }>
+  >();
+
+  // otoge-db's id normally matches Music.xml SortOrder, but older/removed
+  // songs can retain a historical id. Build a deterministic, verified
+  // same-character fallback from rows which still have an exact SortOrder
+  // mapping so those songs do not collapse to the dummy jacket.
+  for (const entry of entries) {
+    const boss = bossMap?.songs[entry.id ?? ""];
+    const characterKey = entry.chara_id || entry.character;
+    if (!boss || !characterKey) continue;
+    let counts = bossCountsByCharacter.get(characterKey);
+    if (!counts) {
+      counts = new Map();
+      bossCountsByCharacter.set(characterKey, counts);
+    }
+    const current = counts.get(boss.bossCardId);
+    counts.set(boss.bossCardId, { boss, count: (current?.count ?? 0) + 1 });
+  }
+
+  const representativeBossByCharacter = new Map<string, OngekiBossMapEntry>();
+  for (const [characterKey, counts] of bossCountsByCharacter) {
+    const representative = [...counts.values()].sort(
+      (left, right) => right.count - left.count || left.boss.bossCardId - right.boss.bossCardId,
+    )[0]?.boss;
+    if (representative) representativeBossByCharacter.set(characterKey, representative);
+  }
+
   const songs: OngekiSong[] = [];
   for (const entry of entries) {
     if (!entry.title || !entry.image_url || !entry.id) continue;
@@ -444,7 +475,17 @@ function normalizeOngeki(entries: RawEntry[], assets: SupplementalAssets): Ongek
     }
     if (Object.keys(charts).length === 0) continue;
     const attribute = (entry.enemy_type ?? "").toLowerCase();
-    const boss = assets.ongekiBosses?.songs[entry.id];
+    const exactBoss = bossMap?.songs[entry.id];
+    const characterKey = entry.chara_id || entry.character;
+    const representativeBoss = characterKey
+      ? representativeBossByCharacter.get(characterKey)
+      : undefined;
+    const exactBossIconUrl = exactBoss
+      ? ongekiBossIcon(exactBoss.bossCardId, bossMap?.version)
+      : undefined;
+    const representativeBossIconUrl = representativeBoss
+      ? ongekiBossIcon(representativeBoss.bossCardId, bossMap?.version)
+      : undefined;
     songs.push({
       id: entry.id,
       title: entry.title,
@@ -464,9 +505,15 @@ function normalizeOngeki(entries: RawEntry[], assets: SupplementalAssets): Ongek
         attribute === "fire" || attribute === "aqua" || attribute === "leaf"
           ? attribute
           : undefined,
-      officialMusicId: boss?.musicId,
-      bossCardId: boss?.bossCardId,
-      bossIconUrl: boss ? ongekiBossIcon(boss.bossCardId, assets.ongekiBosses?.version) : undefined,
+      officialMusicId: exactBoss?.musicId,
+      bossCardId: exactBoss?.bossCardId,
+      bossIconUrl: exactBossIconUrl ?? representativeBossIconUrl,
+      bossIconFallbacks:
+        exactBossIconUrl &&
+        representativeBossIconUrl &&
+        representativeBoss?.bossCardId !== exactBoss?.bossCardId
+          ? [representativeBossIconUrl]
+          : undefined,
     });
   }
   return songs;

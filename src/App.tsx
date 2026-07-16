@@ -138,12 +138,14 @@ export function App() {
       setSelectedId("");
       return;
     }
-    setSelectedId((current) =>
-      filteredCards.some((card) => card.dataName === current)
-        ? current
-        : filteredCards[0]?.dataName ?? "",
-    );
-  }, [filteredCards]);
+    if (filteredCards.some((card) => card.dataName === selectedId)) return;
+    setSelectedId(filteredCards[0]?.dataName ?? "");
+    const list = cardListRef.current;
+    if (list) {
+      list.scrollTop = 0;
+      updateCardListScroll();
+    }
+  }, [cardListRef, filteredCards, selectedId, updateCardListScroll]);
   const virtualStart = Math.max(
     0,
     Math.floor(cardListViewport.scrollTop / CARD_ROW_HEIGHT) - CARD_LIST_OVERSCAN,
@@ -284,7 +286,7 @@ export function App() {
     <OfficialFontContext.Provider value={officialFonts}>
       <TmpFontContext.Provider value={tmpFont}>
       <main className="app-shell">
-      <aside className="sidebar">
+      <aside className="sidebar" aria-label="Card browser">
         <section className="filters">
           <div className="search-field">
             <svg
@@ -365,6 +367,9 @@ export function App() {
               </label>
             ))}
           </div>
+          <span className="visually-hidden" role="status" aria-live="polite">
+            {filteredCards.length.toLocaleString()} card results
+          </span>
         </section>
 
         <section
@@ -496,7 +501,10 @@ export function App() {
               )}
             />
           ) : (
-            <aside className="editor-panel empty public-editor-notice">
+            <aside
+              className="editor-panel empty public-editor-notice"
+              aria-label="Card editor"
+            >
               Editing is unavailable in the public asset build because that renderer does not
               apply print fields.
             </aside>

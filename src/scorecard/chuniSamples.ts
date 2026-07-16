@@ -2,9 +2,8 @@ import { CHUNI_DUMMY_JACKET } from "./chuniAssets";
 import { ChuniSong } from "./chuniTypes";
 
 /**
- * Bundled demo songs. Real CHUNITHM jackets are not extracted yet, so every
- * entry uses the scene's dummy jacket; ids are local placeholders until the
- * song-database ingestion pipeline lands.
+ * Bundled offline fallbacks. They intentionally use the scene's dummy jacket
+ * and local ids only while the complete song DB is unavailable.
  */
 export const CHUNI_SAMPLE_SONGS: ChuniSong[] = [
   {

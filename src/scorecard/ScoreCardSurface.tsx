@@ -89,6 +89,12 @@ const GAMES: Array<{ key: ScoreCardGame; label: string }> = [
   { key: "ongeki", label: "O.N.G.E.K.I." },
 ];
 
+const SCORECARD_ASSET_SENTINEL: Record<ScoreCardGame, string> = {
+  mai: "/official/scorecard/mai/UI_CMN_Long_base_big.png",
+  chuni: "/official/scorecard/chuni/baked_musicbox_bpm_0.png",
+  ongeki: "/official/scorecard/ongeki/UI_CMN_AttributeIcon_Fire_mini.png",
+};
+
 /** chuni/ongeki each render one of two cards: playing panel or select card. */
 const CARD_TYPES: Array<{ key: "panel" | "score"; label: string }> = [
   { key: "panel", label: "Play panel" },
@@ -330,6 +336,27 @@ export function ScoreCardSurface() {
   const captureRef = React.useRef<HTMLDivElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
   const [stageScale, setStageScale] = React.useState(1);
+  const [assetStatus, setAssetStatus] = React.useState<"checking" | "ready" | "error">(
+    "checking",
+  );
+
+  React.useEffect(() => {
+    let active = true;
+    const sentinel = new Image();
+    setAssetStatus("checking");
+    sentinel.onload = () => {
+      if (active) setAssetStatus("ready");
+    };
+    sentinel.onerror = () => {
+      if (active) setAssetStatus("error");
+    };
+    sentinel.src = SCORECARD_ASSET_SENTINEL[game];
+    return () => {
+      active = false;
+      sentinel.onload = null;
+      sentinel.onerror = null;
+    };
+  }, [game]);
 
   /** Online song DB per game; the samples keep rendering until it loads. */
   const [songDb, setSongDb] = React.useState<{
@@ -524,6 +551,81 @@ export function ScoreCardSurface() {
     ongekiSongs[0] ??
     ONGEKI_SAMPLE_SONGS[0];
 
+  // Bundled entries are an offline/loading fallback, not a sticky choice.
+  // Once the complete DB arrives, migrate an old/sample selection to its
+  // real row (matching by printed identity where local ids are placeholders).
+  React.useEffect(() => {
+    if (songDb.mai.status !== "ready" || songDb.mai.songs.length === 0) return;
+    setState((current) => {
+      const currentSong = songDb.mai.songs.find((entry) => entry.id === current.songId);
+      if (current.songDbBacked && currentSong) return current;
+      const sample = MAI_SAMPLE_SONGS.find((entry) => entry.id === current.songId);
+      const next = sample
+        ? songDb.mai.songs.find(
+            (entry) =>
+              entry.title === sample.title &&
+              entry.artist === sample.artist &&
+              entry.isDx === sample.isDx,
+          )
+        : currentSong;
+      const resolved = next ?? songDb.mai.songs[0];
+      const difficulty = maiPreferredDifficulty(resolved, current.difficulty);
+      return {
+        ...current,
+        songId: resolved.id,
+        songDbBacked: true,
+        difficulty,
+        dxScoreMax: "",
+      };
+    });
+  }, [songDb.mai]);
+
+  React.useEffect(() => {
+    if (songDb.chuni.status !== "ready" || songDb.chuni.songs.length === 0) return;
+    setChuniState((current) => {
+      const currentSong = songDb.chuni.songs.find((entry) => entry.id === current.songId);
+      if (current.songDbBacked && currentSong) return current;
+      const sample = CHUNI_SAMPLE_SONGS.find((entry) => entry.id === current.songId);
+      const next = sample
+        ? songDb.chuni.songs.find(
+            (entry) => entry.title === sample.title && entry.artist === sample.artist,
+          )
+        : currentSong;
+      const resolved = next ?? songDb.chuni.songs[0];
+      const difficulty = chuniPreferredDifficulty(resolved, current.difficulty);
+      return {
+        ...current,
+        ...chuniChartFields(resolved, difficulty),
+        songId: resolved.id,
+        songDbBacked: true,
+        difficulty,
+      };
+    });
+  }, [songDb.chuni]);
+
+  React.useEffect(() => {
+    if (songDb.ongeki.status !== "ready" || songDb.ongeki.songs.length === 0) return;
+    setOngekiState((current) => {
+      const currentSong = songDb.ongeki.songs.find((entry) => entry.id === current.songId);
+      if (current.songDbBacked && currentSong) return current;
+      const sample = ONGEKI_SAMPLE_SONGS.find((entry) => entry.id === current.songId);
+      const next = sample
+        ? songDb.ongeki.songs.find(
+            (entry) => entry.title === sample.title && entry.artist === sample.artist,
+          )
+        : currentSong;
+      const resolved = next ?? songDb.ongeki.songs[0];
+      const difficulty = ongekiPreferredDifficulty(resolved, current.difficulty);
+      return {
+        ...current,
+        ...ongekiChartFields(resolved, difficulty),
+        songId: resolved.id,
+        songDbBacked: true,
+        difficulty,
+      };
+    });
+  }, [songDb.ongeki]);
+
   function update<Key extends keyof MaiScoreState>(key: Key, value: MaiScoreState[Key]) {
     setState((current) => ({ ...current, [key]: value }));
   }
@@ -643,7 +745,7 @@ export function ScoreCardSurface() {
 
   return (
     <main className="scorecard-shell">
-      <aside className="scorecard-form">
+      <aside className="scorecard-form" aria-label="Score card controls">
         <div className="control">
           <span>Game</span>
           <div className="segment" role="group" aria-label="Score card game">
@@ -705,7 +807,9 @@ export function ScoreCardSurface() {
               <input
                 value={state.achievement}
                 inputMode="decimal"
-                onChange={(event) => update("achievement", event.target.value)}
+                onChange={(event) =>
+                  update("achievement", sanitizeDecimal(event.target.value, 3, 4))
+                }
               />
             </label>
 
@@ -1292,6 +1396,13 @@ export function ScoreCardSurface() {
         {exportError ? (
           <div className="scorecard-export-error" role="alert">
             {exportError}
+          </div>
+        ) : null}
+        {assetStatus === "error" ? (
+          <div className="scorecard-export-error" role="alert">
+            {import.meta.env.DEV
+              ? "Official artwork is unavailable in this preview. Use the private preview or seed the Cloudflare R2 asset store."
+              : "Official artwork is temporarily unavailable from the asset store."}
           </div>
         ) : null}
         <div className="scorecard-stage" ref={stageRef}>

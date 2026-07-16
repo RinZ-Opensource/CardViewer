@@ -232,6 +232,12 @@ the application uses its public otoge-db fallback. Worker secrets such as the
 manual-sync token belong in Cloudflare secret storage and must never use a
 `VITE_` variable.
 
+The committed Tauri CSP permits only the default `cdn.jsdelivr.net` fallback.
+If a desktop build embeds a custom Worker origin, add that exact origin to both
+`connect-src` and `img-src` in `src-tauri/tauri.conf.json`; do not widen either
+directive to arbitrary HTTPS origins. Web/Cloudflare builds are not governed by
+the Tauri CSP.
+
 The Worker and Pages Functions may share one physical R2 bucket, but they use
 separate bindings and key prefixes: the Worker uses `SONGDB` and `songdb/*`,
 while Pages uses `ASSETS_BUCKET` and serves `official/*` plus

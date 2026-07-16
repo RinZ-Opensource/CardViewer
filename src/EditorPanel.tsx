@@ -26,7 +26,11 @@ export function EditorPanel({
   canResetPlayer: boolean;
 }) {
   if (!card) {
-    return <aside className="editor-panel empty">No selection</aside>;
+    return (
+      <aside className="editor-panel empty" aria-label="Card editor">
+        No selection
+      </aside>
+    );
   }
 
   const merged = applyEdits(card, edits);
@@ -47,7 +51,7 @@ export function EditorPanel({
   const editJson = JSON.stringify(edits ?? {}, null, 2);
 
   return (
-    <aside className="editor-panel">
+    <aside className="editor-panel" aria-label="Card editor">
       <div className="editor-scroll">
         <section className="editor-section">
           <div className="editor-header">

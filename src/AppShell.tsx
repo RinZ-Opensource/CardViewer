@@ -25,6 +25,10 @@ function loadSurface(): SurfaceKey {
 
 export function AppShell() {
   const [surface, setSurface] = React.useState<SurfaceKey>(loadSurface);
+  const surfacePaneRefs = React.useRef<Record<SurfaceKey, HTMLDivElement | null>>({
+    cards: null,
+    scorecard: null,
+  });
   const [mountedSurfaces, setMountedSurfaces] = React.useState<Set<SurfaceKey>>(
     () => new Set([surface]),
   );
@@ -35,6 +39,9 @@ export function AppShell() {
       next.add(nextSurface);
       return next;
     });
+  }, []);
+  const focusSurface = React.useCallback((nextSurface: SurfaceKey) => {
+    window.requestAnimationFrame(() => surfacePaneRefs.current[nextSurface]?.focus());
   }, []);
 
   React.useEffect(() => {
@@ -52,11 +59,12 @@ export function AppShell() {
       if (SURFACES.some((entry) => entry.key === next)) {
         mountSurface(next as SurfaceKey);
         setSurface(next as SurfaceKey);
+        focusSurface(next as SurfaceKey);
       }
     };
     window.addEventListener("hashchange", syncSurfaceFromHistory);
     return () => window.removeEventListener("hashchange", syncSurfaceFromHistory);
-  }, [mountSurface]);
+  }, [focusSurface, mountSurface]);
 
   function selectSurface(next: SurfaceKey) {
     if (next === surface) return;
@@ -88,12 +96,30 @@ export function AppShell() {
       </nav>
       <div className="surface-body">
         {mountedSurfaces.has("cards") ? (
-          <div className="surface-pane" hidden={surface !== "cards"}>
+          <div
+            className="surface-pane"
+            hidden={surface !== "cards"}
+            role="region"
+            aria-label="Card Viewer"
+            tabIndex={-1}
+            ref={(node) => {
+              surfacePaneRefs.current.cards = node;
+            }}
+          >
             <CardViewerSurface />
           </div>
         ) : null}
         {mountedSurfaces.has("scorecard") ? (
-          <div className="surface-pane" hidden={surface !== "scorecard"}>
+          <div
+            className="surface-pane"
+            hidden={surface !== "scorecard"}
+            role="region"
+            aria-label="Score Cards"
+            tabIndex={-1}
+            ref={(node) => {
+              surfacePaneRefs.current.scorecard = node;
+            }}
+          >
             <ScoreCardSurface />
           </div>
         ) : null}
