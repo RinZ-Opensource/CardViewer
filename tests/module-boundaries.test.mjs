@@ -14,6 +14,10 @@ const boundaries = [
     file: "src/cardAssets.ts",
     forbidden: ["./cards", "./hooks", "./App"],
   },
+  {
+    file: "src/scorecard/scorecardInput.ts",
+    forbidden: ["react", "./ScoreCardSurface", "../persistence"],
+  },
 ];
 
 function importedModules(file, source) {
