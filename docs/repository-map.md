@@ -41,6 +41,8 @@ must remain local.
   Online and mobile exporters share only path/print-field normalization and
   deterministic manifest sharding through `scanner/export/common.rs` and
   `scanner/export/manifest.rs`; target-specific asset policies remain separate.
+  `scanner/export/online.rs` owns the online export pipeline, including WebP
+  transcodes, thumbnails, pruning, URL rewriting, and MAI composites.
 - `functions/`: Cloudflare Pages Function for serving an allowlisted subset of
   `/official/*` from the `ASSETS_BUCKET` R2 binding. Public Cloudflare does not
   serve `/fonts/private/*`.
