@@ -18,7 +18,9 @@ must remain local.
   `export_mobile_pack` binary is a local pack-building tool; its presence does
   not make Android a supported release target. The image IPC reader serves only
   canonical paths below the most recent successful UI scan and revokes the
-  previous package roots and data-URL cache when that scan changes.
+  previous package roots and data-URL cache when that scan changes. The desktop
+  shell and both exporter binaries consume the same `src/lib.rs` scanner module,
+  so its unit suite is compiled and executed once per test run.
 - `functions/`: Cloudflare Pages Function for serving an allowlisted subset of
   `/official/*` from the `ASSETS_BUCKET` R2 binding. Public Cloudflare does not
   serve `/fonts/private/*`.

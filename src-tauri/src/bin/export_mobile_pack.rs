@@ -1,8 +1,4 @@
-#[allow(dead_code)]
-#[path = "../scanner/mod.rs"]
-mod scanner;
-
-use scanner::export_mobile_pack_with_progress_impl;
+use configarc_card_viewer::scanner::export_mobile_pack_with_progress_impl;
 
 fn main() {
     let mut args = std::env::args().skip(1);

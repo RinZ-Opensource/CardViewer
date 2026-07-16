@@ -1,6 +1,4 @@
-mod scanner;
-
-use scanner::{
+use configarc_card_viewer::scanner::{
     export_mobile_pack_impl, export_online_package_impl, read_image_data_url_impl,
     save_edit_session_impl, scan_package_impl, MobilePackResult, OnlineExportResult, ScanResult,
 };
