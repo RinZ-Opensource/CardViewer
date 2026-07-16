@@ -11,8 +11,9 @@ must remain local.
 - `src/persistence.ts` and `src/priorityTaskScheduler.ts`: guarded browser-state
   persistence and priority-aware image-task scheduling used by the frontend.
 - `src/scorecard/`: score-card components, public fallback song samples, song
-  database adapters, asset lookup helpers, and isolated score-input sanitizers.
-  This is part of the web app, not the Android CardMaker prototype.
+  database adapters, asset lookup helpers, isolated score-input sanitizers, and
+  surface configuration. This is part of the web app, not the Android
+  CardMaker prototype.
 - `src-tauri/`: Tauri desktop shell plus Rust scanners and exporters. The
   `export_mobile_pack` binary is a local pack-building tool; its presence does
   not make Android a supported release target.
@@ -25,9 +26,10 @@ must remain local.
   helpers for R2 manifests and score-card assets.
 - `tests/module-boundaries.test.mjs` keeps shared frontend modules below their
   consumers: hooks cannot depend on cards, card data cannot depend on render
-  layers, and card assets cannot depend on cards, hooks, or the app shell. It
-  runs under `npm run check` alongside the score-input, frontend reliability,
-  secret-scanner, public-dist, and Pages Function suites.
+  layers, card assets cannot depend on cards, hooks, or the app shell, and
+  score-card surface configuration cannot depend on React, persistence, or card
+  components. It runs under `npm run check` alongside the score-input, frontend
+  reliability, secret-scanner, public-dist, and Pages Function suites.
 - `docs/online-preview.md`: authoritative public/private build and Cloudflare
   deployment runbook.
 - `public/`: repository-safe static files copied verbatim by Vite. It may hold

@@ -53,7 +53,7 @@ import {
   ChuniStartBanner,
   ChuniSuccessLamp,
 } from "./chuniTypes";
-import { MAI_DIFFICULTY_LABEL, MAI_DIFFICULTY_ORDER } from "./maiScore";
+import { MAI_DIFFICULTY_LABEL } from "./maiScore";
 import { ONGEKI_DIFFICULTY_LABEL, ONGEKI_DIFFICULTY_ORDER } from "./ongekiAssets";
 import { ONGEKI_SAMPLE_SONGS } from "./ongekiSamples";
 import {
@@ -66,6 +66,33 @@ import {
   OngekiSong,
 } from "./ongekiTypes";
 import { sanitizeDecimal, sanitizeDigits, sanitizeLevel } from "./scorecardInput";
+import {
+  CARD_TYPES,
+  CHUNI_BANNER_OPTIONS,
+  CHUNI_COMBO_OPTIONS,
+  CHUNI_FCHAIN_OPTIONS,
+  CHUNI_STORAGE_KEY,
+  CHUNI_STORAGE_OPTIONS,
+  CHUNI_SUCCESS_OPTIONS,
+  COMBO_OPTIONS,
+  GAMES,
+  GAME_STORAGE_KEY,
+  MAI_STORAGE_OPTIONS,
+  ONGEKI_ATTRIBUTE_OPTIONS,
+  ONGEKI_BATTLE_RANK_OPTIONS,
+  ONGEKI_FC_OPTIONS,
+  ONGEKI_STORAGE_KEY,
+  ONGEKI_STORAGE_OPTIONS,
+  SCORECARD_ASSET_SENTINEL,
+  SCORE_STORAGE_KEY,
+  SHOW_CHUNI_CONFIRMED_START,
+  SHOW_PANEL_CARDS,
+  SHOW_SCORECARD_EXPORT,
+  SHOW_SCORECARD_RESET,
+  SYNC_OPTIONS,
+  type ScoreCardGame,
+  WE_STAR_OPTIONS,
+} from "./scorecardSurfaceConfig";
 import { MAI_SAMPLE_SONGS } from "./sampleSongs";
 import {
   SongDbStatus,
@@ -83,40 +110,6 @@ import {
 } from "./songdb";
 import { MaiComboBadge, MaiDifficulty, MaiScoreState, MaiSong, MaiSyncBadge } from "./types";
 
-type ScoreCardGame = "mai" | "chuni" | "ongeki";
-
-const GAME_STORAGE_KEY = "configarc-card-viewer.scorecard-game";
-/** Pre-game-selector key; kept verbatim so existing maimai state survives. */
-const SCORE_STORAGE_KEY = "configarc-card-viewer.scorecard";
-const CHUNI_STORAGE_KEY = "configarc-card-viewer.scorecard-chuni";
-const ONGEKI_STORAGE_KEY = "configarc-card-viewer.scorecard-ongeki";
-
-const GAMES: Array<{ key: ScoreCardGame; label: string }> = [
-  { key: "mai", label: "maimai" },
-  { key: "chuni", label: "CHUNITHM" },
-  { key: "ongeki", label: "O.N.G.E.K.I." },
-];
-
-const SCORECARD_ASSET_SENTINEL: Record<ScoreCardGame, string> = {
-  mai: "/official/scorecard/mai/UI_CMN_Long_base_big.png",
-  chuni: "/official/scorecard/chuni/baked_musicbox_bpm_0.png",
-  ongeki: "/official/scorecard/ongeki/UI_CMN_AttributeIcon_Fire_mini.png",
-};
-
-/** chuni/ongeki each render one of two cards: playing panel or select card. */
-const CARD_TYPES: Array<{ key: "panel" | "score"; label: string }> = [
-  { key: "panel", label: "Play panel" },
-  { key: "score", label: "Music card" },
-];
-
-/** Panel-style cards stay implemented, but are hidden until their UX is ready. */
-const SHOW_PANEL_CARDS = false;
-/** Keep the unfinished CHUNITHM decide/start state disabled and out of the UI. */
-const SHOW_CHUNI_CONFIRMED_START = false;
-/** Keep unfinished/destructive workbench actions out of the UI for now. */
-const SHOW_SCORECARD_RESET = false;
-const SHOW_SCORECARD_EXPORT = false;
-
 /** Active card design-space size; the stage auto-fit zoom uses this. */
 function designSize(
   game: ScoreCardGame,
@@ -133,107 +126,6 @@ function designSize(
     ? { width: ONGEKI_MUSICBT_WIDTH, height: ONGEKI_MUSICBT_HEIGHT }
     : { width: ONGEKI_SCORECARD_WIDTH, height: ONGEKI_SCORECARD_HEIGHT };
 }
-
-const COMBO_OPTIONS: Array<{ value: MaiComboBadge; label: string }> = [
-  { value: "none", label: "—" },
-  { value: "fc", label: "FULL COMBO" },
-  { value: "fcp", label: "FULL COMBO+" },
-  { value: "ap", label: "ALL PERFECT" },
-  { value: "app", label: "ALL PERFECT+" },
-];
-
-const SYNC_OPTIONS: Array<{ value: MaiSyncBadge; label: string }> = [
-  { value: "none", label: "—" },
-  { value: "sync", label: "SYNC PLAY" },
-  { value: "fs", label: "FULL SYNC" },
-  { value: "fsp", label: "FULL SYNC+" },
-  { value: "fsd", label: "FULL SYNC DX" },
-  { value: "fsdp", label: "FULL SYNC DX+" },
-];
-
-/** WE star options, half-star steps (gold patterns 10-19). */
-const WE_STAR_OPTIONS = Array.from({ length: 10 }, (_, index) => (index + 1) / 2);
-
-const CHUNI_SUCCESS_OPTIONS: Array<{ value: ChuniSuccessLamp; label: string }> = [
-  { value: "none", label: "—" },
-  { value: "failed", label: "FAILED" },
-  { value: "clear", label: "CLEAR" },
-  { value: "hard", label: "HARD" },
-  { value: "brave", label: "BRAVE" },
-  { value: "absolute", label: "ABSOLUTE" },
-  { value: "catastrophy", label: "CATASTROPHY" },
-];
-
-const CHUNI_COMBO_OPTIONS: Array<{ value: ChuniComboLamp; label: string }> = [
-  { value: "none", label: "—" },
-  { value: "fc", label: "FULL COMBO" },
-  { value: "aj", label: "ALL JUSTICE" },
-  { value: "ajc", label: "ALL JUSTICE CRITICAL" },
-];
-
-const CHUNI_FCHAIN_OPTIONS: Array<{ value: ChuniFullChainLamp; label: string }> = [
-  { value: "none", label: "—" },
-  { value: "gold", label: "FULL CHAIN (GOLD)" },
-  { value: "platinum", label: "FULL CHAIN (PLATINUM)" },
-];
-
-const CHUNI_BANNER_OPTIONS: Array<{ value: ChuniStartBanner; label: string }> = [
-  { value: "gamestart", label: "GAME START!" },
-  { value: "ready", label: "GAME 準備完了" },
-  { value: "linkstart", label: "Link START!" },
-];
-
-const ONGEKI_BATTLE_RANK_OPTIONS: Array<{ value: OngekiBattleRank; label: string }> = [
-  { value: "none", label: "—" },
-  { value: "usually", label: "可 (USUALLY)" },
-  { value: "good", label: "良 (GOOD)" },
-  { value: "great", label: "優 (GREAT)" },
-  { value: "excellent", label: "秀 (EXCELLENT)" },
-  { value: "unbelievable", label: "極 (UNBELIEVABLE)" },
-];
-
-const ONGEKI_FC_OPTIONS: Array<{ value: OngekiFcLamp; label: string }> = [
-  { value: "none", label: "—" },
-  { value: "fc", label: "FULL COMBO" },
-  { value: "ab", label: "ALL BREAK" },
-  { value: "abplus", label: "ALL BREAK+" },
-];
-
-const ONGEKI_ATTRIBUTE_OPTIONS: Array<{ value: OngekiAttribute; label: string }> = [
-  { value: "fire", label: "FIRE" },
-  { value: "aqua", label: "AQUA" },
-  { value: "leaf", label: "LEAF" },
-];
-
-const MAI_STORAGE_OPTIONS = {
-  allowedValues: {
-    difficulty: MAI_DIFFICULTY_ORDER,
-    comboBadge: COMBO_OPTIONS.map((option) => option.value),
-    syncBadge: SYNC_OPTIONS.map((option) => option.value),
-  },
-};
-
-const CHUNI_STORAGE_OPTIONS = {
-  allowedValues: {
-    difficulty: CHUNI_DIFFICULTY_ORDER,
-    weStars: WE_STAR_OPTIONS,
-    cardType: ["panel", "musicbox"],
-    successLamp: CHUNI_SUCCESS_OPTIONS.map((option) => option.value),
-    comboLamp: CHUNI_COMBO_OPTIONS.map((option) => option.value),
-    fullChainLamp: CHUNI_FCHAIN_OPTIONS.map((option) => option.value),
-    startBanner: CHUNI_BANNER_OPTIONS.map((option) => option.value),
-  },
-};
-
-const ONGEKI_STORAGE_OPTIONS = {
-  allowedValues: {
-    difficulty: ONGEKI_DIFFICULTY_ORDER,
-    cardType: ["panel", "musicbt"],
-    battleRank: ONGEKI_BATTLE_RANK_OPTIONS.map((option) => option.value),
-    fcLamp: ONGEKI_FC_OPTIONS.map((option) => option.value),
-    bossAttribute: ONGEKI_ATTRIBUTE_OPTIONS.map((option) => option.value),
-  },
-};
 
 function loadGame(): ScoreCardGame {
   const stored = readLocalStorage(GAME_STORAGE_KEY);

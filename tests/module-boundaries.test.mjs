@@ -18,6 +18,19 @@ const boundaries = [
     file: "src/scorecard/scorecardInput.ts",
     forbidden: ["react", "./ScoreCardSurface", "../persistence"],
   },
+  {
+    file: "src/scorecard/scorecardSurfaceConfig.ts",
+    forbidden: [
+      "react",
+      "./ScoreCardSurface",
+      "../persistence",
+      "./MaiScoreCard",
+      "./ChuniScoreCard",
+      "./ChuniMusicBoxCard",
+      "./OngekiScoreCard",
+      "./OngekiMusicBtCard",
+    ],
+  },
 ];
 
 function importedModules(file, source) {
