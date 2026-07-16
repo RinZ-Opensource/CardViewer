@@ -90,10 +90,16 @@ impl ImageDataUrlCache {
     }
 }
 
+mod asset_format;
 mod config;
 mod types;
 mod xmlutil;
 
+use asset_format::{
+    classify_export_asset, detect_image_mime, image_export_file_name, is_image_extension,
+    is_lossless_webp_layer, is_unity_asset_bundle, read_file_header, thumbnail_file_name,
+    webp_export_file_name, ExportAssetKind,
+};
 use config::*;
 pub use types::{
     AssetLayer, CardRecord, MobilePackResult, OnlineExportResult, PrintField, PrintOption,
@@ -269,12 +275,6 @@ struct ImageTranscodeJob {
     // Full-image transcode never downscales (resize stays false); the thumbnail
     // path keeps using ThumbnailJob, which the script resizes by default.
     resize: bool,
-}
-
-enum ExportAssetKind {
-    Image,
-    Unity,
-    Unsupported,
 }
 
 #[derive(Clone, Debug)]
@@ -2359,84 +2359,6 @@ fn game_asset_group(game: &str) -> String {
     }
 }
 
-fn image_export_file_name(source_path: &Path) -> Result<String, String> {
-    let file_name = source_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| "missing file name".to_string())?;
-    let header = read_file_header(source_path, 16)?;
-    let lower_ext = source_path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-
-    if is_image_extension(&lower_ext) {
-        return Ok(file_name.to_string());
-    }
-    if let Some(mime) = detect_image_mime(&header) {
-        return Ok(format!("{file_name}.{}", image_extension_for_mime(mime)));
-    }
-    if is_unity_asset_bundle(&header) {
-        return Ok(format!("{file_name}.png"));
-    }
-
-    Err("unsupported image payload".to_string())
-}
-
-/// Online-export output name: every supported source (plain image or Unity
-/// bundle) becomes `<stem>.webp`, since the online pipeline transcodes all art
-/// to WebP. Kept separate from `image_export_file_name` (which the mobile pack
-/// still uses to preserve original formats).
-fn webp_export_file_name(source_path: &Path) -> Result<String, String> {
-    let file_name = source_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| "missing file name".to_string())?;
-    let header = read_file_header(source_path, 16)?;
-    let lower_ext = source_path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    let is_image = is_image_extension(&lower_ext) || detect_image_mime(&header).is_some();
-    if !is_image && !is_unity_asset_bundle(&header) {
-        return Err("unsupported image payload".to_string());
-    }
-    // For real image files swap the extension; for Unity bundles (no image
-    // extension) keep the full name so distinct bundles don't collide.
-    let base = if is_image_extension(&lower_ext) {
-        source_path
-            .file_stem()
-            .and_then(|stem| stem.to_str())
-            .unwrap_or(file_name)
-    } else {
-        file_name
-    };
-    Ok(format!("{base}.webp"))
-}
-
-/// Mask and holo layers are transcoded losslessly: lossy WebP would risk
-/// degrading the alpha stencil / foil colour, and for these flat images it is
-/// often larger than the source anyway. Everything else uses lossy WebP.
-fn is_lossless_webp_layer(source_path: &Path) -> bool {
-    let name = source_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    name.contains("mask") || name.contains("holo")
-}
-
-fn thumbnail_file_name(source_name: &str) -> String {
-    let stem = Path::new(source_name)
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .filter(|stem| !stem.is_empty())
-        .unwrap_or(source_name);
-    format!("{stem}.webp")
-}
-
 fn export_image_asset(
     source_path: &Path,
     output_path: &Path,
@@ -2466,45 +2388,6 @@ fn export_image_asset(
     }
 
     Err("unsupported image payload".to_string())
-}
-
-fn classify_export_asset(source_path: &Path) -> Result<ExportAssetKind, String> {
-    let header = read_file_header(source_path, 16)?;
-    let lower_ext = source_path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    if is_image_extension(&lower_ext) || detect_image_mime(&header).is_some() {
-        Ok(ExportAssetKind::Image)
-    } else if is_unity_asset_bundle(&header) {
-        Ok(ExportAssetKind::Unity)
-    } else {
-        Ok(ExportAssetKind::Unsupported)
-    }
-}
-
-fn read_file_header(path: &Path, max_len: usize) -> Result<Vec<u8>, String> {
-    let mut file =
-        fs::File::open(path).map_err(|err| format!("Failed to open {}: {err}", path.display()))?;
-    let mut header = vec![0u8; max_len];
-    let len = file
-        .read(&mut header)
-        .map_err(|err| format!("Failed to read {}: {err}", path.display()))?;
-    header.truncate(len);
-    Ok(header)
-}
-
-fn is_image_extension(ext: &str) -> bool {
-    matches!(ext, "png" | "jpg" | "jpeg" | "webp")
-}
-
-fn image_extension_for_mime(mime: &str) -> &'static str {
-    match mime {
-        "image/jpeg" => "jpg",
-        "image/webp" => "webp",
-        _ => "png",
-    }
 }
 
 fn is_web_asset_path(path: &str) -> bool {
@@ -4244,25 +4127,6 @@ fn mai_chara_options(
             print_option(id.to_string(), label)
         })
         .collect()
-}
-
-fn detect_image_mime(bytes: &[u8]) -> Option<&'static str> {
-    if bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]) {
-        return Some("image/png");
-    }
-    if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
-        return Some("image/jpeg");
-    }
-    if bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
-        return Some("image/webp");
-    }
-    None
-}
-
-fn is_unity_asset_bundle(bytes: &[u8]) -> bool {
-    bytes.starts_with(b"UnityFS")
-        || bytes.starts_with(b"UnityWeb")
-        || bytes.starts_with(b"UnityRaw")
 }
 
 /// Runs the UnityPy extractor under each candidate Python interpreter until one
