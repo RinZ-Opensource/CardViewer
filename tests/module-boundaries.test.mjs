@@ -124,6 +124,21 @@ const boundaries = [
     ],
   },
   {
+    file: "src/scorecard/ScoreCardPreview.tsx",
+    allowed: [
+      "react",
+      "./ChuniMusicBoxCard",
+      "./ChuniScoreCard",
+      "./MaiScoreCard",
+      "./OngekiMusicBtCard",
+      "./OngekiScoreCard",
+      "./chuniTypes",
+      "./ongekiTypes",
+      "./scorecardSurfaceConfig",
+      "./types",
+    ],
+  },
+  {
     file: "src/scorecard/useScoreCardSongDb.ts",
     allowed: [
       "react",
@@ -339,6 +354,24 @@ function jsxTagNames(sourceFile) {
   return names;
 }
 
+function hasJsxClass(sourceFile, className) {
+  let found = false;
+  function visit(node) {
+    if (
+      ts.isJsxAttribute(node) &&
+      node.name.getText(sourceFile) === "className" &&
+      node.initializer &&
+      ts.isStringLiteral(node.initializer) &&
+      node.initializer.text.split(/\s+/).includes(className)
+    ) {
+      found = true;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return found;
+}
+
 test("ScoreCardSurface delegates each controlled game editor", async () => {
   const file = "src/scorecard/ScoreCardSurface.tsx";
   const source = await readFile(path.join(projectRoot, file), "utf8");
@@ -361,6 +394,71 @@ test("ScoreCardSurface delegates each controlled game editor", async () => {
   for (const delegated of ["SongPicker", "input", "select", "label"]) {
     assert.equal(tags.includes(delegated), false, `Surface must delegate ${delegated}`);
   }
+});
+
+test("ScoreCardSurface delegates its controlled preview leaf", async () => {
+  const surfaceFile = "src/scorecard/ScoreCardSurface.tsx";
+  const surfaceSource = await readFile(path.join(projectRoot, surfaceFile), "utf8");
+  const surface = ts.createSourceFile(
+    surfaceFile,
+    surfaceSource,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const rendererTags = [
+    "MaiScoreCard",
+    "ChuniScoreCard",
+    "ChuniMusicBoxCard",
+    "OngekiScoreCard",
+    "OngekiMusicBtCard",
+  ];
+  const surfaceTags = jsxTagNames(surface);
+  assert.equal(surfaceTags.filter((tag) => tag === "ScoreCardPreview").length, 1);
+  for (const renderer of rendererTags) {
+    assert.equal(surfaceTags.includes(renderer), false, `Surface must delegate ${renderer}`);
+  }
+  assert.equal(hasJsxClass(surface, "scorecard-preview"), false);
+
+  const previewFile = "src/scorecard/ScoreCardPreview.tsx";
+  const previewSource = await readFile(path.join(projectRoot, previewFile), "utf8");
+  const preview = ts.createSourceFile(
+    previewFile,
+    previewSource,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const previewTags = jsxTagNames(preview);
+  for (const renderer of rendererTags) {
+    assert.equal(previewTags.filter((tag) => tag === renderer).length, 1);
+  }
+  for (const className of ["scorecard-preview", "scorecard-stage", "scorecard-zoom"]) {
+    assert.equal(hasJsxClass(preview, className), true, `Preview must retain ${className}`);
+  }
+
+  let exportFlagReferences = 0;
+  const forbiddenHooks = [];
+  function visit(node) {
+    if (ts.isIdentifier(node) && node.text === "SHOW_SCORECARD_EXPORT") {
+      exportFlagReferences += 1;
+    }
+    if (ts.isCallExpression(node)) {
+      const expression = node.expression;
+      const name = ts.isIdentifier(expression)
+        ? expression.text
+        : ts.isPropertyAccessExpression(expression)
+          ? expression.name.text
+          : "";
+      if (["useState", "useEffect", "useRef", "useMemo"].includes(name)) {
+        forbiddenHooks.push(name);
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(preview);
+  assert.equal(exportFlagReferences >= 2, true);
+  assert.deepEqual(forbiddenHooks, []);
 });
 
 test("ScoreCardSurface delegates song database loading to its hook", async () => {

@@ -4,35 +4,31 @@ import {
   CHUNI_MUSICBOX_EXPORT_WIDTH,
   CHUNI_MUSICBOX_HEIGHT,
   CHUNI_MUSICBOX_WIDTH,
-  ChuniMusicBoxCard,
 } from "./ChuniMusicBoxCard";
 import {
   CHUNI_SCORECARD_EXPORT_WIDTH,
   CHUNI_SCORECARD_HEIGHT,
   CHUNI_SCORECARD_WIDTH,
-  ChuniScoreCard,
 } from "./ChuniScoreCard";
 import { ChuniScoreCardEditor } from "./ChuniScoreCardEditor";
 import {
   MAI_SCORECARD_EXPORT_WIDTH,
   MAI_SCORECARD_HEIGHT,
   MAI_SCORECARD_WIDTH,
-  MaiScoreCard,
 } from "./MaiScoreCard";
 import { MaiScoreCardEditor } from "./MaiScoreCardEditor";
 import {
   ONGEKI_MUSICBT_EXPORT_WIDTH,
   ONGEKI_MUSICBT_HEIGHT,
   ONGEKI_MUSICBT_WIDTH,
-  OngekiMusicBtCard,
 } from "./OngekiMusicBtCard";
 import {
   ONGEKI_SCORECARD_EXPORT_WIDTH,
   ONGEKI_SCORECARD_HEIGHT,
   ONGEKI_SCORECARD_WIDTH,
-  OngekiScoreCard,
 } from "./OngekiScoreCard";
 import { OngekiScoreCardEditor } from "./OngekiScoreCardEditor";
+import { ScoreCardPreview } from "./ScoreCardPreview";
 import { CHUNI_SAMPLE_SONGS } from "./chuniSamples";
 import { ChuniCardType, ChuniDifficulty, ChuniSong } from "./chuniTypes";
 import { ONGEKI_SAMPLE_SONGS } from "./ongekiSamples";
@@ -41,7 +37,6 @@ import { defaultChuniState, defaultOngekiState, defaultState } from "./scorecard
 import {
   GAMES,
   SCORECARD_ASSET_SENTINEL,
-  SHOW_SCORECARD_EXPORT,
   SHOW_SCORECARD_RESET,
   type ScoreCardGame,
 } from "./scorecardSurfaceConfig";
@@ -379,63 +374,24 @@ export function ScoreCardSurface() {
         ) : null}
       </aside>
 
-      <section className="scorecard-preview">
-        {SHOW_SCORECARD_EXPORT ? (
-          <div className="scorecard-toolbar">
-            <button
-              type="button"
-              className="scorecard-export"
-              onClick={exportPng}
-              disabled={exportingPng}
-            >
-              {exportingPng ? "Exporting…" : "Export PNG"}
-            </button>
-          </div>
-        ) : null}
-        {exportError ? (
-          <div className="scorecard-export-error" role="alert">
-            {exportError}
-          </div>
-        ) : null}
-        {assetStatus === "error" ? (
-          <div className="scorecard-export-error" role="alert">
-            {import.meta.env.DEV
-              ? "Official artwork is unavailable in this preview. Use the private preview or seed the Cloudflare R2 asset store."
-              : "Official artwork is temporarily unavailable from the asset store."}
-          </div>
-        ) : null}
-        <div className="scorecard-stage" ref={stageRef}>
-          {/* CSS zoom (not transform:scale): text re-rasterizes at the zoomed
-              size, so glyph spacing stays even at fractional fit factors. */}
-          <div className="scorecard-zoom" style={{ zoom: stageScale }}>
-            {game === "mai" ? (
-              <MaiScoreCard
-                song={song}
-                chart={chart}
-                state={state}
-                maxDxScore={maxDxScore}
-                captureRef={captureRef}
-              />
-            ) : game === "chuni" ? (
-              chuniState.cardType === "musicbox" ? (
-                <ChuniMusicBoxCard song={chuniSong} state={chuniState} captureRef={captureRef} />
-              ) : (
-                <ChuniScoreCard song={chuniSong} state={chuniState} captureRef={captureRef} />
-              )
-            ) : ongekiState.cardType === "musicbt" ? (
-              <OngekiMusicBtCard
-                song={ongekiSong}
-                state={ongekiState}
-                bossIconUrl={ongekiSong.bossIconUrl}
-                bossIconFallbacks={ongekiSong.bossIconFallbacks}
-                captureRef={captureRef}
-              />
-            ) : (
-              <OngekiScoreCard song={ongekiSong} state={ongekiState} captureRef={captureRef} />
-            )}
-          </div>
-        </div>
-      </section>
+      <ScoreCardPreview
+        game={game}
+        song={song}
+        chart={chart}
+        state={state}
+        maxDxScore={maxDxScore}
+        chuniSong={chuniSong}
+        chuniState={chuniState}
+        ongekiSong={ongekiSong}
+        ongekiState={ongekiState}
+        captureRef={captureRef}
+        stageRef={stageRef}
+        stageScale={stageScale}
+        assetStatus={assetStatus}
+        exportingPng={exportingPng}
+        exportError={exportError}
+        onExport={exportPng}
+      />
     </main>
   );
 }

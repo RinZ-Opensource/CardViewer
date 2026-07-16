@@ -17,8 +17,9 @@ must remain local.
   their controlled form UI, `useScoreCardSongDb` owns lazy song-database loading
   and retry state, and `useScoreCardState` owns stored state initialization and
   persistence effects. `scorecardSelection.ts` contains the React-independent
-  song-database migrations and selection transitions. This is part of the web
-  app, not the Android CardMaker prototype.
+  song-database migrations and selection transitions; `ScoreCardPreview.tsx`
+  owns the controlled preview DOM and its five renderer branches. This is part
+  of the web app, not the Android CardMaker prototype.
 - `src-tauri/`: Tauri desktop shell plus Rust scanners and exporters. The
   `export_mobile_pack` binary is a local pack-building tool; its presence does
   not make Android a supported release target. The image IPC reader serves only
