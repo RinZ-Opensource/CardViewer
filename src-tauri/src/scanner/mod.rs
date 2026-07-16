@@ -3,7 +3,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     fs,
     hash::{Hash, Hasher},
     io::Read,
@@ -98,6 +98,7 @@ impl ImageDataUrlCache {
 mod archive;
 mod asset_format;
 mod config;
+mod export;
 mod fsutil;
 mod games;
 mod tools;
@@ -111,6 +112,7 @@ use asset_format::{
     webp_export_file_name, ExportAssetKind,
 };
 use config::*;
+use export::{game_asset_group, is_web_asset_path, set_print_field_value, write_manifest_shards};
 use fsutil::{find_named_files, path_string, resolve_sibling, walk_files};
 use games::{
     content_asset_dirs, game_data_leaf_roots, game_data_pack_paths,
@@ -231,34 +233,6 @@ struct ExtractedUnityObject {
     width: Option<u32>,
     height: Option<u32>,
     file: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct OnlineManifestIndex<'a> {
-    package_root: &'a str,
-    streaming_assets: &'a str,
-    stats: &'a ScanStats,
-    warnings: &'a [String],
-    total_cards: usize,
-    shards: Vec<OnlineManifestShardInfo>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct OnlineManifestShardInfo {
-    key: String,
-    game: String,
-    href: String,
-    card_count: usize,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct OnlineManifestShard<'a> {
-    key: &'a str,
-    game: &'a str,
-    cards: Vec<&'a CardRecord>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -834,7 +808,7 @@ where
     fs::write(&manifest_path, manifest)
         .map_err(|err| format!("Failed to write online manifest: {err}"))?;
     let (index_manifest_path, shard_count) =
-        write_online_manifest_shards(&scan, &output_root, &mut progress)?;
+        write_manifest_shards(&scan, &output_root, &mut progress)?;
     // Replace MAI card thumbnails with base+character composites. Runs after the
     // manifests are written and rewrites the MAI thumbnailPath entries in place,
     // so re-running export no longer clobbers them back to the bare "_s" base.
@@ -966,7 +940,7 @@ where
     fs::write(&cards_manifest_path, cards_body)
         .map_err(|err| format!("Failed to write mobile card manifest: {err}"))?;
     let (index_manifest_path, shard_count) =
-        write_online_manifest_shards(&scan, &staging_root, &mut progress)?;
+        write_manifest_shards(&scan, &staging_root, &mut progress)?;
     let asset_index_path = staging_root.join("assets").join("index.json");
     write_mobile_asset_index(&exporter, &asset_index_path)?;
     progress(format!(
@@ -1791,64 +1765,6 @@ impl MobileAssetExporter {
     }
 }
 
-fn write_online_manifest_shards<F>(
-    scan: &ScanResult,
-    output_root: &Path,
-    progress: &mut F,
-) -> Result<(PathBuf, usize), String>
-where
-    F: FnMut(String),
-{
-    let mut grouped: BTreeMap<String, Vec<&CardRecord>> = BTreeMap::new();
-    for card in &scan.cards {
-        grouped.entry(card.game.clone()).or_default().push(card);
-    }
-
-    let mut shards = Vec::new();
-    for (game, cards) in &grouped {
-        let key = game.to_ascii_lowercase();
-        let href = format!("cards.{key}.json");
-        let path = output_root.join(&href);
-        let shard = OnlineManifestShard {
-            key: &key,
-            game,
-            cards: cards.clone(),
-        };
-        progress(format!(
-            "Writing manifest shard: {} ({} records)",
-            path.display(),
-            cards.len()
-        ));
-        let body = serde_json::to_string(&shard)
-            .map_err(|err| format!("Failed to serialize online manifest shard: {err}"))?;
-        fs::write(&path, body)
-            .map_err(|err| format!("Failed to write online manifest shard: {err}"))?;
-        shards.push(OnlineManifestShardInfo {
-            key,
-            game: game.clone(),
-            href,
-            card_count: cards.len(),
-        });
-    }
-
-    let index = OnlineManifestIndex {
-        package_root: &scan.package_root,
-        streaming_assets: &scan.streaming_assets,
-        stats: &scan.stats,
-        warnings: &scan.warnings,
-        total_cards: scan.cards.len(),
-        shards,
-    };
-    let index_path = output_root.join("cards.index.json");
-    progress(format!("Writing manifest index: {}", index_path.display()));
-    let body = serde_json::to_string_pretty(&index)
-        .map_err(|err| format!("Failed to serialize online manifest index: {err}"))?;
-    fs::write(&index_path, body)
-        .map_err(|err| format!("Failed to write online manifest index: {err}"))?;
-
-    Ok((index_path, index.shards.len()))
-}
-
 fn generate_online_thumbnails<F>(
     scan: &mut ScanResult,
     exporter: &mut OnlineAssetExporter,
@@ -2271,22 +2187,6 @@ fn rewrite_optional_mobile_asset_path(
     path.and_then(|path| exporter.export_asset_url(&path, group))
 }
 
-fn set_print_field_value(
-    card: &mut CardRecord,
-    key: &str,
-    label: &str,
-    field_type: &str,
-    value: impl Into<String>,
-) {
-    let value = value.into();
-    if let Some(field) = card.print_fields.iter_mut().find(|field| field.key == key) {
-        field.value = value;
-    } else {
-        card.print_fields
-            .push(print_field(key, label, field_type, value));
-    }
-}
-
 fn print_field_value<'a>(card: &'a CardRecord, key: &str) -> Option<&'a str> {
     card.print_fields
         .iter()
@@ -2334,15 +2234,6 @@ fn resolve_mai_export_asset(
     None
 }
 
-fn game_asset_group(game: &str) -> String {
-    match game {
-        "CHU" => "chu".to_string(),
-        "MAI" => "mai".to_string(),
-        "MU3" => "mu3".to_string(),
-        other => other.to_ascii_lowercase(),
-    }
-}
-
 fn export_image_asset(
     source_path: &Path,
     output_path: &Path,
@@ -2372,13 +2263,6 @@ fn export_image_asset(
     }
 
     Err("unsupported image payload".to_string())
-}
-
-fn is_web_asset_path(path: &str) -> bool {
-    path.starts_with('/')
-        || path.starts_with("http://")
-        || path.starts_with("https://")
-        || path.starts_with("data:")
 }
 
 fn percent_encode_path_segment(value: &str) -> String {

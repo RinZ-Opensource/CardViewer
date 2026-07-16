@@ -38,6 +38,9 @@ must remain local.
   Python script installation and interpreter selection live in
   `scanner/tools/python.rs`; UnityPy image and bundle extraction, batching, and
   cache handling live in `scanner/tools/unity.rs`.
+  Online and mobile exporters share only path/print-field normalization and
+  deterministic manifest sharding through `scanner/export/common.rs` and
+  `scanner/export/manifest.rs`; target-specific asset policies remain separate.
 - `functions/`: Cloudflare Pages Function for serving an allowlisted subset of
   `/official/*` from the `ASSETS_BUCKET` R2 binding. Public Cloudflare does not
   serve `/fonts/private/*`.
