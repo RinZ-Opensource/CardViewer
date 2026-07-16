@@ -16,8 +16,9 @@ must remain local.
   coordinates state and card rendering, the three `*ScoreCardEditor` files own
   their controlled form UI, `useScoreCardSongDb` owns lazy song-database loading
   and retry state, and `useScoreCardState` owns stored state initialization and
-  persistence effects. This is part of the web app, not the Android CardMaker
-  prototype.
+  persistence effects. `scorecardSelection.ts` contains the React-independent
+  song-database migrations and selection transitions. This is part of the web
+  app, not the Android CardMaker prototype.
 - `src-tauri/`: Tauri desktop shell plus Rust scanners and exporters. The
   `export_mobile_pack` binary is a local pack-building tool; its presence does
   not make Android a supported release target. The image IPC reader serves only
@@ -44,9 +45,10 @@ must remain local.
   renderer, score-card surface configuration cannot depend on React,
   persistence, or card components, default-state factories are limited to
   samples and state types, and the score-card editors remain controlled UI
-  leaves below the surface and song-database hook. It runs under `npm run check`
-  alongside the holographic mask math, score-card model, frontend reliability,
-  secret-scanner, public-dist, and Pages Function suites.
+  leaves below the surface and song-database hook. Selection transitions remain
+  below React, persistence, export, and rendering modules. It runs under
+  `npm run check` alongside the holographic mask math, score-card model,
+  frontend reliability, secret-scanner, public-dist, and Pages Function suites.
 - `.github/workflows/ci.yml`: read-only pull-request and `main` validation for
   the web checks, pinned Rust formatting/lints/locked tests, and the
   dependency-free .NET mobile Runtime/Smoke build; it does not deploy or

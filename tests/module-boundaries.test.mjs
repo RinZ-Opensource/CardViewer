@@ -65,6 +65,32 @@ const boundaries = [
     ],
   },
   {
+    file: "src/scorecard/scorecardSelection.ts",
+    allowed: [
+      "./chuniSamples",
+      "./chuniTypes",
+      "./ongekiSamples",
+      "./ongekiTypes",
+      "./sampleSongs",
+      "./songdb",
+      "./types",
+    ],
+    forbidden: [
+      "react",
+      "../persistence",
+      "../exportPng",
+      "./ScoreCardSurface",
+      "./MaiScoreCard",
+      "./ChuniScoreCard",
+      "./ChuniMusicBoxCard",
+      "./OngekiScoreCard",
+      "./OngekiMusicBtCard",
+      "./MaiScoreCardEditor",
+      "./ChuniScoreCardEditor",
+      "./OngekiScoreCardEditor",
+    ],
+  },
+  {
     file: "src/scorecard/MaiScoreCardEditor.tsx",
     allowed: [
       "./SongPicker",
@@ -369,6 +395,53 @@ test("ScoreCardSurface delegates song database loading to its hook", async () =>
   }
 
   assert.deepEqual(imported.filter((name) => forbidden.has(name)), []);
+});
+
+test("ScoreCardSurface retains ordered song database migration effects", async () => {
+  const file = "src/scorecard/ScoreCardSurface.tsx";
+  const source = await readFile(path.join(projectRoot, file), "utf8");
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const effects = [];
+
+  function visit(node) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.expression.getText(sourceFile) === "React" &&
+      node.expression.name.text === "useEffect" &&
+      node.arguments.length === 2 &&
+      ts.isArrayLiteralExpression(node.arguments[1]) &&
+      node.arguments[1].elements.length === 1
+    ) {
+      const dependency = node.arguments[1].elements[0].getText(sourceFile);
+      if (["songDb.mai", "songDb.chuni", "songDb.ongeki"].includes(dependency)) {
+        effects.push({ dependency, body: node.arguments[0].getText(sourceFile) });
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  const expected = [
+    ["songDb.mai", "setState", "migrateMaiStateToSongDb"],
+    ["songDb.chuni", "setChuniState", "migrateChuniStateToSongDb"],
+    ["songDb.ongeki", "setOngekiState", "migrateOngekiStateToSongDb"],
+  ];
+  assert.deepEqual(
+    effects.map(({ dependency }) => dependency),
+    expected.map(([dependency]) => dependency),
+  );
+  for (let index = 0; index < expected.length; index += 1) {
+    const [, setter, migration] = expected[index];
+    assert.match(effects[index].body, new RegExp(`\\b${setter}\\s*\\(`));
+    assert.match(effects[index].body, new RegExp(`\\b${migration}\\s*\\(`));
+  }
 });
 
 test("ScoreCardSurface delegates stored score-card state to its hooks", async () => {

@@ -47,12 +47,16 @@ import {
 } from "./scorecardSurfaceConfig";
 import { MAI_SAMPLE_SONGS } from "./sampleSongs";
 import {
-  chuniChartFields,
-  chuniPreferredDifficulty,
-  maiPreferredDifficulty,
-  ongekiChartFields,
-  ongekiPreferredDifficulty,
-} from "./songdb";
+  createChuniDifficultySelection,
+  createChuniSongSelection,
+  createMaiDifficultySelection,
+  createMaiSongSelection,
+  createOngekiDifficultySelection,
+  createOngekiSongSelection,
+  migrateChuniStateToSongDb,
+  migrateMaiStateToSongDb,
+  migrateOngekiStateToSongDb,
+} from "./scorecardSelection";
 import { MaiDifficulty, MaiScoreState, MaiSong } from "./types";
 import { useScoreCardSongDb } from "./useScoreCardSongDb";
 import { usePersistScoreCardState, useScoreCardState } from "./useScoreCardState";
@@ -220,74 +224,17 @@ export function ScoreCardSurface() {
   // real row (matching by printed identity where local ids are placeholders).
   React.useEffect(() => {
     if (songDb.mai.status !== "ready" || songDb.mai.songs.length === 0) return;
-    setState((current) => {
-      const currentSong = songDb.mai.songs.find((entry) => entry.id === current.songId);
-      if (current.songDbBacked && currentSong) return current;
-      const sample = MAI_SAMPLE_SONGS.find((entry) => entry.id === current.songId);
-      const next = sample
-        ? songDb.mai.songs.find(
-            (entry) =>
-              entry.title === sample.title &&
-              entry.artist === sample.artist &&
-              entry.isDx === sample.isDx,
-          )
-        : currentSong;
-      const resolved = next ?? songDb.mai.songs[0];
-      const difficulty = maiPreferredDifficulty(resolved, current.difficulty);
-      return {
-        ...current,
-        songId: resolved.id,
-        songDbBacked: true,
-        difficulty,
-        dxScoreMax: "",
-      };
-    });
+    setState((current) => migrateMaiStateToSongDb(current, songDb.mai.songs));
   }, [songDb.mai]);
 
   React.useEffect(() => {
     if (songDb.chuni.status !== "ready" || songDb.chuni.songs.length === 0) return;
-    setChuniState((current) => {
-      const currentSong = songDb.chuni.songs.find((entry) => entry.id === current.songId);
-      if (current.songDbBacked && currentSong) return current;
-      const sample = CHUNI_SAMPLE_SONGS.find((entry) => entry.id === current.songId);
-      const next = sample
-        ? songDb.chuni.songs.find(
-            (entry) => entry.title === sample.title && entry.artist === sample.artist,
-          )
-        : currentSong;
-      const resolved = next ?? songDb.chuni.songs[0];
-      const difficulty = chuniPreferredDifficulty(resolved, current.difficulty);
-      return {
-        ...current,
-        ...chuniChartFields(resolved, difficulty),
-        songId: resolved.id,
-        songDbBacked: true,
-        difficulty,
-      };
-    });
+    setChuniState((current) => migrateChuniStateToSongDb(current, songDb.chuni.songs));
   }, [songDb.chuni]);
 
   React.useEffect(() => {
     if (songDb.ongeki.status !== "ready" || songDb.ongeki.songs.length === 0) return;
-    setOngekiState((current) => {
-      const currentSong = songDb.ongeki.songs.find((entry) => entry.id === current.songId);
-      if (current.songDbBacked && currentSong) return current;
-      const sample = ONGEKI_SAMPLE_SONGS.find((entry) => entry.id === current.songId);
-      const next = sample
-        ? songDb.ongeki.songs.find(
-            (entry) => entry.title === sample.title && entry.artist === sample.artist,
-          )
-        : currentSong;
-      const resolved = next ?? songDb.ongeki.songs[0];
-      const difficulty = ongekiPreferredDifficulty(resolved, current.difficulty);
-      return {
-        ...current,
-        ...ongekiChartFields(resolved, difficulty),
-        songId: resolved.id,
-        songDbBacked: true,
-        difficulty,
-      };
-    });
+    setOngekiState((current) => migrateOngekiStateToSongDb(current, songDb.ongeki.songs));
   }, [songDb.ongeki]);
 
   // Song/difficulty selection (re-)applies the chart-derived fields; manual
@@ -295,57 +242,31 @@ export function ScoreCardSurface() {
   // Samples carry no chart tables, so their *ChartFields are {} (no-op).
 
   function selectMaiSong(next: MaiSong) {
-    const difficulty = maiPreferredDifficulty(next, state.difficulty);
-    // dxScoreMax cleared: the chart's own max takes over as the denominator.
-    setState((current) => ({
-      ...current,
-      songId: next.id,
-      songDbBacked: songDb.mai.status === "ready",
-      difficulty,
-      dxScoreMax: "",
-    }));
+    setState(createMaiSongSelection(next, state.difficulty, songDb.mai.status === "ready"));
   }
 
   function selectMaiDifficulty(difficulty: MaiDifficulty) {
-    setState((current) => ({ ...current, difficulty, dxScoreMax: "" }));
+    setState(createMaiDifficultySelection(difficulty));
   }
 
   function selectChuniSong(next: ChuniSong) {
-    const difficulty = chuniPreferredDifficulty(next, chuniState.difficulty);
-    setChuniState((current) => ({
-      ...current,
-      ...chuniChartFields(next, difficulty),
-      songId: next.id,
-      songDbBacked: songDb.chuni.status === "ready",
-      difficulty,
-    }));
+    setChuniState(
+      createChuniSongSelection(next, chuniState.difficulty, songDb.chuni.status === "ready"),
+    );
   }
 
   function selectChuniDifficulty(difficulty: ChuniDifficulty) {
-    setChuniState((current) => ({
-      ...current,
-      ...chuniChartFields(chuniSong, difficulty),
-      difficulty,
-    }));
+    setChuniState(createChuniDifficultySelection(chuniSong, difficulty));
   }
 
   function selectOngekiSong(next: OngekiSong) {
-    const difficulty = ongekiPreferredDifficulty(next, ongekiState.difficulty);
-    setOngekiState((current) => ({
-      ...current,
-      ...ongekiChartFields(next, difficulty),
-      songId: next.id,
-      songDbBacked: songDb.ongeki.status === "ready",
-      difficulty,
-    }));
+    setOngekiState(
+      createOngekiSongSelection(next, ongekiState.difficulty, songDb.ongeki.status === "ready"),
+    );
   }
 
   function selectOngekiDifficulty(difficulty: OngekiDifficulty) {
-    setOngekiState((current) => ({
-      ...current,
-      ...ongekiChartFields(ongekiSong, difficulty),
-      difficulty,
-    }));
+    setOngekiState(createOngekiDifficultySelection(ongekiSong, difficulty));
   }
 
   async function exportPng() {
