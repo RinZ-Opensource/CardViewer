@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { onRequest } from "../functions/official/[[path]].js";
+import { onRequest as onPrivateFontRequest } from "../functions/fonts/private/[[path]].js";
 
 function installCache(t) {
   const previous = Object.getOwnPropertyDescriptor(globalThis, "caches");
@@ -53,6 +54,23 @@ function makeBucket(body = "asset-body", contentType) {
     },
   };
 }
+
+test("private font paths always fail closed without consulting request context", async () => {
+  const context = new Proxy(
+    {},
+    {
+      get(_target, property) {
+        throw new Error(`private font guard must not read context.${String(property)}`);
+      },
+    },
+  );
+
+  const response = await onPrivateFontRequest(context);
+
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(await response.text(), "");
+});
 
 async function invoke({ bucket, env, method = "GET", url }) {
   const pending = [];
@@ -145,6 +163,7 @@ test("denies unreviewed prefixes, root assets, hidden files, and non-public exte
   for (const pathname of denied) {
     const response = await invoke({ bucket, url: `https://assets.example${pathname}` });
     assert.equal(response.status, 404, pathname);
+    assert.equal(response.headers.get("cache-control"), "no-store", pathname);
   }
 
   assert.deepEqual(getCalls, []);
@@ -169,6 +188,7 @@ test("rejects malformed and ambiguous path segments before reading R2", async (t
   for (const pathname of denied) {
     const response = await invoke({ bucket, url: `https://assets.example${pathname}` });
     assert.equal(response.status, 404, pathname);
+    assert.equal(response.headers.get("cache-control"), "no-store", pathname);
   }
 
   assert.deepEqual(getCalls, []);
@@ -239,6 +259,27 @@ test("returns a diagnostic 503 when the R2 binding is missing", async (t) => {
   assert.deepEqual(cache.putCalls, []);
 });
 
+test("returns an uncacheable 404 when an allowed R2 object is missing", async (t) => {
+  const cache = installCache(t);
+  const getCalls = [];
+  const bucket = {
+    async get(key) {
+      getCalls.push(key);
+      return null;
+    },
+  };
+
+  const response = await invoke({
+    bucket,
+    url: "https://assets.example/official/generated/missing.png",
+  });
+
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(getCalls, ["official/generated/missing.png"]);
+  assert.deepEqual(cache.putCalls, []);
+});
+
 test("rejects unreviewed paths before revealing binding availability", async (t) => {
   const cache = installCache(t);
 
@@ -248,6 +289,7 @@ test("rejects unreviewed paths before revealing binding availability", async (t)
   });
 
   assert.equal(response.status, 404);
+  assert.equal(response.headers.get("cache-control"), "no-store");
   assert.deepEqual(cache.matchCalls, []);
   assert.deepEqual(cache.putCalls, []);
 });

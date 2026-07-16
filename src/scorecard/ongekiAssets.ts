@@ -4,11 +4,12 @@ import {
   OngekiDifficulty,
   OngekiFcLamp,
 } from "./ongekiTypes";
+import { scorecardStaticPng } from "./scorecardAssetUrl";
 
 const ONGEKI_SCORECARD_ROOT = "/official/scorecard/ongeki";
 
 export function ongekiSprite(name: string) {
-  return `${ONGEKI_SCORECARD_ROOT}/${name}.png`;
+  return scorecardStaticPng("ongeki", name);
 }
 
 /** Jacket by zero-padded id. The game loads 220x220 S thumbnails here, but we

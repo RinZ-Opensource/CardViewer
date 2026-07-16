@@ -1,13 +1,12 @@
 import { MaiComboBadge, MaiDifficulty, MaiRank, MaiSyncBadge } from "./types";
-
-const MAI_SCORECARD_ROOT = "/official/scorecard/mai";
+import { scorecardStaticPng } from "./scorecardAssetUrl";
 
 export function maiSprite(name: string) {
-  return `${MAI_SCORECARD_ROOT}/${name}.png`;
+  return scorecardStaticPng("mai", name);
 }
 
 export function maiJacket(songId: number) {
-  return `${MAI_SCORECARD_ROOT}/jackets/jacket_${songId}.png`;
+  return scorecardStaticPng("mai", `jackets/jacket_${songId}`);
 }
 
 /** Sprite-name suffix per difficulty, shared by MBase / Tab / banner text / LvBase. */

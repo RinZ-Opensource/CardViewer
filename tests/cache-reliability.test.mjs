@@ -3,6 +3,20 @@ import test from "node:test";
 import { importTypeScriptModule } from "./helpers/import-typescript.mjs";
 
 const { LruMap } = await importTypeScriptModule("src/lru.ts");
+const { scorecardStaticPng } = await importTypeScriptModule(
+  "src/scorecard/scorecardAssetUrl.ts",
+);
+
+test("scorecard static assets carry a stable publication revision", () => {
+  assert.equal(
+    scorecardStaticPng("mai", "jackets/jacket_11818"),
+    "/official/scorecard/mai/jackets/jacket_11818.png?v=1",
+  );
+  assert.equal(
+    scorecardStaticPng("ongeki", "UI_CMN_AttributeIcon_Fire_mini"),
+    "/official/scorecard/ongeki/UI_CMN_AttributeIcon_Fire_mini.png?v=1",
+  );
+});
 
 test("LRU refreshes reads and evicts the least-recent entry", () => {
   const cache = new LruMap({ maxEntries: 2 });

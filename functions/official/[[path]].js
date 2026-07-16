@@ -74,6 +74,13 @@ function publicObjectKey(rawUrl) {
   return publicPrefix === "generated" || publicPrefix === "scorecard" ? key : null;
 }
 
+function notFoundResponse() {
+  return new Response("Not found", {
+    status: 404,
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
 function unavailableBindingResponse() {
   return new Response("ASSETS_BUCKET binding is not configured", {
     status: 503,
@@ -105,7 +112,7 @@ export async function onRequest({ request, env, waitUntil }) {
   const rawUrl = String(request.url);
   const key = publicObjectKey(rawUrl);
   if (!key) {
-    return new Response("Not found", { status: 404 });
+    return notFoundResponse();
   }
 
   if (typeof env?.ASSETS_BUCKET?.get !== "function") {
@@ -125,7 +132,7 @@ export async function onRequest({ request, env, waitUntil }) {
   if (!response) {
     const object = await env.ASSETS_BUCKET.get(key);
     if (!object || object.body == null) {
-      return new Response("Not found", { status: 404 });
+      return notFoundResponse();
     }
 
     const headers = new Headers();

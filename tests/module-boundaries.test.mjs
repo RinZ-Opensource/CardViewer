@@ -309,6 +309,13 @@ test("frontend source remains independent of local desktop and export modules", 
   assert.deepEqual(violations, []);
 });
 
+test("private font guard remains a dependency-free Pages Function leaf", async () => {
+  const file = "functions/fonts/private/[[path]].js";
+  const source = await readFile(path.join(projectRoot, file), "utf8");
+
+  assert.deepEqual(importedModules(file, source), []);
+});
+
 function jsxTagNames(sourceFile) {
   const names = [];
   function visit(node) {

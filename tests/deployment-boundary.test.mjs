@@ -11,6 +11,7 @@ const forbiddenPrefixes = new Map([
   ["src-tauri/", "DESKTOP_TOOLING"],
   ["mobile/", "MOBILE_PROTOTYPE"],
   ["private-assets/", "PRIVATE_ASSETS"],
+  ["public/fonts/private/", "PRIVATE_FONT_STATIC_ASSETS"],
   ["scripts/scorecard-extract/", "SOURCE_EXTRACTION_TOOLING"],
 ]);
 
@@ -94,6 +95,7 @@ test("deployment path rules reject local product and toolchain scopes", () => {
     "src-tauri/Cargo.toml",
     "mobile/Runtime.cs",
     "private-assets/official/card.png",
+    "public/fonts/private/licensed.ttf",
     "scripts/scorecard-extract/tool.py",
     ".env.private",
     ".env.public",
@@ -115,6 +117,13 @@ test("deployment path rules reject local product and toolchain scopes", () => {
   }
   assert.equal(pathViolation("src/App.tsx"), null);
   assert.equal(pathViolation("scripts/cloudflare/prepare_r2_bulk_manifest.mjs"), null);
+});
+
+test("deployment retains an explicit fail-closed private font route", () => {
+  const relativePath = "functions/fonts/private/[[path]].js";
+
+  assert.equal(pathViolation(relativePath), null);
+  assert.equal(existsSync(path.join(projectRoot, ...relativePath.split("/"))), true);
 });
 
 test("frontend content rules reject desktop and PNG-export coupling", () => {

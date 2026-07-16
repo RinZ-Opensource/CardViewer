@@ -5,18 +5,17 @@ import {
   ChuniStartBanner,
   ChuniSuccessLamp,
 } from "./chuniTypes";
-
-const CHUNI_SCORECARD_ROOT = "/official/scorecard/chuni";
+import { scorecardStaticPng } from "./scorecardAssetUrl";
 
 /** Atlas the whole panel is cut from; PNGs are named <texture>_<cropIndex>.png. */
 const CHUNI_SHEET = "CHU_UI_playing_00_v11";
 
 export function chuniCrop(cropIndex: number) {
-  return `${CHUNI_SCORECARD_ROOT}/${CHUNI_SHEET}_${cropIndex}.png`;
+  return scorecardStaticPng("chuni", `${CHUNI_SHEET}_${cropIndex}`);
 }
 
 /** 300x300 dummy jacket the scene ships with (real jackets not extracted yet). */
-export const CHUNI_DUMMY_JACKET = `${CHUNI_SCORECARD_ROOT}/CHU_UI_Jacket_dummy_0.png`;
+export const CHUNI_DUMMY_JACKET = scorecardStaticPng("chuni", "CHU_UI_Jacket_dummy_0");
 
 export const CHUNI_DIFFICULTY_ORDER: ChuniDifficulty[] = [
   "basic",
@@ -102,12 +101,12 @@ export const CHUNI_WE_STAR: Array<{ crop: number; width: number }> = [
 
 /** Generic <texture>_<cropIndex>.png resolver for the music-box sheets. */
 export function chuniSelectSprite(texture: string, cropIndex: number) {
-  return `${CHUNI_SCORECARD_ROOT}/${texture}_${cropIndex}.png`;
+  return scorecardStaticPng("chuni", `${texture}_${cropIndex}`);
 }
 
 /** Static 9-slice assets pre-baked by the external asset producer. */
 export function chuniBakedSprite(name: string) {
-  return `${CHUNI_SCORECARD_ROOT}/${name}.png`;
+  return scorecardStaticPng("chuni", name);
 }
 
 const BOX_SHEET = "CHU_UI_Select_musicbox_00";

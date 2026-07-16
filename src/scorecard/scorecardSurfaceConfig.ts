@@ -8,6 +8,7 @@ import type {
 import { MAI_DIFFICULTY_ORDER } from "./maiScore";
 import { ONGEKI_DIFFICULTY_ORDER } from "./ongekiAssets";
 import type { OngekiAttribute, OngekiBattleRank, OngekiFcLamp } from "./ongekiTypes";
+import { scorecardStaticPng } from "./scorecardAssetUrl";
 import type { MaiComboBadge, MaiSyncBadge } from "./types";
 
 export type ScoreCardGame = "mai" | "chuni" | "ongeki";
@@ -25,9 +26,9 @@ export const GAMES: Array<{ key: ScoreCardGame; label: string }> = [
 ];
 
 export const SCORECARD_ASSET_SENTINEL: Record<ScoreCardGame, string> = {
-  mai: "/official/scorecard/mai/UI_CMN_Long_base_big.png",
-  chuni: "/official/scorecard/chuni/baked_musicbox_bpm_0.png",
-  ongeki: "/official/scorecard/ongeki/UI_CMN_AttributeIcon_Fire_mini.png",
+  mai: scorecardStaticPng("mai", "UI_CMN_Long_base_big"),
+  chuni: scorecardStaticPng("chuni", "baked_musicbox_bpm_0"),
+  ongeki: scorecardStaticPng("ongeki", "UI_CMN_AttributeIcon_Fire_mini"),
 };
 
 /** chuni/ongeki each render one of two cards: playing panel or select card. */
