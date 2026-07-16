@@ -34,7 +34,10 @@ must remain local.
   Shared game-content path construction and fallback-root selection live in
   `scanner/games/common.rs`, below the individual game parsers. CHUNITHM card
   discovery and XML parsing are isolated in `scanner/games/chu.rs`; the parent
-  scanner retains orchestration and shared print-field construction.
+  scanner retains orchestration and shared print-field construction. Embedded
+  Python script installation and interpreter selection live in
+  `scanner/tools/python.rs`; UnityPy image and bundle extraction, batching, and
+  cache handling live in `scanner/tools/unity.rs`.
 - `functions/`: Cloudflare Pages Function for serving an allowlisted subset of
   `/official/*` from the `ASSETS_BUCKET` R2 binding. Public Cloudflare does not
   serve `/fonts/private/*`.

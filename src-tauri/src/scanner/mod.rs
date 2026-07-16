@@ -10,11 +10,8 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     sync::{Mutex, OnceLock, RwLock},
-    time::UNIX_EPOCH,
 };
 
-const UNITY_EXTRACT_SCRIPT: &str = include_str!("../../scripts/extract_unity_image.py");
-const UNITY_BUNDLE_EXTRACT_SCRIPT: &str = include_str!("../../scripts/extract_unity_bundle.py");
 const THUMBNAIL_SCRIPT: &str = include_str!("../../scripts/generate_thumbnails.py");
 const MAI_COMPOSITE_SCRIPT: &str =
     include_str!("../../scripts/generate_mai_composite_thumbnails.py");
@@ -103,6 +100,7 @@ mod asset_format;
 mod config;
 mod fsutil;
 mod games;
+mod tools;
 mod types;
 mod xmlutil;
 
@@ -118,6 +116,10 @@ use games::{
     content_asset_dirs, game_data_leaf_roots, game_data_pack_paths,
     resolve_content_asset_root_with_fallback_roots, resolve_content_asset_with_fallback_roots,
     scan_chu_cards,
+};
+use tools::{
+    extract_unity_bundle_to_mobile_dir, extract_unity_image_jobs, extract_unity_image_to_cache,
+    extract_unity_image_to_path, python_candidates, write_tool_script, UnityExtractJob,
 };
 pub use types::{
     AssetLayer, CardRecord, MobilePackResult, OnlineExportResult, PrintField, PrintOption,
@@ -274,12 +276,6 @@ struct ThumbnailPlan {
     thumbnail_url: String,
     output_path: PathBuf,
     job: Option<ThumbnailJob>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-struct UnityExtractJob {
-    source: String,
-    output: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1310,10 +1306,8 @@ impl OnlineAssetExporter {
             }
             Ok(ExportAssetKind::Unity) => {
                 let intermediate = output_path.with_extension("png");
-                self.unity_jobs.push(UnityExtractJob {
-                    source: path_string(&source_path),
-                    output: path_string(&intermediate),
-                });
+                self.unity_jobs
+                    .push(UnityExtractJob::new(&source_path, &intermediate));
                 self.image_jobs.push(ImageTranscodeJob {
                     source: path_string(&intermediate),
                     output: path_string(&output_path),
@@ -1345,89 +1339,13 @@ impl OnlineAssetExporter {
     where
         F: FnMut(String),
     {
-        if self.unity_jobs.is_empty() {
-            return;
-        }
-        let all_jobs = std::mem::take(&mut self.unity_jobs);
-        let total = all_jobs.len();
-
-        if let Err(err) = write_extract_script(&self.unity_extract_script_path) {
-            self.warnings.push(err);
-        }
         let tools_dir = self.output_root.join(".tools");
-        if let Err(err) = fs::create_dir_all(&tools_dir) {
-            self.warnings
-                .push(format!("Failed to create Unity job directory: {err}"));
-        }
-        let unitypy_path = find_unitypy_path()
-            .map(|path| path_string(&path))
-            .unwrap_or_default();
-        let worker_count = unity_worker_count().min(total).max(1);
-        let chunk_size = total.div_ceil(worker_count);
-        progress(format!(
-            "Extracting {total} Unity image assets across {worker_count} worker process(es)"
+        self.warnings.extend(extract_unity_image_jobs(
+            &self.unity_extract_script_path,
+            &tools_dir,
+            std::mem::take(&mut self.unity_jobs),
+            progress,
         ));
-
-        // UnityPy is not reliable inside a spawned process pool, so run several
-        // serial extractor processes in parallel instead: each imports UnityPy
-        // once and handles a contiguous slice of the jobs.
-        let script_path = &self.unity_extract_script_path;
-        let chunk_warnings: Vec<String> = all_jobs
-            .par_chunks(chunk_size)
-            .enumerate()
-            .flat_map(|(index, chunk)| {
-                let mut warnings = Vec::new();
-                let jobs_path = tools_dir.join(format!("unity_extract_jobs_{index}.json"));
-                let body = match serde_json::to_string(chunk) {
-                    Ok(body) => body,
-                    Err(err) => {
-                        warnings.push(format!("Failed to serialize Unity jobs: {err}"));
-                        return warnings;
-                    }
-                };
-                if let Err(err) = fs::write(&jobs_path, body) {
-                    warnings.push(format!("Failed to write Unity jobs: {err}"));
-                    return warnings;
-                }
-                let mut ran = false;
-                let mut errors = Vec::new();
-                for candidate in python_candidates() {
-                    let mut command = Command::new(&candidate);
-                    command.arg(script_path).arg("--jobs").arg(&jobs_path);
-                    if !unitypy_path.is_empty() {
-                        command.env("PYTHONPATH", &unitypy_path);
-                    }
-                    match command.status() {
-                        Ok(status) if status.success() => {
-                            ran = true;
-                            break;
-                        }
-                        Ok(status) => errors.push(format!("{candidate}: exited with {status}")),
-                        Err(err) => errors.push(format!("{candidate}: {err}")),
-                    }
-                }
-                if !ran {
-                    warnings.push(format!(
-                        "Failed to extract Unity images (worker {index}). {}",
-                        errors.join(" | ")
-                    ));
-                }
-                warnings
-            })
-            .collect();
-        self.warnings.extend(chunk_warnings);
-
-        // Unity outputs are intermediate PNGs that feed the WebP transcode pass,
-        // so the final asset is counted in flush_image_jobs, not here. Warn on a
-        // missing extraction; its transcode job will then be marked skipped.
-        for job in &all_jobs {
-            if !Path::new(&job.output).exists() {
-                self.warnings.push(format!(
-                    "Skipped asset {}: Unity extraction produced no image",
-                    job.source
-                ));
-            }
-        }
     }
 
     fn flush_image_jobs<F>(&mut self, progress: &mut F)
@@ -3944,147 +3862,6 @@ fn mai_chara_options(
         .collect()
 }
 
-/// Runs the UnityPy extractor under each candidate Python interpreter until one
-/// succeeds (exit 0 and `is_success` confirms the expected files landed). Shared
-/// by the image-to-cache, image-to-path, and bundle-to-dir extractors so the
-/// interpreter discovery, PYTHONPATH wiring, and error aggregation live in one
-/// place. `kind` is "image" or "bundle" for the failure message.
-fn run_unity_extractor<C, S>(
-    asset_path: &Path,
-    kind: &str,
-    configure: C,
-    is_success: S,
-) -> Result<(), String>
-where
-    C: Fn(&mut Command),
-    S: Fn() -> bool,
-{
-    let unitypy_path = find_unitypy_path();
-    let python_paths = unitypy_path
-        .as_ref()
-        .map(|path| path_string(path))
-        .unwrap_or_default();
-    let mut errors = Vec::new();
-
-    for candidate in python_candidates() {
-        let mut command = Command::new(&candidate);
-        configure(&mut command);
-        if !python_paths.is_empty() {
-            command.env("PYTHONPATH", &python_paths);
-        }
-
-        match command.output() {
-            Ok(output) if output.status.success() && is_success() => return Ok(()),
-            Ok(output) => {
-                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                let detail = if stderr.is_empty() { stdout } else { stderr };
-                errors.push(format!("{candidate}: {detail}"));
-            }
-            Err(err) => errors.push(format!("{candidate}: {err}")),
-        }
-    }
-
-    Err(format!(
-        "Failed to extract Unity {kind} from {}. UnityPy path: {}. {}",
-        asset_path.display(),
-        unitypy_path
-            .as_ref()
-            .map(|path| path_string(path))
-            .unwrap_or_else(|| "not found".into()),
-        errors.join(" | ")
-    ))
-}
-
-fn extract_unity_image_to_cache(asset_path: &Path) -> Result<PathBuf, String> {
-    let cache_dir = app_data_dir().join("asset-cache");
-    fs::create_dir_all(&cache_dir)
-        .map_err(|err| format!("Failed to create asset cache directory: {err}"))?;
-    let script_path = cache_dir.join("extract_unity_image.py");
-    write_extract_script(&script_path)?;
-
-    let output_path = cache_dir.join(format!("{}.png", unity_cache_key(asset_path)));
-    if output_path.exists() {
-        return Ok(output_path);
-    }
-
-    run_unity_extractor(
-        asset_path,
-        "image",
-        |command| {
-            command.arg(&script_path).arg(asset_path).arg(&output_path);
-        },
-        || output_path.exists(),
-    )?;
-    Ok(output_path)
-}
-
-fn extract_unity_image_to_path(
-    asset_path: &Path,
-    output_path: &Path,
-    script_path: &Path,
-) -> Result<(), String> {
-    write_extract_script(script_path)?;
-    if output_path.exists() {
-        return Ok(());
-    }
-
-    run_unity_extractor(
-        asset_path,
-        "image",
-        |command| {
-            command.arg(script_path).arg(asset_path).arg(output_path);
-        },
-        || output_path.exists(),
-    )
-}
-
-fn extract_unity_bundle_to_mobile_dir(
-    asset_path: &Path,
-    output_dir: &Path,
-    primary_output_path: &Path,
-    primary_archive_path: &str,
-    script_path: &Path,
-) -> Result<(), String> {
-    write_bundle_extract_script(script_path)?;
-    let metadata_path = output_dir.join("metadata.json");
-
-    run_unity_extractor(
-        asset_path,
-        "bundle",
-        |command| {
-            command
-                .arg(script_path)
-                .arg(asset_path)
-                .arg(output_dir)
-                .arg(primary_output_path)
-                .arg(primary_archive_path);
-        },
-        || primary_output_path.exists() && metadata_path.exists(),
-    )
-}
-
-fn unity_worker_count() -> usize {
-    if let Ok(value) = std::env::var("CARDVIEWER_UNITY_WORKERS") {
-        if let Ok(count) = value.trim().parse::<usize>() {
-            if count > 0 {
-                return count;
-            }
-        }
-    }
-    // Each worker loads a whole Unity bundle + UnityPy into memory, so default
-    // to a conservative concurrency to avoid exhausting RAM. Raise it with
-    // CARDVIEWER_UNITY_WORKERS on machines with spare memory.
-    let cores = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(4);
-    cores.min(4)
-}
-
-fn write_extract_script(script_path: &Path) -> Result<(), String> {
-    write_tool_script(script_path, UNITY_EXTRACT_SCRIPT, "Unity extraction")
-}
-
 fn composite_mai_thumbnails<F>(
     has_mai_card_records: bool,
     output_root: &Path,
@@ -4164,85 +3941,6 @@ fn run_mai_composite_script(
 
 fn write_thumbnail_script(script_path: &Path) -> Result<(), String> {
     write_tool_script(script_path, THUMBNAIL_SCRIPT, "thumbnail generation")
-}
-
-fn write_bundle_extract_script(script_path: &Path) -> Result<(), String> {
-    write_tool_script(
-        script_path,
-        UNITY_BUNDLE_EXTRACT_SCRIPT,
-        "Unity bundle extraction",
-    )
-}
-
-fn write_tool_script(script_path: &Path, content: &str, label: &str) -> Result<(), String> {
-    if let Some(parent) = script_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|err| format!("Failed to create {label} script directory: {err}"))?;
-    }
-    if fs::read_to_string(script_path)
-        .map(|body| body == content)
-        .unwrap_or(false)
-    {
-        return Ok(());
-    }
-    fs::write(script_path, content).map_err(|err| format!("Failed to write {label} script: {err}"))
-}
-
-fn unity_cache_key(asset_path: &Path) -> String {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    path_string(asset_path).hash(&mut hasher);
-    if let Ok(metadata) = fs::metadata(asset_path) {
-        metadata.len().hash(&mut hasher);
-        if let Ok(modified) = metadata.modified() {
-            if let Ok(duration) = modified.duration_since(UNIX_EPOCH) {
-                duration.as_secs().hash(&mut hasher);
-                duration.subsec_nanos().hash(&mut hasher);
-            }
-        }
-    }
-    format!("{:016x}", hasher.finish())
-}
-
-fn app_data_dir() -> PathBuf {
-    std::env::var_os("CARDVIEWER_CACHE_DIR")
-        .or_else(|| std::env::var_os("APPDATA"))
-        .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
-        .join("ConfigArc")
-        .join("CardViewer")
-}
-
-fn python_candidates() -> Vec<String> {
-    if let Some(python) = std::env::var_os("CARDVIEWER_PYTHON") {
-        return vec![PathBuf::from(python).to_string_lossy().into_owned()];
-    }
-
-    vec!["py".into(), "python".into(), "python3".into()]
-}
-
-fn find_unitypy_path() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("CARDVIEWER_UNITYPY_PATH").map(PathBuf::from) {
-        if path.exists() {
-            return Some(path);
-        }
-    }
-
-    let mut roots = Vec::new();
-    if let Ok(current_dir) = std::env::current_dir() {
-        roots.push(current_dir);
-    }
-    roots.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")));
-
-    for root in roots {
-        for ancestor in root.ancestors() {
-            let candidate = ancestor.join(".analysis").join("py");
-            if candidate.join("UnityPy").exists() {
-                return Some(candidate);
-            }
-        }
-    }
-
-    None
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {
