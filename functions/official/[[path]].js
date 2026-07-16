@@ -11,6 +11,13 @@ const ALLOWED_ROOT_KEYS = new Set([
 ]);
 
 const ALLOWED_EXTENSIONS = new Set([".json", ".png", ".jpg", ".jpeg", ".webp"]);
+const CONTENT_TYPES = new Map([
+  [".json", "application/json; charset=utf-8"],
+  [".png", "image/png"],
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+  [".webp", "image/webp"],
+]);
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
 function rawPathname(rawUrl) {
@@ -76,6 +83,19 @@ function unavailableBindingResponse() {
   });
 }
 
+function publicAssetResponse(response, key) {
+  const extensionAt = key.lastIndexOf(".");
+  const contentType = CONTENT_TYPES.get(key.slice(extensionAt).toLowerCase());
+  const headers = new Headers(response.headers);
+  headers.set("Content-Type", contentType);
+  headers.set("X-Content-Type-Options", "nosniff");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export async function onRequest({ request, env, waitUntil }) {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method Not Allowed", {
@@ -119,17 +139,17 @@ export async function onRequest({ request, env, waitUntil }) {
         ? "public, max-age=60, stale-while-revalidate=86400"
         : "public, max-age=31536000, immutable",
     );
-    if (key.endsWith(".json") && !headers.get("content-type")) {
-      headers.set("content-type", "application/json; charset=utf-8");
-    }
-
-    response = new Response(object.body, { headers });
+    response = publicAssetResponse(new Response(object.body, { headers }), key);
     const cacheWrite = cache.put(cacheKey, response.clone());
     if (typeof waitUntil === "function") {
       waitUntil(cacheWrite);
     } else {
       await cacheWrite;
     }
+  } else {
+    // Normalize cached entries too so a response written by an older Function
+    // deployment cannot retain unsafe R2 metadata.
+    response = publicAssetResponse(response, key);
   }
 
   if (request.method === "HEAD") {

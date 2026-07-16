@@ -95,9 +95,11 @@ The public Function accepts only `official/generated/**`,
 - `official/UI_Card_Horo_Pattern_00.png`
 
 It additionally restricts files to `.json`, `.png`, `.jpg`, `.jpeg`, or
-`.webp` and rejects hidden or abnormal path segments. Everything else in R2 is
-outside the Pages route. Do not attach a public custom domain directly to the
-bucket or a broader prefix, because that bypasses this boundary.
+`.webp`, rejects hidden or abnormal path segments, forces the response MIME
+type from that reviewed extension, and sends `X-Content-Type-Options: nosniff`.
+Everything else in R2 is outside the Pages route. Do not attach a public custom
+domain directly to the bucket or a broader prefix, because that bypasses this
+boundary.
 
 Score-card jackets, O.N.G.E.K.I. boss assets, and JSON maps published to R2 use
 the `official/scorecard/...` key space. They are runtime assets, not files to

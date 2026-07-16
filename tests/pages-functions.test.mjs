@@ -35,7 +35,7 @@ function installCache(t) {
   return { entries, matchCalls, putCalls };
 }
 
-function makeBucket(body = "asset-body") {
+function makeBucket(body = "asset-body", contentType) {
   const getCalls = [];
   return {
     getCalls,
@@ -45,7 +45,9 @@ function makeBucket(body = "asset-body") {
         return {
           body,
           httpEtag: '"asset-etag"',
-          writeHttpMetadata() {},
+          writeHttpMetadata(headers) {
+            if (contentType) headers.set("content-type", contentType);
+          },
         };
       },
     },
@@ -88,6 +90,41 @@ test("serves generated, scorecard, and the three reviewed root assets", async (t
     getCalls,
     allowed.map(([, key]) => key),
   );
+});
+
+test("forces response MIME types and nosniff instead of trusting R2 metadata", async (t) => {
+  installCache(t);
+  const { bucket } = makeBucket("<html>not executable</html>", "text/html");
+
+  const json = await invoke({
+    bucket,
+    url: "https://assets.example/official/generated/cards.json",
+  });
+  const image = await invoke({
+    bucket,
+    url: "https://assets.example/official/scorecard/mai/icon.png",
+  });
+
+  assert.equal(json.headers.get("content-type"), "application/json; charset=utf-8");
+  assert.equal(image.headers.get("content-type"), "image/png");
+  assert.equal(json.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(image.headers.get("x-content-type-options"), "nosniff");
+});
+
+test("normalizes unsafe metadata already present in the edge cache", async (t) => {
+  const cache = installCache(t);
+  const url = "https://assets.example/official/scorecard/chuni/jackets/cover.jpg";
+  cache.entries.set(
+    url,
+    new Response("cached-image", { headers: { "content-type": "text/html" } }),
+  );
+  const { bucket, getCalls } = makeBucket();
+
+  const response = await invoke({ bucket, url });
+
+  assert.equal(response.headers.get("content-type"), "image/jpeg");
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.deepEqual(getCalls, []);
 });
 
 test("denies unreviewed prefixes, root assets, hidden files, and non-public extensions", async (t) => {
