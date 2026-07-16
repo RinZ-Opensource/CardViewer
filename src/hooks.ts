@@ -1,6 +1,6 @@
 import React from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { assetLayerLoadPriority, visibleAssetLayers } from "./cards";
+import { assetLayerLoadPriority, visibleAssetLayers } from "./cardAssets";
 import { maiLinkedPrintEdits } from "./cardData";
 import { PLAYER_EDIT_KEYS, SHARED_PLAYER_EDITS_KEY, sharedPlayerEdits } from "./cardEdits";
 import { isSupportedCardRecord } from "./cardSupport";

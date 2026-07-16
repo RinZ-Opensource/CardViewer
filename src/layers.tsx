@@ -4,6 +4,7 @@ import { OFFICIAL_ASSET_ROOT, OfficialFontContext, TmpFontContext, officialAsset
 import { unityRect } from "./geometry";
 import { TMP_TEXT_PADDING, TmpHorizontalAlign, TmpTextVariant, TmpVerticalAlign, clearCanvas, layoutUnityText, loadTmpAtlas, reactText, renderCanvasText, renderTmpText, waitForCanvasFont } from "./textRendering";
 import { OfficialFontKey } from "./types";
+import type { QrSource } from "./types";
 
 export function LayerImage({
   src,
@@ -584,8 +585,6 @@ export function counterFigureBackgroundPosition(figure: number) {
   }
   return `${(col / 3) * 100}% ${(row / 3) * 100}%`;
 }
-
-export type QrSource = string | { data: Uint8ClampedArray; mode: "byte" }[];
 
 export function LayerQr({
   source,

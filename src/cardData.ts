@@ -1,7 +1,7 @@
 import { HOLO_ENABLED, MAI_FRAME_ASSETS, MAI_PASS_CROPS, MAI_PASS_RECT, MU3_LEVEL_LIMITS } from "./constants";
 import { spriteCropDisplayRect } from "./geometry";
-import { QrSource } from "./layers";
 import { CardEdits, CardRecord, PrintField, PrintFieldValue } from "./types";
+import type { QrSource } from "./types";
 
 export function randomDigitString(length: number) {
   const digits = new Uint8Array(length);
@@ -549,4 +549,3 @@ export function clampInt(value: number, min: number, max: number) {
 export function twoDigits(value: number) {
   return String(value).padStart(2, "0");
 }
-

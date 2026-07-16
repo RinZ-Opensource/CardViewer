@@ -97,6 +97,7 @@ export type LoadedAssetDataUrls = {
   signature: string;
   urls: Record<string, string>;
 };
+export type QrSource = string | { data: Uint8ClampedArray; mode: "byte" }[];
 export type ViewMode = "2d" | "3d";
 export type DeploymentMode = "private" | "public";
 export type Bounds = {

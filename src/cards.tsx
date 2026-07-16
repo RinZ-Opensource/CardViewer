@@ -1,11 +1,10 @@
 import React from "react";
-import { clampInt, fieldBool, fieldNumber, fieldString, formatDisplaySerial, formatMaiEndDate, maiCardTypeEffects, maiCharaChoice, maiEffectIconAsset, maiFrameAssets, maiOfficialHolo, maiRatingBaseAsset, mu3AttackValue, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3FrameAsset, mu3MaxOwnCount, mu3NeedsSign, mu3RareSpriteName, mu3RarityKind, mu3ShowMainFrame, mu3SkillAsset, numericField, officialHolo, qrSource, twoDigits } from "./cardData";
+import { clampInt, fieldBool, fieldNumber, fieldString, formatDisplaySerial, formatMaiEndDate, maiCardTypeEffects, maiEffectIconAsset, maiFrameAssets, maiRatingBaseAsset, mu3AttackValue, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3FrameAsset, mu3MaxOwnCount, mu3RareSpriteName, mu3RarityKind, mu3ShowMainFrame, mu3SkillAsset, numericField, officialHolo, qrSource, twoDigits } from "./cardData";
 import { CANVAS_FONT_SEGA_MARU_DB, CARD_TILT_X_MAX, CARD_TILT_Y_MAX, MAI_CHARA_NAME_RECT, MAI_EFFECT_ICON_RECT, MAI_END_DATE_RECT, MAI_FRIEND_CODE_BASE_RECT, MAI_MASTER_ICON_RECT, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MAI_PLAYER_NAME_BASE_RECT, MAI_QR_CODE_BASE_RECT, MAI_RATING_BASE_RECT, MAI_RATING_ICON_RECT, MAI_SERIAL_CODE_BASE_RECT, MU3_ATTRIBUTE_RECT, MU3_AWAKEN_MARK_RECT, MU3_CMN_ICON_RECT, MU3_DIGITAL_MARK_RECT, MU3_GRADE_RECT, MU3_LIMIT_BREAK_STAR_POSITIONS, MU3_LIMIT_BREAK_STAR_Y, MU3_MAX_LABEL_RECT, MU3_QR_BASE_RECT, MU3_RARE_SPRITE_RECT, MU3_RIGHTS_PLATE_RECT, MU3_RIGHTS_RECT, MU3_SKILL_BASE_RECT, MU3_USER_NAME_BASE_RECT, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
 import { HoloShaderLayer } from "./holo";
-import { ImageLoadPriority, isStaticAssetPath } from "./imageLoader";
 import { LayerCanvasText, LayerChuCounter, LayerDigitCounter, LayerImage, LayerQr, LayerTmpText, LayerUnityText } from "./layers";
 import { clampNumber } from "./textRendering";
-import { AssetLayer, CardRecord, ViewMode } from "./types";
+import { CardRecord, ViewMode } from "./types";
 
 export function PreviewStage({
   card,
@@ -229,99 +228,6 @@ export function cardLightStyle(tilt: { x: number; y: number }, mode: ViewMode): 
   } as React.CSSProperties;
 }
 
-export function visibleAssetLayers(card: CardRecord | null, streamingAssets?: string) {
-  if (!card) return [];
-  const layers = card.assetLayers ?? [];
-  if (card.game === "MAI") {
-    const dynamicLayers = streamingAssets ? dynamicMaiAssetLayers(card, streamingAssets) : [];
-    const dynamicKeys = new Set(dynamicLayers.map((layer) => layer.key));
-    const fallbackLayers = layers
-      .filter((layer) => dynamicKeys.has(layer.key))
-      .map(maiFallbackAssetLayer);
-    const mergedLayers = [
-      ...dynamicLayers,
-      ...fallbackLayers,
-      ...layers.filter((layer) => !dynamicKeys.has(layer.key)),
-    ];
-    return mergedLayers.filter((layer) => !isMaiMaskLayer(layer.key) || maiOfficialHolo(card));
-  }
-  if (card.game === "MU3") {
-    return layers.filter((layer) => {
-      if (layer.key === "mu3Mask" || layer.key === "mu3Holo") return officialHolo(card);
-      if (layer.key === "mu3Sign" || layer.key === "mu3SignMask") {
-        return officialHolo(card) && mu3NeedsSign(card);
-      }
-      if (layer.key === "mu3Grade") return !fieldBool(card, "hideGrade");
-      if (layer.key === "mu3Rights") return numericField(card, "rightsId", 0) > 0;
-      return true;
-    });
-  }
-  return layers;
-}
-
-export function maiFallbackAssetLayer(layer: AssetLayer): AssetLayer {
-  return {
-    ...layer,
-    key: `${layer.key}Fallback`,
-    label: `${layer.label} fallback`,
-  };
-}
-
-export function isMaiMaskLayer(key: string) {
-  return key === "maiMask" || key === "maiMaskFallback";
-}
-
-export function selectedAssetSignature(card: CardRecord | null, streamingAssets?: string) {
-  return visibleAssetLayers(card, streamingAssets)
-    .map((layer) => `${layer.key}:${layer.path}`)
-    .join("|");
-}
-
-export function assetLayerLoadPriority(layer: AssetLayer): ImageLoadPriority {
-  return ["mu3Mask", "mu3Holo", "mu3Sign", "mu3SignMask"].includes(layer.key) ? "normal" : "high";
-}
-
-export function joinAssetPath(root: string, stem: string) {
-  if (isStaticAssetPath(root)) {
-    const normalizedRoot = root.replace(/\/+$/, "");
-    const fileName = stem.match(/\.(png|jpg|jpeg|webp)$/i) ? stem : `${stem}.png`;
-    return `${normalizedRoot}/${fileName}`;
-  }
-  return `${root}\\${stem}`;
-}
-
-export function dynamicMaiAssetLayers(card: CardRecord, streamingAssets: string): AssetLayer[] {
-  const typeId = numericField(card, "typeId", -1);
-  const charaId = numericField(card, "charaId", -1);
-  const choice = maiCharaChoice(card, charaId);
-  const mapId = choice?.mapId ?? numericField(card, "mapId", -1);
-  const root = fieldString(card, "maiAssetRoot") || `${streamingAssets}\\assets_mai`;
-  const layers: AssetLayer[] = [];
-  if (typeId >= 0 && mapId >= 0) {
-    layers.push({
-      key: "maiBase",
-      label: "MAI card base",
-      path: joinAssetPath(
-        root,
-        `ui_cardbase_${String(typeId).padStart(7, "0")}_${String(mapId).padStart(6, "0")}`,
-      ),
-    });
-  }
-  if (charaId > 0) {
-    layers.push({
-      key: "maiChara",
-      label: "MAI character layer",
-      path: joinAssetPath(root, `ui_cardchara_${String(charaId).padStart(6, "0")}`),
-    });
-    layers.push({
-      key: "maiMask",
-      label: "MAI holo character mask",
-      path: joinAssetPath(root, `ui_cardcharamask_${String(charaId).padStart(6, "0")}`),
-    });
-  }
-  return layers;
-}
-
 export function OfficialCardCanvas({
   card,
   imageDataUrl,
@@ -355,10 +261,6 @@ export function OfficialCardCanvas({
   }
 
   return <Mu3OfficialCard card={card} imageDataUrl={imageDataUrl} assetDataUrls={assetDataUrls} lightStyle={lightStyle} />;
-}
-
-export function usesPrimaryImageDataUrl(card: CardRecord) {
-  return !(USE_OFFICIAL_ASSETS && card.game === "MU3" && card.recordType === "Card");
 }
 
 export function PublicCardCanvas({
@@ -886,4 +788,3 @@ export function Mu3AssetCard({
     </div>
   );
 }
-

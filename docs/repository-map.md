@@ -23,10 +23,11 @@ must remain local.
   metadata used by the score-card picker.
 - `scripts/cloudflare/` and `scripts/scorecard-extract/`: repository maintenance
   helpers for R2 manifests and score-card assets.
-- `tests/persistence.test.mjs`, `tests/cache-reliability.test.mjs`, and
-  `tests/tracked-secrets.test.mjs`: frontend reliability and secret-scanner
-  regressions run by `npm run check`, alongside the public-dist and Pages
-  Function suites.
+- `tests/module-boundaries.test.mjs` keeps shared frontend modules below their
+  consumers: hooks cannot depend on cards, card data cannot depend on render
+  layers, and card assets cannot depend on cards, hooks, or the app shell. It
+  runs under `npm run check` alongside the frontend reliability,
+  secret-scanner, public-dist, and Pages Function suites.
 - `docs/online-preview.md`: authoritative public/private build and Cloudflare
   deployment runbook.
 - `public/`: repository-safe static files copied verbatim by Vite. It may hold
