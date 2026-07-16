@@ -14,9 +14,10 @@ must remain local.
   database adapters, asset lookup helpers, isolated score-input sanitizers,
   default-state factories, and surface configuration. `ScoreCardSurface`
   coordinates state and card rendering, the three `*ScoreCardEditor` files own
-  their controlled form UI, and `useScoreCardSongDb` owns lazy song-database
-  loading and retry state. This is part of the web app, not the Android
-  CardMaker prototype.
+  their controlled form UI, `useScoreCardSongDb` owns lazy song-database loading
+  and retry state, and `useScoreCardState` owns stored state initialization and
+  persistence effects. This is part of the web app, not the Android CardMaker
+  prototype.
 - `src-tauri/`: Tauri desktop shell plus Rust scanners and exporters. The
   `export_mobile_pack` binary is a local pack-building tool; its presence does
   not make Android a supported release target. The image IPC reader serves only

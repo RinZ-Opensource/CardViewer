@@ -108,6 +108,29 @@ const boundaries = [
       "./types",
     ],
   },
+  {
+    file: "src/scorecard/useScoreCardState.ts",
+    allowed: [
+      "react",
+      "../persistence",
+      "./chuniTypes",
+      "./ongekiTypes",
+      "./scorecardDefaults",
+      "./scorecardSurfaceConfig",
+      "./types",
+    ],
+    forbidden: [
+      "../exportPng",
+      "./MaiScoreCard",
+      "./ChuniScoreCard",
+      "./ChuniMusicBoxCard",
+      "./OngekiScoreCard",
+      "./OngekiMusicBtCard",
+      "./MaiScoreCardEditor",
+      "./ChuniScoreCardEditor",
+      "./OngekiScoreCardEditor",
+    ],
+  },
 ];
 
 const holoMaskTypeExports = [
@@ -346,6 +369,36 @@ test("ScoreCardSurface delegates song database loading to its hook", async () =>
   }
 
   assert.deepEqual(imported.filter((name) => forbidden.has(name)), []);
+});
+
+test("ScoreCardSurface delegates stored score-card state to its hooks", async () => {
+  const file = "src/scorecard/ScoreCardSurface.tsx";
+  const source = await readFile(path.join(projectRoot, file), "utf8");
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const calls = [];
+
+  function visit(node) {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      calls.push(node.expression.text);
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  assert.equal(calls.filter((name) => name === "useScoreCardState").length, 1);
+  assert.equal(calls.filter((name) => name === "usePersistScoreCardState").length, 1);
+  assert.equal(
+    importedModules(file, source).some(
+      ({ specifier }) => normalizeModule(specifier) === normalizeModule("../persistence"),
+    ),
+    false,
+  );
 });
 
 for (const editor of [

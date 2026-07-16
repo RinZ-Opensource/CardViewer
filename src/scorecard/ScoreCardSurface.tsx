@@ -1,12 +1,6 @@
 import React from "react";
 import { exportNodeAsPng, renderNodeToPng } from "../exportPng";
 import {
-  loadStoredRecord,
-  readLocalStorage,
-  writeLocalStorage,
-  writeLocalStorageJson,
-} from "../persistence";
-import {
   CHUNI_MUSICBOX_EXPORT_WIDTH,
   CHUNI_MUSICBOX_HEIGHT,
   CHUNI_MUSICBOX_WIDTH,
@@ -40,32 +34,13 @@ import {
 } from "./OngekiScoreCard";
 import { OngekiScoreCardEditor } from "./OngekiScoreCardEditor";
 import { CHUNI_SAMPLE_SONGS } from "./chuniSamples";
-import {
-  ChuniCardType,
-  ChuniDifficulty,
-  ChuniScoreState,
-  ChuniSong,
-} from "./chuniTypes";
+import { ChuniCardType, ChuniDifficulty, ChuniSong } from "./chuniTypes";
 import { ONGEKI_SAMPLE_SONGS } from "./ongekiSamples";
-import {
-  OngekiCardType,
-  OngekiDifficulty,
-  OngekiScoreState,
-  OngekiSong,
-} from "./ongekiTypes";
+import { OngekiCardType, OngekiDifficulty, OngekiSong } from "./ongekiTypes";
 import { defaultChuniState, defaultOngekiState, defaultState } from "./scorecardDefaults";
 import {
-  CHUNI_STORAGE_KEY,
-  CHUNI_STORAGE_OPTIONS,
   GAMES,
-  GAME_STORAGE_KEY,
-  MAI_STORAGE_OPTIONS,
-  ONGEKI_STORAGE_KEY,
-  ONGEKI_STORAGE_OPTIONS,
   SCORECARD_ASSET_SENTINEL,
-  SCORE_STORAGE_KEY,
-  SHOW_CHUNI_CONFIRMED_START,
-  SHOW_PANEL_CARDS,
   SHOW_SCORECARD_EXPORT,
   SHOW_SCORECARD_RESET,
   type ScoreCardGame,
@@ -80,6 +55,7 @@ import {
 } from "./songdb";
 import { MaiDifficulty, MaiScoreState, MaiSong } from "./types";
 import { useScoreCardSongDb } from "./useScoreCardSongDb";
+import { usePersistScoreCardState, useScoreCardState } from "./useScoreCardState";
 
 /** Active card design-space size; the stage auto-fit zoom uses this. */
 function designSize(
@@ -98,36 +74,20 @@ function designSize(
     : { width: ONGEKI_SCORECARD_WIDTH, height: ONGEKI_SCORECARD_HEIGHT };
 }
 
-function loadGame(): ScoreCardGame {
-  const stored = readLocalStorage(GAME_STORAGE_KEY);
-  return GAMES.some((game) => game.key === stored) ? (stored as ScoreCardGame) : "mai";
-}
-
 export function ScoreCardSurface() {
-  const [game, setGame] = React.useState<ScoreCardGame>(loadGame);
-  const [state, setState] = React.useState<MaiScoreState>(() =>
-    loadStoredRecord(SCORE_STORAGE_KEY, defaultState, MAI_STORAGE_OPTIONS),
-  );
-  const [chuniState, setChuniState] = React.useState<ChuniScoreState>(() => {
-    const stored = loadStoredRecord(
-      CHUNI_STORAGE_KEY,
-      defaultChuniState,
-      CHUNI_STORAGE_OPTIONS,
-    );
-    return {
-      ...stored,
-      cardType: SHOW_PANEL_CARDS ? stored.cardType : "musicbox",
-      confirmed: SHOW_CHUNI_CONFIRMED_START ? stored.confirmed : false,
-    };
-  });
-  const [ongekiState, setOngekiState] = React.useState<OngekiScoreState>(() => {
-    const stored = loadStoredRecord(
-      ONGEKI_STORAGE_KEY,
-      defaultOngekiState,
-      ONGEKI_STORAGE_OPTIONS,
-    );
-    return SHOW_PANEL_CARDS ? stored : { ...stored, cardType: "musicbt" };
-  });
+  const {
+    game,
+    setGame,
+    state,
+    setState,
+    chuniState,
+    setChuniState,
+    ongekiState,
+    setOngekiState,
+    update,
+    updateChuni,
+    updateOngeki,
+  } = useScoreCardState();
   const [exportingPng, setExportingPng] = React.useState(false);
   const [exportError, setExportError] = React.useState("");
   const captureRef = React.useRef<HTMLDivElement | null>(null);
@@ -188,28 +148,7 @@ export function ScoreCardSurface() {
     return () => observer.disconnect();
   }, [game, design.width, design.height]);
 
-  React.useEffect(() => {
-    writeLocalStorage(GAME_STORAGE_KEY, game);
-  }, [game]);
-
-  React.useEffect(() => {
-    writeLocalStorageJson(SCORE_STORAGE_KEY, state);
-  }, [state]);
-
-  React.useEffect(() => {
-    writeLocalStorageJson(CHUNI_STORAGE_KEY, chuniState);
-  }, [chuniState]);
-
-  React.useEffect(() => {
-    if (SHOW_CHUNI_CONFIRMED_START || !chuniState.confirmed) return;
-    setChuniState((current) =>
-      current.confirmed ? { ...current, confirmed: false } : current,
-    );
-  }, [chuniState.confirmed]);
-
-  React.useEffect(() => {
-    writeLocalStorageJson(ONGEKI_STORAGE_KEY, ongekiState);
-  }, [ongekiState]);
+  usePersistScoreCardState({ game, state, chuniState, setChuniState, ongekiState });
 
   // Dev-only automation hooks for generating sample PNGs from the console.
   React.useEffect(() => {
@@ -350,24 +289,6 @@ export function ScoreCardSurface() {
       };
     });
   }, [songDb.ongeki]);
-
-  function update<Key extends keyof MaiScoreState>(key: Key, value: MaiScoreState[Key]) {
-    setState((current) => ({ ...current, [key]: value }));
-  }
-
-  function updateChuni<Key extends keyof ChuniScoreState>(
-    key: Key,
-    value: ChuniScoreState[Key],
-  ) {
-    setChuniState((current) => ({ ...current, [key]: value }));
-  }
-
-  function updateOngeki<Key extends keyof OngekiScoreState>(
-    key: Key,
-    value: OngekiScoreState[Key],
-  ) {
-    setOngekiState((current) => ({ ...current, [key]: value }));
-  }
 
   // Song/difficulty selection (re-)applies the chart-derived fields; manual
   // edits made afterwards stick until the song or difficulty changes again.
