@@ -30,6 +30,9 @@ must remain local.
   score-card surface configuration cannot depend on React, persistence, or card
   components. It runs under `npm run check` alongside the score-input, frontend
   reliability, secret-scanner, public-dist, and Pages Function suites.
+- `.github/workflows/ci.yml`: read-only pull-request and `main` validation for
+  the web checks and locked Rust tests; it does not deploy or reference
+  repository secrets.
 - `docs/online-preview.md`: authoritative public/private build and Cloudflare
   deployment runbook.
 - `public/`: repository-safe static files copied verbatim by Vite. It may hold

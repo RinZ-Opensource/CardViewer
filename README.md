@@ -28,11 +28,13 @@ preview boundary, and deployment checklist.
 
 Use Node.js 22.20.0, as pinned by the root `.node-version` file.
 
-Install both locked JavaScript toolchains after a clean checkout:
+Install both locked JavaScript toolchains and the pinned Python dependency used
+by the Rust image-export tests after a clean checkout:
 
 ```powershell
 npm.cmd ci
 npm.cmd --prefix workers/songdb-sync ci
+python -m pip install --requirement src-tauri/requirements-test.txt --only-binary=:all:
 ```
 
 ```powershell
@@ -56,7 +58,8 @@ syntax-checks the Function, and type-checks the songdb Worker. It is not an R2
 integration test.
 The static `dist` guard and the runtime R2 allowlist are independent release
 gates; passing either one does not validate the other. `check:all` also runs the
-Rust/Tauri check.
+Rust/Tauri test suite against the locked Cargo dependencies through
+`check:rust`.
 
 `VITE_SONGDB_BASE_URL` may be supplied at dev/build time to use the optional
 song database Worker. It is a public endpoint setting, not a secret. If it is
