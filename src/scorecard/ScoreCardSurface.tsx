@@ -103,6 +103,8 @@ const CARD_TYPES: Array<{ key: "panel" | "score"; label: string }> = [
 
 /** Panel-style cards stay implemented, but are hidden until their UX is ready. */
 const SHOW_PANEL_CARDS = false;
+/** Keep the unfinished CHUNITHM decide/start state disabled and out of the UI. */
+const SHOW_CHUNI_CONFIRMED_START = false;
 /** Keep unfinished/destructive workbench actions out of the UI for now. */
 const SHOW_SCORECARD_RESET = false;
 const SHOW_SCORECARD_EXPORT = false;
@@ -325,7 +327,11 @@ export function ScoreCardSurface() {
   );
   const [chuniState, setChuniState] = React.useState<ChuniScoreState>(() => {
     const stored = loadStored(CHUNI_STORAGE_KEY, defaultChuniState);
-    return SHOW_PANEL_CARDS ? stored : { ...stored, cardType: "musicbox" };
+    return {
+      ...stored,
+      cardType: SHOW_PANEL_CARDS ? stored.cardType : "musicbox",
+      confirmed: SHOW_CHUNI_CONFIRMED_START ? stored.confirmed : false,
+    };
   });
   const [ongekiState, setOngekiState] = React.useState<OngekiScoreState>(() => {
     const stored = loadStored(ONGEKI_STORAGE_KEY, defaultOngekiState);
@@ -481,6 +487,13 @@ export function ScoreCardSurface() {
   React.useEffect(() => {
     localStorage.setItem(CHUNI_STORAGE_KEY, JSON.stringify(chuniState));
   }, [chuniState]);
+
+  React.useEffect(() => {
+    if (SHOW_CHUNI_CONFIRMED_START || !chuniState.confirmed) return;
+    setChuniState((current) =>
+      current.confirmed ? { ...current, confirmed: false } : current,
+    );
+  }, [chuniState.confirmed]);
 
   React.useEffect(() => {
     localStorage.setItem(ONGEKI_STORAGE_KEY, JSON.stringify(ongekiState));
@@ -1087,31 +1100,38 @@ export function ScoreCardSurface() {
                   />
                 </label>
 
-                <label className="control inline">
-                  <input
-                    type="checkbox"
-                    checked={chuniState.confirmed}
-                    onChange={(event) => updateChuni("confirmed", event.target.checked)}
-                  />
-                  <span>已确认 START (decide frame)</span>
-                </label>
+                {SHOW_CHUNI_CONFIRMED_START ? (
+                  <>
+                    <label className="control inline">
+                      <input
+                        type="checkbox"
+                        checked={chuniState.confirmed}
+                        onChange={(event) => updateChuni("confirmed", event.target.checked)}
+                      />
+                      <span>已确认 START (decide frame)</span>
+                    </label>
 
-                {chuniState.confirmed ? (
-                  <label className="control">
-                    <span>Start Banner</span>
-                    <select
-                      value={chuniState.startBanner}
-                      onChange={(event) =>
-                        updateChuni("startBanner", event.target.value as ChuniStartBanner)
-                      }
-                    >
-                      {CHUNI_BANNER_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    {chuniState.confirmed ? (
+                      <label className="control">
+                        <span>Start Banner</span>
+                        <select
+                          value={chuniState.startBanner}
+                          onChange={(event) =>
+                            updateChuni(
+                              "startBanner",
+                              event.target.value as ChuniStartBanner,
+                            )
+                          }
+                        >
+                          {CHUNI_BANNER_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </>
                 ) : null}
               </>
             )}
