@@ -6,7 +6,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
     fs,
     hash::{Hash, Hasher},
-    io::{Read, Write},
+    io::Read,
     path::{Path, PathBuf},
     process::Command,
     sync::{Mutex, OnceLock, RwLock},
@@ -98,11 +98,13 @@ impl ImageDataUrlCache {
     }
 }
 
+mod archive;
 mod asset_format;
 mod config;
 mod types;
 mod xmlutil;
 
+use archive::{archive_path, path_from_archive_path, write_cmpack_archive};
 use asset_format::{
     classify_export_asset, detect_image_mime, image_export_file_name, is_image_extension,
     is_lossless_webp_layer, is_unity_asset_bundle, read_file_header, thumbnail_file_name,
@@ -1012,7 +1014,12 @@ where
         "Writing mobile pack archive: {}",
         output_path.display()
     ));
-    let (pack_file_count, pack_size_bytes) = write_cmpack_archive(&staging_root, &output_path)?;
+    let archive_files = walk_files(&staging_root)
+        .into_iter()
+        .filter(|file| !is_mobile_internal_tool_file(&staging_root, file))
+        .collect();
+    let (pack_file_count, pack_size_bytes) =
+        write_cmpack_archive(&staging_root, &output_path, archive_files)?;
     progress("Mobile pack export finished".to_string());
 
     Ok(MobilePackResult {
@@ -4485,141 +4492,8 @@ fn find_unitypy_path() -> Option<PathBuf> {
     None
 }
 
-fn write_cmpack_archive(staging_root: &Path, output_path: &Path) -> Result<(usize, u64), String> {
-    if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|err| format!("Failed to create archive directory: {err}"))?;
-    }
-    let mut output = fs::File::create(output_path).map_err(|err| {
-        format!(
-            "Failed to create mobile pack {}: {err}",
-            output_path.display()
-        )
-    })?;
-    let mut files = walk_files(staging_root);
-    files.sort();
-    let mut count = 0usize;
-    for file in files {
-        if is_mobile_internal_tool_file(staging_root, &file) {
-            continue;
-        }
-        let relative = archive_path(file.strip_prefix(staging_root).unwrap_or(&file))?;
-        write_ustar_file(&mut output, &relative, &file)?;
-        count += 1;
-    }
-    output
-        .write_all(&[0u8; 1024])
-        .map_err(|err| format!("Failed to finalize mobile pack: {err}"))?;
-    output
-        .flush()
-        .map_err(|err| format!("Failed to flush mobile pack: {err}"))?;
-    let size = fs::metadata(output_path)
-        .map_err(|err| format!("Failed to inspect mobile pack: {err}"))?
-        .len();
-    Ok((count, size))
-}
-
-fn write_ustar_file(
-    output: &mut fs::File,
-    archive_name: &str,
-    source: &Path,
-) -> Result<(), String> {
-    let data = fs::read(source)
-        .map_err(|err| format!("Failed to read archive source {}: {err}", source.display()))?;
-    let header = ustar_header(archive_name, data.len() as u64)?;
-    output
-        .write_all(&header)
-        .map_err(|err| format!("Failed to write archive header for {archive_name}: {err}"))?;
-    output
-        .write_all(&data)
-        .map_err(|err| format!("Failed to write archive data for {archive_name}: {err}"))?;
-    let padding = (512 - (data.len() % 512)) % 512;
-    if padding > 0 {
-        output
-            .write_all(&vec![0u8; padding])
-            .map_err(|err| format!("Failed to write archive padding for {archive_name}: {err}"))?;
-    }
-    Ok(())
-}
-
-fn ustar_header(archive_name: &str, size: u64) -> Result<[u8; 512], String> {
-    let (name, prefix) = split_ustar_name(archive_name)?;
-    let mut header = [0u8; 512];
-    write_tar_field(&mut header[0..100], name.as_bytes());
-    write_tar_octal(&mut header[100..108], 0o644);
-    write_tar_octal(&mut header[108..116], 0);
-    write_tar_octal(&mut header[116..124], 0);
-    write_tar_octal(&mut header[124..136], size);
-    write_tar_octal(&mut header[136..148], unix_timestamp_secs());
-    for byte in &mut header[148..156] {
-        *byte = b' ';
-    }
-    header[156] = b'0';
-    write_tar_field(&mut header[257..263], b"ustar\0");
-    write_tar_field(&mut header[263..265], b"00");
-    write_tar_field(&mut header[345..500], prefix.as_bytes());
-    let checksum: u32 = header.iter().map(|byte| *byte as u32).sum();
-    let checksum_text = format!("{checksum:06o}\0 ");
-    write_tar_field(&mut header[148..156], checksum_text.as_bytes());
-    Ok(header)
-}
-
-fn split_ustar_name(archive_name: &str) -> Result<(String, String), String> {
-    let normalized = archive_name.replace('\\', "/");
-    if normalized.len() <= 100 {
-        return Ok((normalized, String::new()));
-    }
-    let mut best = None;
-    for (index, ch) in normalized.char_indices() {
-        if ch != '/' {
-            continue;
-        }
-        let prefix = &normalized[..index];
-        let name = &normalized[index + 1..];
-        if prefix.len() <= 155 && name.len() <= 100 {
-            best = Some((name.to_string(), prefix.to_string()));
-        }
-    }
-    best.ok_or_else(|| format!("archive path is too long for cmpack v1: {normalized}"))
-}
-
-fn write_tar_field(target: &mut [u8], value: &[u8]) {
-    let len = target.len().min(value.len());
-    target[..len].copy_from_slice(&value[..len]);
-}
-
-fn write_tar_octal(target: &mut [u8], value: u64) {
-    let text = format!("{value:0width$o}\0", width = target.len() - 1);
-    write_tar_field(target, text.as_bytes());
-}
-
 fn path_string(path: &Path) -> String {
     path.to_string_lossy().replace('/', "\\")
-}
-
-fn archive_path(path: &Path) -> Result<String, String> {
-    let mut parts = Vec::new();
-    for component in path.components() {
-        let value = component.as_os_str().to_string_lossy();
-        if value.is_empty() || value == "." {
-            continue;
-        }
-        if value == ".." {
-            return Err(format!("archive path escapes root: {}", path.display()));
-        }
-        parts.push(value.replace('\\', "/"));
-    }
-    if parts.is_empty() {
-        Err("empty archive path".to_string())
-    } else {
-        Ok(parts.join("/"))
-    }
-}
-
-fn path_from_archive_path(path: &str) -> PathBuf {
-    path.split('/')
-        .filter(|part| !part.is_empty())
-        .fold(PathBuf::new(), |acc, part| acc.join(part))
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {
