@@ -102,6 +102,7 @@ mod archive;
 mod asset_format;
 mod config;
 mod fsutil;
+mod games;
 mod types;
 mod xmlutil;
 
@@ -112,7 +113,11 @@ use asset_format::{
     webp_export_file_name, ExportAssetKind,
 };
 use config::*;
-use fsutil::{find_named_files, path_string, resolve_sibling, same_path, walk_files};
+use fsutil::{find_named_files, path_string, resolve_sibling, walk_files};
+use games::{
+    content_asset_dirs, game_data_leaf_roots, game_data_pack_paths,
+    resolve_content_asset_root_with_fallback_roots, resolve_content_asset_with_fallback_roots,
+};
 pub use types::{
     AssetLayer, CardRecord, MobilePackResult, OnlineExportResult, PrintField, PrintOption,
     ScanResult, ScanStats,
@@ -3996,93 +4001,6 @@ fn read_le_i64(bytes: &[u8], offset: usize) -> Result<i64, String> {
         bytes[offset + 6],
         bytes[offset + 7],
     ]))
-}
-
-fn resolve_content_asset(
-    stem: &str,
-    content_root: &Path,
-    game: &str,
-    asset_dir: &str,
-) -> Option<String> {
-    for dir in content_asset_dirs(content_root, game, asset_dir) {
-        let path = dir.join(stem);
-        if path.exists() {
-            return Some(path_string(&path));
-        }
-    }
-    None
-}
-
-fn resolve_content_asset_with_fallback_roots(
-    stem: &str,
-    preferred_content_root: &Path,
-    content_roots: &[PathBuf],
-    game: &str,
-    asset_dir: &str,
-) -> Option<String> {
-    if let Some(path) = resolve_content_asset(stem, preferred_content_root, game, asset_dir) {
-        return Some(path);
-    }
-
-    for content_root in content_roots.iter().rev() {
-        if same_path(content_root, preferred_content_root) {
-            continue;
-        }
-        if let Some(path) = resolve_content_asset(stem, content_root, game, asset_dir) {
-            return Some(path);
-        }
-    }
-
-    None
-}
-
-fn resolve_content_asset_root_with_fallback_roots(
-    preferred_content_root: &Path,
-    content_roots: &[PathBuf],
-    game: &str,
-    asset_dir: &str,
-) -> Option<PathBuf> {
-    if let Some(path) = content_asset_dirs(preferred_content_root, game, asset_dir)
-        .into_iter()
-        .find(|path| path.exists())
-    {
-        return Some(path);
-    }
-
-    for content_root in content_roots.iter().rev() {
-        if same_path(content_root, preferred_content_root) {
-            continue;
-        }
-        if let Some(path) = content_asset_dirs(content_root, game, asset_dir)
-            .into_iter()
-            .find(|path| path.exists())
-        {
-            return Some(path);
-        }
-    }
-
-    None
-}
-
-fn content_asset_dirs(content_root: &Path, game: &str, asset_dir: &str) -> Vec<PathBuf> {
-    vec![
-        content_root.join(asset_dir),
-        content_root.join(game).join(asset_dir),
-    ]
-}
-
-fn game_data_leaf_roots(content_root: &Path, game: &str, leaf: &str) -> Vec<PathBuf> {
-    vec![
-        content_root.join(game).join("Data").join("A000").join(leaf),
-        content_root.join(game).join(leaf),
-    ]
-}
-
-fn game_data_pack_paths(content_root: &Path, game: &str) -> Vec<PathBuf> {
-    vec![
-        content_root.join(game).join("Data").join("A000.pac"),
-        content_root.join(game).join("A000.pac"),
-    ]
 }
 
 fn format_mai_chara_choices(

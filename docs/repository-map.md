@@ -30,6 +30,8 @@ must remain local.
   export keeps ownership of which staged files are eligible for the archive.
   Recursive file discovery, sibling resolution, path comparison, and path
   display normalization live in the dependency-free `scanner/fsutil.rs` leaf.
+  Shared game-content path construction and fallback-root selection live in
+  `scanner/games/common.rs`, below the individual game parsers.
 - `functions/`: Cloudflare Pages Function for serving an allowlisted subset of
   `/official/*` from the `ASSETS_BUCKET` R2 binding. Public Cloudflare does not
   serve `/fonts/private/*`.
