@@ -2,32 +2,37 @@ import React from "react";
 import { clampInt, fieldBool, fieldNumber, maiCardTypeEffects, maiEffectIconAsset, maiFrameAssets, maiRatingBaseAsset, mu3AttributeName, mu3AwakenMarkAsset, mu3CardNames, mu3HoloBgAsset, mu3HoloFrameBaseAsset, mu3HoloFrameOverlayAsset, mu3NeedsSign, mu3RareSpriteName, mu3SkillAsset, numericField, twoDigits } from "./cardData";
 import { CARD_HEIGHT, CARD_WIDTH, MAI_CHARA_NAME_RECT, MAI_EFFECT_ICON_RECT, MAI_END_DATE_RECT, MAI_FRIEND_CODE_BASE_RECT, MAI_HOLO_UI_MASKS, MAI_MASTER_ICON_RECT, MAI_NAME_BASE_RECT, MAI_PERIOD_LABEL_RECT, MAI_PLAYER_NAME_BASE_RECT, MAI_QR_CODE_BASE_RECT, MAI_RATING_BASE_RECT, MAI_RATING_ICON_RECT, MAI_SERIAL_CODE_BASE_RECT, MU3_ATTRIBUTE_RECT, MU3_AWAKEN_MARK_RECT, MU3_CMN_ICON_RECT, MU3_DIGITAL_MARK_RECT, MU3_GRADE_RECT, MU3_MAX_LABEL_RECT, MU3_QR_BASE_RECT, MU3_RARE_SPRITE_RECT, MU3_RIGHTS_PLATE_RECT, MU3_RIGHTS_RECT, MU3_SKILL_BASE_RECT, MU3_USER_NAME_BASE_RECT, TmpFontContext, USE_OFFICIAL_ASSETS, officialAsset } from "./constants";
 import { withUnityCanvasRect } from "./geometry";
-import { TMP_TEXT_PADDING, TmpHorizontalAlign, TmpTextVariant, TmpVerticalAlign, clampNumber, loadTmpAtlas, rasterizeTmpText } from "./textRendering";
+import {
+  FRONT_MASK_DILATION,
+  binarizeRenderedPixels,
+  dilateBinaryMask,
+  normalizeMaskData,
+  paintBinaryMask,
+} from "./holoMaskMath";
+import type {
+  HoloMaskImage,
+  HoloMaskInput,
+  HoloMaskRect,
+  HoloMaskRenderState,
+  HoloTmpTextMask,
+} from "./holoMaskTypes";
+import { TMP_TEXT_PADDING, loadTmpAtlas, rasterizeTmpText } from "./textRendering";
 import { CardRecord, TmpFontMetrics } from "./types";
 
-// Alpha below this (0-255) is treated as fully transparent when deriving masks.
-const MASK_ALPHA_EPSILON = 8;
-// Grow the front-element mask outward by this many 1px passes so the foil is
-// reliably cleared around printed art/text edges.
-const FRONT_MASK_DILATION = 7;
+export type {
+  HoloCssMaskOptions,
+  HoloMaskImage,
+  HoloMaskInput,
+  HoloMaskMode,
+  HoloMaskRect,
+  HoloMaskRenderState,
+  HoloRootMaskMode,
+  HoloTmpTextMask,
+} from "./holoMaskTypes";
+
 const HOLO_IMAGE_LOAD_TIMEOUT_MS = 5_000;
 const HOLO_IMAGE_LOAD_ATTEMPTS = 2;
 const HOLO_IMAGE_RETRY_DELAY_MS = 150;
-
-// Tuning for the luminance-keyed mask modes ("light-or-alpha"/"dark-or-alpha").
-// Per-image coverage gates decide whether to key off luminance at all; the
-// chosen ramp then maps luminance (0-255) to mask alpha via clamp((edge±lum)/span).
-const MASK_LUMINANCE = {
-  lightPivot: 128, // luminance at/above which a pixel counts as "light"
-  darkPivot: 144, // luminance at/below which a pixel counts as "dark"
-  coverageGate: 0.72, // min alpha coverage before luminance keying applies
-  darkModeCoverageGate: 0.42, // looser gate for the explicit dark-or-alpha mode
-  lightBand: { min: 0.01, max: 0.96 }, // light-coverage band selecting the light ramp
-  darkBand: { min: 0.005, max: 0.98 }, // dark-coverage band selecting the dark ramp
-  darkRamp: { edge: 212, span: 168 },
-  lightRamp: { edge: 24, span: 200 },
-  brightRamp: { edge: 232, span: 200 },
-};
 
 export function HoloShaderLayer({
   card,
@@ -125,69 +130,6 @@ export function HoloMaterialLayer({
     </div>
   );
 }
-
-export type HoloMaskRenderState = {
-  url: string;
-  status: "pending" | "ready" | "error";
-  error: string;
-  warnings: string[];
-};
-
-export type HoloMaskImage = {
-  href: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  rotation?: number;
-  maskMode?: HoloRootMaskMode;
-  /** A failed critical source invalidates the generated mask. */
-  required?: boolean;
-};
-
-export type HoloMaskRect = {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  rotation?: number;
-};
-
-export type HoloTmpTextMask = HoloMaskRect & {
-  text: string;
-  fontSize: number;
-  variant: TmpTextVariant;
-  characterSpacing?: number;
-  autoSize?: boolean;
-  minFontSize?: number;
-  horizontalAlign?: TmpHorizontalAlign;
-  verticalAlign?: TmpVerticalAlign;
-  dilation?: number;
-  maskIncludeUnderlay?: boolean;
-};
-
-export type HoloMaskMode = "alpha" | "light-or-alpha" | "dark-or-alpha" | "raw";
-export type HoloRootMaskMode = HoloMaskMode | "red";
-
-export type HoloCssMaskOptions = {
-  fallbackAllowWhenSparse?: boolean;
-  invertApplicationArea?: boolean;
-};
-
-// Named inputs for the holo mask builder — grouping them (vs ~10 positional args)
-// self-documents call sites and removes the signMask/signClear transpose risk.
-export type HoloMaskInput = {
-  rootImages: HoloMaskImage[];
-  frontImages: HoloMaskImage[];
-  frontRects: HoloMaskRect[];
-  signMaskImages?: HoloMaskImage[];
-  signClearImages?: HoloMaskImage[];
-  frontTextMasks?: HoloTmpTextMask[];
-  excludeImages?: HoloMaskImage[];
-  tmpFont?: TmpFontMetrics | null;
-  waitingForRequiredResources?: boolean;
-  options?: HoloCssMaskOptions;
-};
 
 function pushHoloTmpTextMask(masks: HoloTmpTextMask[], mask: HoloTmpTextMask) {
   if (!mask.text) return;
@@ -765,62 +707,6 @@ async function renderOfficialHoloMask(input: HoloMaskInput, signal: AbortSignal)
   return { url: canvas.toDataURL("image/png"), warnings: [...warnings] };
 }
 
-function binarizeRenderedPixels(imageData: ImageData) {
-  const mask = new Uint8ClampedArray(imageData.width * imageData.height);
-  for (let src = 0, dst = 0; src < imageData.data.length; src += 4, dst += 1) {
-    mask[dst] =
-      imageData.data[src] > 0 ||
-      imageData.data[src + 1] > 0 ||
-      imageData.data[src + 2] > 0 ||
-      imageData.data[src + 3] > 0
-        ? 255
-        : 0;
-  }
-  return mask;
-}
-
-function paintBinaryMask(imageData: ImageData, mask: Uint8ClampedArray<ArrayBufferLike>) {
-  for (let pixel = 0, index = 0; pixel < mask.length; pixel += 1, index += 4) {
-    const alpha = mask[pixel] > 0 ? 255 : 0;
-    imageData.data[index] = 255;
-    imageData.data[index + 1] = 255;
-    imageData.data[index + 2] = 255;
-    imageData.data[index + 3] = alpha;
-  }
-}
-
-function dilateBinaryMask(src: Uint8ClampedArray<ArrayBufferLike>, width: number, height: number, iterations: number) {
-  let current: Uint8ClampedArray<ArrayBufferLike> = src;
-  let next: Uint8ClampedArray<ArrayBufferLike> = new Uint8ClampedArray(src.length);
-  for (let pass = 0; pass < iterations; pass += 1) {
-    for (let y = 0; y < height; y += 1) {
-      const y0 = Math.max(y - 1, 0) * width;
-      const y1 = y * width;
-      const y2 = Math.min(y + 1, height - 1) * width;
-      for (let x = 0; x < width; x += 1) {
-        const x0 = Math.max(x - 1, 0);
-        const x1 = x;
-        const x2 = Math.min(x + 1, width - 1);
-        next[y1 + x1] =
-          current[y0 + x0] > 0 ||
-          current[y0 + x1] > 0 ||
-          current[y0 + x2] > 0 ||
-          current[y1 + x0] > 0 ||
-          current[y1 + x2] > 0 ||
-          current[y2 + x0] > 0 ||
-          current[y2 + x1] > 0 ||
-          current[y2 + x2] > 0
-            ? 255
-            : 0;
-      }
-    }
-    const tmp = current;
-    current = next;
-    next = tmp;
-  }
-  return current;
-}
-
 async function loadMaskImage(src: string, signal: AbortSignal) {
   let lastError: unknown;
   for (let attempt = 1; attempt <= HOLO_IMAGE_LOAD_ATTEMPTS; attempt += 1) {
@@ -937,76 +823,6 @@ function drawMaskImage(ctx: CanvasRenderingContext2D, image: HoloMaskImage, elem
   maskCtx.putImageData(imageData, 0, 0);
 
   ctx.drawImage(maskCanvas, 0, 0);
-}
-
-function normalizeMaskData(data: Uint8ClampedArray, mode: HoloRootMaskMode) {
-  if (mode === "raw") {
-    return;
-  }
-
-  if (mode === "red") {
-    for (let index = 0; index < data.length; index += 4) {
-      const alpha = data[index + 3];
-      const red = data[index];
-      const maskAlpha = alpha > MASK_ALPHA_EPSILON && red > 127 ? 255 : 0;
-      data[index] = maskAlpha;
-      data[index + 1] = maskAlpha;
-      data[index + 2] = maskAlpha;
-      data[index + 3] = maskAlpha;
-    }
-    return;
-  }
-
-  if (mode === "alpha") {
-    for (let index = 0; index < data.length; index += 4) {
-      const alpha = data[index + 3];
-      data[index] = alpha;
-      data[index + 1] = alpha;
-      data[index + 2] = alpha;
-      data[index + 3] = alpha;
-    }
-    return;
-  }
-
-  // "light-or-alpha" / "dark-or-alpha": key off luminance (bright- or dark-only)
-  // when coverage warrants, else fall back to plain alpha. See MASK_LUMINANCE.
-  let alphaPixels = 0;
-  let lightPixels = 0;
-  let darkPixels = 0;
-  const totalPixels = data.length / 4;
-  for (let index = 0; index < data.length; index += 4) {
-    const alpha = data[index + 3];
-    if (alpha <= MASK_ALPHA_EPSILON) continue;
-    alphaPixels += 1;
-    const luminance = 0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2];
-    if (luminance >= MASK_LUMINANCE.lightPivot) lightPixels += 1;
-    if (luminance <= MASK_LUMINANCE.darkPivot) darkPixels += 1;
-  }
-
-  const alphaCoverage = alphaPixels / totalPixels;
-  const lightCoverage = alphaPixels > 0 ? lightPixels / alphaPixels : 0;
-  const darkCoverage = alphaPixels > 0 ? darkPixels / alphaPixels : 0;
-  const useLightLuminance = alphaCoverage > MASK_LUMINANCE.coverageGate && lightCoverage > MASK_LUMINANCE.lightBand.min && lightCoverage < MASK_LUMINANCE.lightBand.max;
-  const useDarkLuminance = alphaCoverage > MASK_LUMINANCE.coverageGate && lightCoverage >= MASK_LUMINANCE.lightBand.max;
-  const preferDarkLuminance = mode === "dark-or-alpha" && alphaCoverage > MASK_LUMINANCE.darkModeCoverageGate && darkCoverage > MASK_LUMINANCE.darkBand.min && darkCoverage < MASK_LUMINANCE.darkBand.max;
-
-  const { darkRamp, lightRamp, brightRamp } = MASK_LUMINANCE;
-  for (let index = 0; index < data.length; index += 4) {
-    const alpha = data[index + 3];
-    const luminance = 0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2];
-    let maskAlpha = alpha;
-    if (preferDarkLuminance) {
-      maskAlpha = alpha * clampNumber((darkRamp.edge - luminance) / darkRamp.span, 0, 1);
-    } else if (useLightLuminance) {
-      maskAlpha = alpha * clampNumber((luminance - lightRamp.edge) / lightRamp.span, 0, 1);
-    } else if (useDarkLuminance) {
-      maskAlpha = alpha * clampNumber((brightRamp.edge - luminance) / brightRamp.span, 0, 1);
-    }
-    data[index] = maskAlpha;
-    data[index + 1] = maskAlpha;
-    data[index + 2] = maskAlpha;
-    data[index + 3] = maskAlpha;
-  }
 }
 
 function drawMaskRect(ctx: CanvasRenderingContext2D, rect: HoloMaskRect) {

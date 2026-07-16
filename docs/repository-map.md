@@ -26,11 +26,13 @@ must remain local.
   helpers for R2 manifests and score-card assets.
 - `tests/module-boundaries.test.mjs` keeps shared frontend modules below their
   consumers: hooks cannot depend on cards, card data cannot depend on render
-  layers, card assets cannot depend on cards, hooks, or the app shell, score-card
-  surface configuration cannot depend on React, persistence, or card
-  components, and default-state factories are limited to samples and state
-  types. It runs under `npm run check` alongside the score-card model, frontend
-  reliability, secret-scanner, public-dist, and Pages Function suites.
+  layers, card assets cannot depend on cards, hooks, or the app shell,
+  holographic mask math and state types remain type-only leaves below the React
+  renderer, score-card surface configuration cannot depend on React,
+  persistence, or card components, and default-state factories are limited to
+  samples and state types. It runs under `npm run check` alongside the
+  holographic mask math, score-card model, frontend reliability, secret-scanner,
+  public-dist, and Pages Function suites.
 - `.github/workflows/ci.yml`: read-only pull-request and `main` validation for
   the web checks and locked Rust tests; it does not deploy or reference
   repository secrets.

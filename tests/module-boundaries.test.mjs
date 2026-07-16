@@ -15,6 +15,18 @@ const boundaries = [
     forbidden: ["./cards", "./hooks", "./App"],
   },
   {
+    file: "src/holoMaskMath.ts",
+    allowed: ["./holoMaskTypes"],
+    typeOnly: true,
+    forbidden: ["react", "./holo", "./constants", "./geometry", "./textRendering"],
+  },
+  {
+    file: "src/holoMaskTypes.ts",
+    allowed: ["./textRendering", "./types"],
+    typeOnly: true,
+    forbidden: ["react", "./holo", "./constants", "./geometry"],
+  },
+  {
     file: "src/scorecard/scorecardInput.ts",
     forbidden: ["react", "./ScoreCardSurface", "../persistence"],
   },
@@ -54,6 +66,17 @@ const boundaries = [
   },
 ];
 
+const holoMaskTypeExports = [
+  "HoloCssMaskOptions",
+  "HoloMaskImage",
+  "HoloMaskInput",
+  "HoloMaskMode",
+  "HoloMaskRect",
+  "HoloMaskRenderState",
+  "HoloRootMaskMode",
+  "HoloTmpTextMask",
+];
+
 function importedModules(file, source) {
   const sourceFile = ts.createSourceFile(
     file,
@@ -70,7 +93,12 @@ function importedModules(file, source) {
       node.moduleSpecifier &&
       ts.isStringLiteral(node.moduleSpecifier)
     ) {
-      modules.push(node.moduleSpecifier.text);
+      modules.push({
+        specifier: node.moduleSpecifier.text,
+        typeOnly:
+          (ts.isImportDeclaration(node) && node.importClause?.isTypeOnly === true) ||
+          (ts.isExportDeclaration(node) && node.isTypeOnly),
+      });
     }
     if (
       ts.isCallExpression(node) &&
@@ -78,7 +106,7 @@ function importedModules(file, source) {
       node.arguments.length === 1 &&
       ts.isStringLiteral(node.arguments[0])
     ) {
-      modules.push(node.arguments[0].text);
+      modules.push({ specifier: node.arguments[0].text, typeOnly: false });
     }
     ts.forEachChild(node, visit);
   }
@@ -97,7 +125,18 @@ function normalizeModule(specifier) {
 for (const boundary of boundaries) {
   test(`${boundary.file} respects its frontend module boundary`, async () => {
     const source = await readFile(path.join(projectRoot, boundary.file), "utf8");
-    const imported = importedModules(boundary.file, source).map(normalizeModule);
+    const importRecords = importedModules(boundary.file, source);
+    const imported = importRecords.map(({ specifier }) => normalizeModule(specifier));
+
+    if (boundary.typeOnly) {
+      for (const importedModule of importRecords) {
+        assert.equal(
+          importedModule.typeOnly,
+          true,
+          `${boundary.file} may only type-import ${importedModule.specifier}`,
+        );
+      }
+    }
 
     if (boundary.allowed) {
       const allowed = boundary.allowed.map(normalizeModule);
@@ -119,3 +158,32 @@ for (const boundary of boundaries) {
     }
   });
 }
+
+test("src/holo.tsx preserves the public holo mask type exports", async () => {
+  const file = "src/holo.tsx";
+  const source = await readFile(path.join(projectRoot, file), "utf8");
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const exported = [];
+
+  for (const statement of sourceFile.statements) {
+    if (
+      ts.isExportDeclaration(statement) &&
+      statement.isTypeOnly &&
+      statement.moduleSpecifier &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      normalizeModule(statement.moduleSpecifier.text) === normalizeModule("./holoMaskTypes") &&
+      statement.exportClause &&
+      ts.isNamedExports(statement.exportClause)
+    ) {
+      exported.push(...statement.exportClause.elements.map((element) => element.name.text));
+    }
+  }
+
+  assert.deepEqual(exported.sort(), [...holoMaskTypeExports].sort());
+});
