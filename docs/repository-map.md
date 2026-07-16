@@ -26,6 +26,8 @@ must remain local.
   so its unit suite is compiled and executed once per test run. Cmpack path and
   USTAR serialization are isolated in `src-tauri/src/scanner/archive.rs`; mobile
   export keeps ownership of which staged files are eligible for the archive.
+  Recursive file discovery, sibling resolution, path comparison, and path
+  display normalization live in the dependency-free `scanner/fsutil.rs` leaf.
 - `functions/`: Cloudflare Pages Function for serving an allowlisted subset of
   `/official/*` from the `ASSETS_BUCKET` R2 binding. Public Cloudflare does not
   serve `/fonts/private/*`.

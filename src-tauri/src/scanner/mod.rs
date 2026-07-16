@@ -101,6 +101,7 @@ impl ImageDataUrlCache {
 mod archive;
 mod asset_format;
 mod config;
+mod fsutil;
 mod types;
 mod xmlutil;
 
@@ -111,6 +112,7 @@ use asset_format::{
     webp_export_file_name, ExportAssetKind,
 };
 use config::*;
+use fsutil::{find_named_files, path_string, resolve_sibling, same_path, walk_files};
 pub use types::{
     AssetLayer, CardRecord, MobilePackResult, OnlineExportResult, PrintField, PrintOption,
     ScanResult, ScanStats,
@@ -3996,62 +3998,6 @@ fn read_le_i64(bytes: &[u8], offset: usize) -> Result<i64, String> {
     ]))
 }
 
-fn find_named_files(root: &Path, file_name: &str) -> Vec<PathBuf> {
-    if !root.exists() {
-        return Vec::new();
-    }
-
-    walk_files(root)
-        .into_iter()
-        .filter(|path| {
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .map(|name| name.eq_ignore_ascii_case(file_name))
-                .unwrap_or(false)
-        })
-        .collect()
-}
-
-fn walk_files(root: &Path) -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    let mut stack = vec![root.to_path_buf()];
-
-    while let Some(path) = stack.pop() {
-        let Ok(entries) = fs::read_dir(&path) else {
-            continue;
-        };
-
-        for entry in entries.flatten() {
-            let child = entry.path();
-            let Ok(file_type) = entry.file_type() else {
-                continue;
-            };
-
-            if file_type.is_dir() {
-                stack.push(child);
-            } else if file_type.is_file() {
-                files.push(child);
-            }
-        }
-    }
-
-    files
-}
-
-fn resolve_sibling(xml_path: &Path, relative: &str) -> Option<String> {
-    let relative = relative.trim();
-    if relative.is_empty() {
-        return None;
-    }
-
-    let path = xml_path.parent()?.join(relative);
-    if path.exists() {
-        Some(path_string(&path))
-    } else {
-        None
-    }
-}
-
 fn resolve_content_asset(
     stem: &str,
     content_root: &Path,
@@ -4116,13 +4062,6 @@ fn resolve_content_asset_root_with_fallback_roots(
     }
 
     None
-}
-
-fn same_path(left: &Path, right: &Path) -> bool {
-    match (left.canonicalize(), right.canonicalize()) {
-        (Ok(left), Ok(right)) => left == right,
-        _ => left == right,
-    }
 }
 
 fn content_asset_dirs(content_root: &Path, game: &str, asset_dir: &str) -> Vec<PathBuf> {
@@ -4490,10 +4429,6 @@ fn find_unitypy_path() -> Option<PathBuf> {
     }
 
     None
-}
-
-fn path_string(path: &Path) -> String {
-    path.to_string_lossy().replace('/', "\\")
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {
