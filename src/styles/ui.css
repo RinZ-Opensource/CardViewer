@@ -1,130 +1,5 @@
-/* Printed-card text overlay (.print-*), preview/meta overlays, the editor panel,
-   and the responsive @media overrides (kept last so they win by source order). */
-
-.print-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 38px 30px 34px;
-  color: #fff;
-  pointer-events: none;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
-  transform: translateZ(18px);
-}
-
-.print-layer.mai {
-  padding-top: 46px;
-}
-
-.print-layer.mu3 {
-  padding-bottom: 38px;
-}
-
-.print-top,
-.print-bottom {
-  min-width: 0;
-}
-
-.print-top.split,
-.qr-line,
-.print-stat-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.print-title,
-.print-subtitle,
-.print-body,
-.print-serial,
-.friend-code,
-.qr-line span {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-}
-
-.print-title {
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1.05;
-}
-
-.print-subtitle {
-  margin-bottom: 7px;
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 1.15;
-}
-
-.print-subtitle.small {
-  font-size: 13px;
-}
-
-.print-body {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: 12px;
-  line-height: 1.35;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-}
-
-.print-bottom {
-  padding: 12px;
-  border-radius: 7px;
-  background: linear-gradient(180deg, rgba(9, 14, 18, 0.18), rgba(9, 14, 18, 0.74));
-}
-
-.print-serial,
-.friend-code,
-.qr-line {
-  margin-top: 8px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-.print-stat-row {
-  margin-top: 10px;
-}
-
-.print-stat-row span,
-.rating-pill,
-.qr-mark {
-  display: inline-grid;
-  place-items: center;
-  min-width: 42px;
-  min-height: 30px;
-  padding: 4px 7px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.88);
-  color: #162022;
-  text-shadow: none;
-}
-
-.print-stat-row strong {
-  display: block;
-  font-size: 13px;
-}
-
-.rating-pill {
-  min-width: 54px;
-  font-size: 16px;
-  font-weight: 900;
-}
-
-.qr-mark {
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
-  font-size: 10px;
-  font-weight: 900;
-}
+/* Card preview overlays and responsive overrides. Kept last so they win by
+   source order. */
 
 .preview-placeholder {
   display: grid;
@@ -167,198 +42,10 @@
   backdrop-filter: blur(10px);
 }
 
-.editor-panel {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 12px;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.editor-panel.empty {
-  display: grid;
-  place-items: center;
-  padding: 16px;
-  color: var(--ui-text-muted);
-}
-
-.editor-scroll {
-  display: grid;
-  align-content: start;
-  gap: 12px;
-  min-height: 0;
-  overflow: auto;
-  padding-right: 2px;
-}
-
-.editor-section {
-  min-width: 0;
-  padding: 16px;
-}
-
-.editor-header p {
-  max-width: 310px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.editor-header h3 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.editor-header h3::before {
-  content: "";
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--ui-accent);
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: start;
-  align-items: start;
-  gap: 12px;
-  min-height: 0;
-  overflow: auto;
-  padding: 16px 2px 6px;
-}
-
-.editor-section .form-grid {
-  overflow: visible;
-  padding: 16px 0 0;
-}
-
-.player-data-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.section-empty {
-  padding-top: 12px;
-}
-
 .control {
   display: grid;
   gap: 6px;
   min-width: 0;
-}
-
-.control.wide {
-  grid-column: 1 / -1;
-}
-
-.flag-section {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: start;
-  align-items: start;
-  gap: 10px 12px;
-  padding-top: 8px;
-  border-top: 1px solid var(--ui-border-soft);
-}
-
-.toggle-control {
-  grid-template-columns: 30px minmax(0, 1fr);
-  align-items: center;
-  min-height: 34px;
-  padding: 7px 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-control);
-  background: var(--ui-toggle-bg);
-  cursor: pointer;
-  transition: border-color 0.14s ease, background 0.14s ease;
-}
-
-.toggle-control:has(input:checked) {
-  border-color: color-mix(in srgb, var(--ui-accent) 52%, var(--ui-border));
-  background: var(--ui-accent-soft);
-}
-
-.toggle-control input {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 30px;
-  height: 18px;
-  margin: 0;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ui-text-muted) 34%, transparent);
-  position: relative;
-  cursor: pointer;
-  transition: background 0.16s ease;
-}
-
-.toggle-control input::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  transition: transform 0.16s ease;
-}
-
-.toggle-control input:checked {
-  background: var(--ui-accent);
-}
-
-.toggle-control input:checked::after {
-  transform: translateX(12px);
-}
-
-.edit-json {
-  margin-top: 12px;
-  border-top: 1px solid var(--ui-divider);
-  padding-top: 10px;
-}
-
-.edit-json summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.edit-json summary::-webkit-details-marker {
-  display: none;
-}
-
-.edit-json summary::before {
-  content: "";
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-right: 1.5px solid var(--ui-text-muted);
-  border-bottom: 1.5px solid var(--ui-text-muted);
-  transform: rotate(-45deg);
-  transition: transform 0.15s ease;
-}
-
-.edit-json[open] summary::before {
-  transform: rotate(45deg);
-}
-
-.edit-json pre {
-  max-height: 170px;
-  overflow: auto;
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: var(--radius-control);
-  background: #292d2f;
-  color: #f5eee5;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 @media (max-width: 1180px) {
@@ -372,14 +59,6 @@
     min-height: 100vh;
   }
 
-  /* Stack the preview above the editor and let that region scroll on its own,
-     so the card keeps a real (viewport-height-based) size instead of being
-     crushed by the editor's min-height inside the fixed 100vh workspace. */
-  .preview-and-editor {
-    grid-template-columns: 1fr;
-    overflow: auto;
-  }
-
   .preview-stage {
     height: min(72dvh, 720px);
     min-height: 360px;
@@ -389,9 +68,6 @@
     width: min(48dvh, 520px);
   }
 
-  .editor-panel {
-    min-height: 420px;
-  }
 }
 
 @media (max-width: 900px) {
@@ -405,9 +81,7 @@
     flex-direction: column;
     min-height: 100dvh;
     height: auto;
-    /* Reserve scrollable space behind the fixed export action so the final
-       editor/list controls can always be brought fully above it. */
-    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .workspace {
@@ -426,8 +100,7 @@
     background: transparent;
   }
 
-  .preview-toolbar,
-  .editor-header {
+  .preview-toolbar {
     align-items: center;
   }
 
@@ -460,11 +133,6 @@
     min-width: 58px;
   }
 
-  .preview-and-editor {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
-  }
-
   .preview-stage {
     min-height: 500px;
     height: min(76dvh, 720px);
@@ -484,26 +152,6 @@
 
   .preview-meta span {
     padding: 6px 8px;
-  }
-
-  .editor-panel {
-    min-height: auto;
-    max-height: none;
-    overflow: visible;
-  }
-
-  .editor-scroll {
-    overflow: visible;
-  }
-
-  .form-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    max-height: none;
-    overflow: visible;
-  }
-
-  .flag-section {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .card-list {
@@ -527,16 +175,6 @@
     height: 44px;
   }
 
-  .export-fab {
-    right: calc(12px + env(safe-area-inset-right, 0px));
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    min-height: 48px;
-    padding: 12px 18px;
-  }
-
-  .error-toast {
-    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-  }
 }
 
 @media (max-width: 700px) {
@@ -597,9 +235,7 @@
     padding: 0 10px 12px;
   }
 
-  .filters,
-  .editor-panel.empty,
-  .editor-section {
+  .filters {
     border-radius: 7px;
   }
 
@@ -638,17 +274,6 @@
     width: min(88vw, 340px, 64dvh);
   }
 
-  .form-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-    padding-top: 12px;
-  }
-
-  .editor-panel.empty,
-  .editor-section {
-    padding: 12px;
-  }
-
   .card-row {
     --thumb-w: 42px;
     gap: 9px;
@@ -666,7 +291,4 @@
     max-height: 300px;
   }
 
-  .edit-json pre {
-    max-height: 120px;
-  }
 }

@@ -4,7 +4,6 @@ import { importTypeScriptModule } from "./helpers/import-typescript.mjs";
 
 const {
   loadStoredRecord,
-  parseStoredCardEdits,
   parseStoredRecord,
   readLocalStorage,
   writeLocalStorage,
@@ -44,20 +43,6 @@ test("parseStoredRecord falls back for malformed or non-object JSON", () => {
   assert.deepEqual(parseStoredRecord("null", fallback), fallback());
   assert.deepEqual(parseStoredRecord("[]", fallback), fallback());
   assert.deepEqual(parseStoredRecord('"text"', fallback), fallback());
-});
-
-test("parseStoredCardEdits retains only nested string and boolean fields", () => {
-  const edits = parseStoredCardEdits(
-    JSON.stringify({
-      cardA: { userName: "Alice", enabled: false, count: 5, nested: {} },
-      cardB: null,
-      cardC: [],
-      empty: {},
-    }),
-  );
-
-  assert.deepEqual(Object.keys(edits), ["cardA"]);
-  assert.deepEqual({ ...edits.cardA }, { userName: "Alice", enabled: false });
 });
 
 test("storage helpers contain denied reads and quota-exceeded writes", () => {

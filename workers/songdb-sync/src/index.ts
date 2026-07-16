@@ -1,7 +1,7 @@
 /**
  * cardviewer-songdb: mirrors otoge-db song metadata and jackets into R2 and
- * serves them with permissive CORS, so the score-card html-to-image exports
- * stay taint-free regardless of where the app is hosted.
+ * serves them with permissive CORS so the browser score-card picker can load
+ * them regardless of where the app is hosted.
  *
  * Routes (every response carries Access-Control-Allow-Origin: *):
  *   GET  /data/{game}/music-ex.json  R2 copy; lazy-bootstraps from GitHub.

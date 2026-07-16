@@ -11,22 +11,6 @@ const boundaries = [
   { file: "src/hooks.ts", forbidden: ["./cards"] },
   { file: "src/cardData.ts", forbidden: ["./layers"] },
   {
-    file: "src/cardAssets.ts",
-    forbidden: ["./cards", "./hooks", "./App"],
-  },
-  {
-    file: "src/holoMaskMath.ts",
-    allowed: ["./holoMaskTypes"],
-    typeOnly: true,
-    forbidden: ["react", "./holo", "./constants", "./geometry", "./textRendering"],
-  },
-  {
-    file: "src/holoMaskTypes.ts",
-    allowed: ["./textRendering", "./types"],
-    typeOnly: true,
-    forbidden: ["react", "./holo", "./constants", "./geometry"],
-  },
-  {
     file: "src/scorecard/scorecardInput.ts",
     forbidden: ["react", "./ScoreCardSurface", "../persistence"],
   },
@@ -174,17 +158,6 @@ const boundaries = [
   },
 ];
 
-const holoMaskTypeExports = [
-  "HoloCssMaskOptions",
-  "HoloMaskImage",
-  "HoloMaskInput",
-  "HoloMaskMode",
-  "HoloMaskRect",
-  "HoloMaskRenderState",
-  "HoloRootMaskMode",
-  "HoloTmpTextMask",
-];
-
 function importedModules(file, source) {
   const sourceFile = ts.createSourceFile(
     file,
@@ -281,35 +254,6 @@ for (const boundary of boundaries) {
   });
 }
 
-test("src/holo.tsx preserves the public holo mask type exports", async () => {
-  const file = "src/holo.tsx";
-  const source = await readFile(path.join(projectRoot, file), "utf8");
-  const sourceFile = ts.createSourceFile(
-    file,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
-  );
-  const exported = [];
-
-  for (const statement of sourceFile.statements) {
-    if (
-      ts.isExportDeclaration(statement) &&
-      statement.isTypeOnly &&
-      statement.moduleSpecifier &&
-      ts.isStringLiteral(statement.moduleSpecifier) &&
-      normalizeModule(statement.moduleSpecifier.text) === normalizeModule("./holoMaskTypes") &&
-      statement.exportClause &&
-      ts.isNamedExports(statement.exportClause)
-    ) {
-      exported.push(...statement.exportClause.elements.map((element) => element.name.text));
-    }
-  }
-
-  assert.deepEqual(exported.sort(), [...holoMaskTypeExports].sort());
-});
-
 test("frontend source does not embed machine-specific absolute paths", async () => {
   const sourceRoot = path.join(projectRoot, "src");
   const violations = [];
@@ -337,6 +281,29 @@ test("frontend source does not embed machine-specific absolute paths", async () 
     }
 
     visit(sourceFile);
+  }
+
+  assert.deepEqual(violations, []);
+});
+
+test("frontend source remains independent of local desktop and export modules", async () => {
+  const sourceRoot = path.join(projectRoot, "src");
+  const violations = [];
+
+  for (const absolute of await collectTypeScriptFiles(sourceRoot)) {
+    const source = await readFile(absolute, "utf8");
+    const relative = path.relative(projectRoot, absolute);
+    for (const { specifier } of importedModules(relative, source)) {
+      const normalized = normalizeModule(specifier);
+      if (
+        specifier === "@tauri-apps" ||
+        specifier.startsWith("@tauri-apps/") ||
+        normalized === "./exportpng" ||
+        normalized.endsWith("/exportpng")
+      ) {
+        violations.push(`${relative} imports ${specifier}`);
+      }
+    }
   }
 
   assert.deepEqual(violations, []);
@@ -437,12 +404,8 @@ test("ScoreCardSurface delegates its controlled preview leaf", async () => {
     assert.equal(hasJsxClass(preview, className), true, `Preview must retain ${className}`);
   }
 
-  let exportFlagReferences = 0;
   const forbiddenHooks = [];
   function visit(node) {
-    if (ts.isIdentifier(node) && node.text === "SHOW_SCORECARD_EXPORT") {
-      exportFlagReferences += 1;
-    }
     if (ts.isCallExpression(node)) {
       const expression = node.expression;
       const name = ts.isIdentifier(expression)
@@ -457,7 +420,6 @@ test("ScoreCardSurface delegates its controlled preview leaf", async () => {
     ts.forEachChild(node, visit);
   }
   visit(preview);
-  assert.equal(exportFlagReferences >= 2, true);
   assert.deepEqual(forbiddenHooks, []);
 });
 
@@ -623,7 +585,6 @@ test("unfinished score-card actions remain disabled", async () => {
     "SHOW_PANEL_CARDS",
     "SHOW_CHUNI_CONFIRMED_START",
     "SHOW_SCORECARD_RESET",
-    "SHOW_SCORECARD_EXPORT",
   ]);
   const disabled = new Set();
 

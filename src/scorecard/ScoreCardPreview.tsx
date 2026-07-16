@@ -6,7 +6,7 @@ import { OngekiMusicBtCard } from "./OngekiMusicBtCard";
 import { OngekiScoreCard } from "./OngekiScoreCard";
 import type { ChuniScoreState, ChuniSong } from "./chuniTypes";
 import type { OngekiScoreState, OngekiSong } from "./ongekiTypes";
-import { SHOW_SCORECARD_EXPORT, type ScoreCardGame } from "./scorecardSurfaceConfig";
+import type { ScoreCardGame } from "./scorecardSurfaceConfig";
 import type { MaiChart, MaiScoreState, MaiSong } from "./types";
 
 interface ScoreCardPreviewProps {
@@ -19,13 +19,9 @@ interface ScoreCardPreviewProps {
   chuniState: ChuniScoreState;
   ongekiSong: OngekiSong;
   ongekiState: OngekiScoreState;
-  captureRef: RefObject<HTMLDivElement | null>;
   stageRef: RefObject<HTMLDivElement | null>;
   stageScale: number;
   assetStatus: "checking" | "ready" | "error";
-  exportingPng: boolean;
-  exportError: string;
-  onExport: () => Promise<void>;
 }
 
 export function ScoreCardPreview({
@@ -38,37 +34,16 @@ export function ScoreCardPreview({
   chuniState,
   ongekiSong,
   ongekiState,
-  captureRef,
   stageRef,
   stageScale,
   assetStatus,
-  exportingPng,
-  exportError,
-  onExport,
 }: ScoreCardPreviewProps) {
   return (
     <section className="scorecard-preview">
-      {SHOW_SCORECARD_EXPORT ? (
-        <div className="scorecard-toolbar">
-          <button
-            type="button"
-            className="scorecard-export"
-            onClick={onExport}
-            disabled={exportingPng}
-          >
-            {exportingPng ? "Exporting…" : "Export PNG"}
-          </button>
-        </div>
-      ) : null}
-      {exportError ? (
-        <div className="scorecard-export-error" role="alert">
-          {exportError}
-        </div>
-      ) : null}
       {assetStatus === "error" ? (
-        <div className="scorecard-export-error" role="alert">
+        <div className="scorecard-asset-error" role="alert">
           {import.meta.env.DEV
-            ? "Official artwork is unavailable in this preview. Use the private preview or seed the Cloudflare R2 asset store."
+            ? "Official artwork is unavailable. Run the Cloudflare preview with a seeded ASSETS_BUCKET binding."
             : "Official artwork is temporarily unavailable from the asset store."}
         </div>
       ) : null}
@@ -82,13 +57,12 @@ export function ScoreCardPreview({
               chart={chart}
               state={state}
               maxDxScore={maxDxScore}
-              captureRef={captureRef}
             />
           ) : game === "chuni" ? (
             chuniState.cardType === "musicbox" ? (
-              <ChuniMusicBoxCard song={chuniSong} state={chuniState} captureRef={captureRef} />
+              <ChuniMusicBoxCard song={chuniSong} state={chuniState} />
             ) : (
-              <ChuniScoreCard song={chuniSong} state={chuniState} captureRef={captureRef} />
+              <ChuniScoreCard song={chuniSong} state={chuniState} />
             )
           ) : ongekiState.cardType === "musicbt" ? (
             <OngekiMusicBtCard
@@ -96,10 +70,9 @@ export function ScoreCardPreview({
               state={ongekiState}
               bossIconUrl={ongekiSong.bossIconUrl}
               bossIconFallbacks={ongekiSong.bossIconFallbacks}
-              captureRef={captureRef}
             />
           ) : (
-            <OngekiScoreCard song={ongekiSong} state={ongekiState} captureRef={captureRef} />
+            <OngekiScoreCard song={ongekiSong} state={ongekiState} />
           )}
         </div>
       </div>

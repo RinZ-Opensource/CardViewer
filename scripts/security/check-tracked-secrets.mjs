@@ -32,11 +32,6 @@ const repositoryRoot = runGit(["rev-parse", "--show-toplevel"])
   .toString("utf8")
   .trim();
 
-const allowedSensitiveNames = new Set([
-  ".env.private",
-  ".env.public",
-]);
-
 const dangerousFilenameRules = [
   {
     id: "ENV_FILE",
@@ -205,11 +200,9 @@ function scan() {
     const normalizedPath = path.toLowerCase();
     const name = normalizedPath.slice(normalizedPath.lastIndexOf("/") + 1);
 
-    if (!allowedSensitiveNames.has(normalizedPath)) {
-      for (const rule of dangerousFilenameRules) {
-        if (rule.matches(normalizedPath, name)) {
-          findings.push({ rule: rule.id, path, line: 1 });
-        }
+    for (const rule of dangerousFilenameRules) {
+      if (rule.matches(normalizedPath, name)) {
+        findings.push({ rule: rule.id, path, line: 1 });
       }
     }
 

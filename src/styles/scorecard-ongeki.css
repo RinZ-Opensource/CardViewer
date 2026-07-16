@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------
  * O.N.G.E.K.I. PlayMusic panel (ANM_PLY_PlayMusic_00 prefab)
  * Design space: 310x162 = PAT_diff_base's serialized rect. All coordinates are
- * panel-relative CSS px from scripts/scorecard-extract/ongeki_playmusic_tree.*.
+ * panel-relative CSS px from the external Ongeki PlayMusic reference dump.
  * ------------------------------------------------------------------------- */
 
 .ongeki-scorecard {
@@ -79,9 +79,8 @@
 /* MU3UICounter digit quads: 28x30 (56x60 sheet cells at 0.5x), 30-high quads
    centred in the 34px sign band on the counter centre y=71.7 -> top 56.7.
    The counter tints its vertices black; the cut glyph PNGs are white, so
-   brightness(0) reproduces the multiply exactly and survives html-to-image
-   PNG export (a CSS mask would need per-glyph mask-image urls, which export
-   less reliably). Left set inline per digit. */
+   brightness(0) reproduces the multiply exactly without requiring a separate
+   per-glyph CSS mask. Left is set inline per digit. */
 .osc-level-digit {
   position: absolute;
   top: 56.7px;

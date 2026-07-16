@@ -7,10 +7,10 @@ import React from "react";
 
 export type ThemePreference = "light" | "dark" | "system";
 
-export const THEME_STORAGE_KEY = "cv-theme";
+const THEME_STORAGE_KEY = "cv-theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
-export function readThemePreference(): ThemePreference {
+function readThemePreference(): ThemePreference {
   try {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
     if (stored === "light" || stored === "dark" || stored === "system") {
@@ -30,13 +30,13 @@ function systemPrefersDark(): boolean {
   );
 }
 
-export function resolveTheme(preference: ThemePreference): "light" | "dark" {
+function resolveTheme(preference: ThemePreference): "light" | "dark" {
   if (preference === "system") return systemPrefersDark() ? "dark" : "light";
   return preference;
 }
 
 // Write the resolved theme to <html data-theme>, matching the pre-paint script.
-export function applyResolvedTheme(preference: ThemePreference): void {
+function applyResolvedTheme(preference: ThemePreference): void {
   document.documentElement.dataset.theme = resolveTheme(preference);
 }
 
@@ -50,7 +50,7 @@ function prefersReducedMotion(): boolean {
 
 // Apply the theme with a crossfade: View Transitions API when available, else a
 // brief .theme-anim colour transition; instant when reduced-motion is preferred.
-export function applyThemeAnimated(preference: ThemePreference): void {
+function applyThemeAnimated(preference: ThemePreference): void {
   if (prefersReducedMotion()) {
     applyResolvedTheme(preference);
     return;

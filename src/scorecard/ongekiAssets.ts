@@ -12,8 +12,7 @@ export function ongekiSprite(name: string) {
 }
 
 /** Jacket by zero-padded id. The game loads 220x220 S thumbnails here, but we
-    serve the 512x512 originals: the cards display at 220/99 design px and the
-    3x PNG export resamples upward, where the S thumbs turn visibly soft. */
+    serve the 512x512 originals so browser scaling and zoom do not soften them. */
 export function ongekiJacket(id: string) {
   return ongekiSprite(`UI_Jacket_${id}`);
 }
@@ -190,13 +189,13 @@ export const ONGEKI_BT_VS_SPRITE = "UI_SLC_MusicSelect_CharaGauge_VS_01";
 export const ONGEKI_BT_CHARA_LV_BASE = "UI_CMN_CharaLevel_base";
 export const ONGEKI_BT_CHARA_LV_HEADER = "UI_CMN_CharaLevel_base_Header";
 
-/** Default boss card icon (runtime loads the boss CardIcon; export has none). */
+/** Browser fallback used when the selected boss CardIcon is unavailable. */
 export const ONGEKI_BT_DEFAULT_BOSS_ICON = "UI_Jacket_0000";
 
 /** OverDamage '%' footer (tinted like the counter). */
 export const ONGEKI_BT_PERCENT_SPRITE = "UI_NUM_24pt_00_per";
 
-/** Pre-baked 9-slices (scripts/scorecard-extract/prebake_scorecard_statics.py). */
+/** Static 9-slice assets pre-baked by the external asset producer. */
 export const ONGEKI_BT_PSCORE_BASE = "baked_pscore_base_122x52";
 export const ONGEKI_BT_RIGHTS_BASE = "baked_rights_base_378x48";
 export const ONGEKI_BT_RIGHTS_DUMMY = "UI_DMY_rights_00";

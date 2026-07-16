@@ -63,9 +63,8 @@ export const MAI_SYNC_SPRITE: Record<Exclude<MaiSyncBadge, "none">, string> = {
 /**
  * Star_Base (UI_TST_MBase_Box_02, 40x32, 9-slice borders L25/R14) pre-sliced
  * per star count at the game's animated widths (DXScore_01..05 sizeDelta.x),
- * baked to PNGs by scripts (see private-assets). Single images because CSS
- * border-image draws separate quads that seam under fractional zoom and
- * html-to-image drops border-image urls from PNG exports.
+ * baked to PNGs by the external asset producer. Single images avoid seams from
+ * the separate quads drawn by CSS border-image at fractional zoom levels.
  */
 export const MAI_STAR_BASE: Record<number, { width: number; sprite: string }> = {
   1: { width: 40, sprite: "UI_TST_MBase_Box_02_star1" },

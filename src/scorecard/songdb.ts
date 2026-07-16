@@ -16,9 +16,8 @@ import { MaiChart, MaiDifficulty, MaiSong } from "./types";
  * URL layouts: with VITE_SONGDB_BASE_URL set, data/jackets come from our
  * songdb worker (workers/songdb-sync — R2 mirror with an HD override tier);
  * unset, they come straight from the public jsDelivr mirror of otoge-db.
- * Both send Access-Control-Allow-Origin: *, so html-to-image exports stay
- * taint-free either way. Loader failures leave the app on the bundled
- * sample songs.
+ * Both sources are CORS-enabled for browser access. Loader failures leave the
+ * app on the bundled sample songs.
  */
 
 export type SongDbGame = "maimai" | "chunithm" | "ongeki";
@@ -57,8 +56,8 @@ export function songdbHdJacketUrl(game: SongDbGame, file: string): string | unde
   return base ? `${base}/hd-jackets/${game}/${file}` : undefined;
 }
 
-/** Terminal <img> fallback: flat slate square as a data URI so it can never
-    404 or taint the export (maimai ships no dummy jacket sprite). */
+/** Terminal <img> fallback: flat slate square as a data URI so it remains
+    available without another network request (maimai has no dummy jacket). */
 const PLACEHOLDER_JACKET =
   "data:image/svg+xml," +
   encodeURIComponent(

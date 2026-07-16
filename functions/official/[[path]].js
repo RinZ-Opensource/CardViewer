@@ -6,8 +6,6 @@
 
 const ALLOWED_ROOT_KEYS = new Set([
   "official/C310Busb_CardBack.png",
-  "official/UI_Card_Horo_Rainbow_Hard.png",
-  "official/UI_Card_Horo_Pattern_00.png",
 ]);
 
 const ALLOWED_EXTENSIONS = new Set([".json", ".png", ".jpg", ".jpeg", ".webp"]);

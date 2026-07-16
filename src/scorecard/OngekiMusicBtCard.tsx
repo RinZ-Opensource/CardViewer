@@ -1,4 +1,3 @@
-import React from "react";
 import { FitText } from "./FitText";
 import {
   ONGEKI_BT_ATTRIBUTE_SPRITE,
@@ -28,8 +27,8 @@ import { jacketImgProps } from "./songdb";
 
 /**
  * Design space: ANM_SWH_MusicBt.prefab — the 278x458 PAT_DF_base plate.
- * Coordinates below are plate-relative CSS px from
- * scripts/scorecard-extract/ongeki_musicbt_tree.json. The capture root is
+ * Coordinates below are plate-relative CSS px from the external Ongeki
+ * MusicBt reference dump. The render root is
  * padded (16 left/right/bottom for the Lunatic plate's 310x490 glow, 22 top
  * for the boss VS block that overhangs the plate), so the plate sits at
  * (PAD_X, PAD_TOP) inside a 310x496 root.
@@ -38,8 +37,6 @@ const PAD_X = 16;
 const PAD_TOP = 22;
 export const ONGEKI_MUSICBT_WIDTH = 278 + 2 * PAD_X;
 export const ONGEKI_MUSICBT_HEIGHT = 458 + PAD_TOP + 16;
-/** Export at 3x so text and sprites survive typical chat-app downscaling. */
-export const ONGEKI_MUSICBT_EXPORT_WIDTH = ONGEKI_MUSICBT_WIDTH * 3;
 
 /*
  * MU3UICounter glyph layout (CustomUI/MU3UICounter.cs OnPopulateMesh): a
@@ -274,8 +271,8 @@ const CHARA_LV_OPTS: CounterOpts = {
 /**
  * UI_SLC_MusicSelect_CharaAttribute_Mask approximated as a clip-path polygon
  * (alpha bbox y 28..216 of 256, top edge x 44..208 at y=28 widening to full
- * width by y~104). clip-path needs no external resource, so it survives the
- * html-to-image PNG export where mask-image urls do not.
+ * width by y~104). clip-path keeps the geometry self-contained instead of
+ * requiring a separate mask-image resource.
  */
 const BOSS_ICON_CLIP =
   "polygon(17.2% 10.9%, 81.3% 10.9%, 100% 40.6%, 100% 84.4%, 0% 84.4%, 0% 40.6%)";
@@ -320,10 +317,9 @@ interface OngekiMusicBtCardProps {
   bossIconFallbacks?: string[];
   /**
    * MusicRights strip (focused songs with musicRightsId != 0 only). It hangs
-   * off the card's right edge per the prefab, so the PNG export clips it.
+   * off the card's right edge per the prefab, so the card container clips it.
    */
   showRights?: boolean;
-  captureRef?: React.Ref<HTMLDivElement>;
 }
 
 export function OngekiMusicBtCard({
@@ -333,7 +329,6 @@ export function OngekiMusicBtCard({
   bossIconUrl,
   bossIconFallbacks,
   showRights,
-  captureRef,
 }: OngekiMusicBtCardProps) {
   // MusicDataObject: level counter = trunc(fumenConst); '+' = isFumenConstPlus.
   const levelInt = Number.parseInt(state.level, 10);
@@ -366,7 +361,7 @@ export function OngekiMusicBtCard({
   const lunatic = state.difficulty === "lunatic";
 
   return (
-    <div className="ongeki-musicbt-card" ref={captureRef}>
+    <div className="ongeki-musicbt-card">
       <div className="omb-plate-space">
         {/* PAT_DF_base: setNativeSize; the 310x490 Lunatic art overhangs. */}
         <img

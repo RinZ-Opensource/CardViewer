@@ -1,4 +1,7 @@
-import { PrintField, PrintFieldType, ScanResult } from "./types";
+import { CardRecord, ScanResult } from "./types";
+
+type PrintField = CardRecord["printFields"][number];
+type PrintFieldType = PrintField["fieldType"];
 
 export function mockScanResult(packageRoot: string): ScanResult {
   return {
@@ -161,7 +164,6 @@ export function mockScanResult(packageRoot: string): ScanResult {
   };
 }
 
-export function pf(key: string, label: string, fieldType: PrintFieldType, value: string): PrintField {
+function pf(key: string, label: string, fieldType: PrintFieldType, value: string): PrintField {
   return { key, label, fieldType, value };
 }
-

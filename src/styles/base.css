@@ -19,7 +19,7 @@
   --font-official-number:
     "CardViewer Zen Kaku", "CardViewer NewRodin", "Impact", "Arial Black",
     sans-serif;
-  /* Data/mono face for IDs, serials, tabular figures, and the override JSON. */
+  /* Data/mono face for IDs, serials, and tabular figures. */
   --font-mono:
     ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
   font-family:
@@ -65,7 +65,6 @@
   --ui-border: #d8dee0;
   --ui-border-strong: #d6dee1;
   --ui-border-soft: #e3e9eb;
-  --ui-divider: #e1dbcf;
   --ui-input-border: #cfd8dc;
   --ui-accent: #0b6f70;
   --ui-accent-strong: #007d80;
@@ -87,9 +86,6 @@
   --ui-danger: #a6423f;
   --ui-meta-bg: rgba(255, 253, 249, 0.8);
   --ui-meta-border: rgba(216, 210, 198, 0.9);
-  --ui-edited-dot: #c85f38;
-  --ui-edited-soft: #f4e9d4;
-  --ui-edited-text: #9a6212;
 
   color: var(--ui-text);
   background: var(--ui-bg);
@@ -114,7 +110,6 @@
   --ui-border: #2c343a;
   --ui-border-strong: #2c343a;
   --ui-border-soft: #242c30;
-  --ui-divider: #2a2f29;
   --ui-input-border: #364046;
   --ui-accent: #18a7a2;
   --ui-accent-strong: #1cb6b0;
@@ -136,9 +131,6 @@
   --ui-danger: #ec8c87;
   --ui-meta-bg: rgba(20, 26, 28, 0.82);
   --ui-meta-border: rgba(74, 86, 90, 0.7);
-  --ui-edited-dot: #db7d52;
-  --ui-edited-soft: #38301d;
-  --ui-edited-text: #e0a552;
 }
 
 /* Theme-switch crossfade (driven from src/theme.ts). The View Transitions API
@@ -178,8 +170,8 @@ html.theme-anim *::after {
     transition: none !important;
   }
 
-  /* Stop persistent decorative motion (including holo keyframes declared in
-     other style sheets) and collapse finite UI transitions to one frame. */
+  /* Stop persistent decorative motion and collapse finite UI transitions to
+     one frame. */
   *,
   *::before,
   *::after {
@@ -350,9 +342,7 @@ button {
 }
 
 .scan-panel,
-.filters,
-.editor-panel.empty,
-.editor-section {
+.filters {
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-card);
   background: var(--ui-surface);
@@ -398,20 +388,8 @@ button {
   padding: 16px;
 }
 
-.package-root-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  margin-bottom: 11px;
-}
-
-.package-root-form .path-input {
-  min-width: 0;
-}
-
 .brand-row,
-.preview-toolbar,
-.editor-header {
+.preview-toolbar {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -460,17 +438,13 @@ h4 {
 
 p,
 small,
-.field-label,
 .control span,
-.control-label,
-.preview-meta,
-.edit-json summary {
+.preview-meta {
   color: var(--ui-text-muted);
   font-size: 12px;
   line-height: 1.35;
 }
 
-.primary-button,
 .ghost-button,
 .segment button {
   min-height: var(--control-h);
@@ -479,56 +453,16 @@ small,
   white-space: nowrap;
 }
 
-.primary-button {
-  background: var(--ui-accent-solid);
-  color: var(--ui-on-accent);
-}
-
 .ghost-button {
   background: var(--ui-ghost-bg);
   color: var(--ui-text-heading);
 }
 
-.primary-button:disabled,
 .ghost-button:disabled {
   cursor: default;
   opacity: 0.45;
 }
 
-.input-with-action {
-  position: relative;
-  display: block;
-  min-width: 0;
-}
-
-.input-with-action input {
-  padding-right: 44px;
-}
-
-.input-action-button {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
-  background: var(--ui-ghost-bg);
-  color: var(--ui-text-heading);
-  font-size: 18px;
-  line-height: 1;
-}
-
-.input-action-button:hover {
-  background: var(--ui-ghost-hover);
-}
-
-.field-label {
-  display: block;
-  margin-top: 18px;
-  margin-bottom: 7px;
-}
-
-.path-input,
 .search-input,
 .control input,
 .control textarea,
@@ -541,7 +475,6 @@ small,
   outline: none;
 }
 
-.path-input,
 .search-input,
 .control input,
 .control select {
@@ -556,7 +489,6 @@ small,
   line-height: 1.45;
 }
 
-.path-input:focus,
 .search-input:focus,
 .control input:focus,
 .control textarea:focus,
@@ -584,93 +516,6 @@ small,
 
 .search-field .search-input {
   padding-left: 34px;
-}
-
-.error-toast {
-  position: fixed;
-  left: 50%;
-  bottom: 28px;
-  transform: translateX(-50%);
-  z-index: 60;
-  max-width: min(560px, calc(100vw - 48px));
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 13px 12px 13px 16px;
-  border-radius: 12px;
-  background: var(--ui-surface);
-  color: var(--ui-danger);
-  border: 1px solid rgba(214, 70, 70, 0.42);
-  box-shadow: 0 6px 20px rgba(20, 40, 40, 0.12);
-  font-size: 13px;
-  line-height: 1.45;
-  animation: error-toast-in 0.18s ease-out;
-}
-
-.error-toast::before {
-  content: "⚠";
-  flex: none;
-  font-size: 15px;
-  line-height: 1.3;
-}
-
-.error-toast-text {
-  flex: 1;
-  overflow-wrap: anywhere;
-}
-
-.export-fab {
-  position: fixed;
-  right: calc(28px + env(safe-area-inset-right, 0px));
-  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
-  z-index: 70;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 16px 28px;
-  border: none;
-  border-radius: 999px;
-  background: var(--ui-accent-solid);
-  color: var(--ui-on-accent);
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  box-shadow: 0 8px 22px rgba(0, 125, 128, 0.24);
-  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
-}
-
-.export-fab-icon {
-  width: 20px;
-  height: 20px;
-  flex: none;
-}
-
-.export-fab:hover {
-  background: var(--ui-accent-solid-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 10px 26px rgba(0, 125, 128, 0.3);
-}
-
-.export-fab:active {
-  transform: translateY(0);
-}
-
-.export-fab:disabled {
-  opacity: 0.6;
-  cursor: default;
-  transform: none;
-}
-
-@keyframes error-toast-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 10px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
 }
 
 .filters {
@@ -879,28 +724,6 @@ small,
   letter-spacing: -0.01em;
 }
 
-.chip-edited {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--ui-edited-soft);
-  color: var(--ui-edited-text);
-  border: 1px solid color-mix(in srgb, var(--ui-edited-text) 28%, transparent);
-  font-size: 10px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.chip-edited::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  border-radius: 999px;
-  background: var(--ui-edited-text);
-}
-
 .workspace {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -975,13 +798,6 @@ small,
 .theme-toggle svg {
   width: 18px;
   height: 18px;
-}
-
-.preview-and-editor {
-  display: grid;
-  grid-template-columns: minmax(440px, 1fr) 430px;
-  gap: 18px;
-  min-height: 0;
 }
 
 .preview-stage {

@@ -67,7 +67,7 @@ async function invoke({ bucket, env, method = "GET", url }) {
   return response;
 }
 
-test("serves generated, scorecard, and the three reviewed root assets", async (t) => {
+test("serves generated, scorecard, and the reviewed card-back asset", async (t) => {
   installCache(t);
   const { bucket, getCalls } = makeBucket();
   const allowed = [
@@ -77,8 +77,6 @@ test("serves generated, scorecard, and the three reviewed root assets", async (t
     ["/official/scorecard/chuni/jackets/cover.jpg", "official/scorecard/chuni/jackets/cover.jpg"],
     ["/official/scorecard/ongeki/jackets/cover.jpeg", "official/scorecard/ongeki/jackets/cover.jpeg"],
     ["/official/C310Busb_CardBack.png", "official/C310Busb_CardBack.png"],
-    ["/official/UI_Card_Horo_Rainbow_Hard.png", "official/UI_Card_Horo_Rainbow_Hard.png"],
-    ["/official/UI_Card_Horo_Pattern_00.png", "official/UI_Card_Horo_Pattern_00.png"],
   ];
 
   for (const [pathname] of allowed) {
@@ -132,6 +130,8 @@ test("denies unreviewed prefixes, root assets, hidden files, and non-public exte
   const { bucket, getCalls } = makeBucket();
   const denied = [
     "/official/MAI_cardbase_default.png",
+    "/official/UI_Card_Horo_Rainbow_Hard.png",
+    "/official/UI_Card_Horo_Pattern_00.png",
     "/official/fonts/private/licensed.png",
     "/official/generated",
     "/official/scorecard/",

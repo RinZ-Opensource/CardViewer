@@ -192,33 +192,7 @@
   background: var(--ui-stage-bg);
 }
 
-.scorecard-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--ui-border);
-  background: var(--ui-sidebar-bg);
-}
-
-.scorecard-export {
-  padding: 8px 16px;
-  border-radius: 8px;
-  background: var(--ui-accent-solid);
-  color: var(--ui-on-accent);
-  font-weight: 600;
-}
-
-.scorecard-export:hover:not(:disabled) {
-  background: var(--ui-accent-solid-hover);
-}
-
-.scorecard-export:disabled {
-  opacity: 0.6;
-}
-
-.scorecard-export-error {
+.scorecard-asset-error {
   margin: 10px 18px 0;
   padding: 9px 11px;
   border: 1px solid color-mix(in srgb, var(--ui-danger) 45%, var(--ui-border));
@@ -237,10 +211,9 @@
   min-height: 0;
 }
 
-/* Scales the design-space card up for on-screen preview (CSS zoom factor set
- * from JS to fit the stage — zoom re-rasterizes text at the target size so
- * glyph spacing stays even, unlike transform:scale); export captures the
- * unzoomed inner node so PNG output stays in design pixels x pixelRatio. */
+/* Scales the design-space card for on-screen preview. CSS zoom re-rasterizes
+ * text at the target size, so glyph spacing stays even at fractional fit
+ * factors unlike transform: scale(). */
 .scorecard-zoom {
   flex: 0 0 auto;
 }
@@ -270,14 +243,6 @@
     border-top: 1px solid var(--ui-border);
   }
 
-  .scorecard-toolbar {
-    flex: 0 0 auto;
-    min-height: 60px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--ui-border);
-    background: var(--ui-sidebar-bg);
-  }
-
   .scorecard-stage {
     min-width: 0;
     min-height: 0;
@@ -290,7 +255,6 @@
   .scorecard-form .control input,
   .scorecard-form .control select,
   .scorecard-form .segment button,
-  .scorecard-export,
   .scorecard-form-actions .ghost-button,
   .songpicker-retry {
     min-height: 44px;
@@ -309,15 +273,6 @@
     min-height: 48px;
   }
 
-  .scorecard-export {
-    padding: 0 16px;
-  }
-
-  .scorecard-toolbar .theme-toggle {
-    width: 44px;
-    height: 44px;
-    min-height: 44px;
-  }
 }
 
 /* ---------------------------------------------------------------------------

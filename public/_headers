@@ -1,4 +1,4 @@
-# Cloudflare Pages headers file (ignored by the Tauri build).
+# Cloudflare Pages headers file.
 #
 # Preload the sharded card manifest index so the browser starts fetching it
 # during HTML parse, before the JS bundle boots and requests it. Cloudflare can

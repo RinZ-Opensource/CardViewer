@@ -1,4 +1,3 @@
-import React from "react";
 import { FitText } from "./FitText";
 import {
   ONGEKI_BASE_SPRITE,
@@ -12,14 +11,12 @@ import { OngekiScoreState, OngekiSong } from "./ongekiTypes";
 
 /**
  * Design space: ANM_PLY_PlayMusic_00 prefab — PAT_diff_base's serialized
- * 310x162 rect. Coordinates are panel-relative CSS px from
- * scripts/scorecard-extract/ongeki_playmusic_tree.json; runtime behaviour
+ * 310x162 rect. Coordinates are panel-relative CSS px from the external Ongeki
+ * PlayMusic reference dump; runtime behaviour
  * mirrors ANM_PLY_PlayMusic_00 / MusicDataObject / MU3UICounter / MU3Text.
  */
 export const ONGEKI_SCORECARD_WIDTH = 310;
 export const ONGEKI_SCORECARD_HEIGHT = 162;
-/** Export at 3x so text and sprites survive typical chat-app downscaling. */
-export const ONGEKI_SCORECARD_EXPORT_WIDTH = ONGEKI_SCORECARD_WIDTH * 3;
 
 /*
  * NUM_MusicLevel (MU3UICounter): rect 32x22 centred at (149.8,71.7); digit
@@ -41,10 +38,9 @@ interface OngekiScoreCardProps {
   state: OngekiScoreState;
   /** Overrides the sample song's jacket when set. */
   jacketUrl?: string;
-  captureRef?: React.Ref<HTMLDivElement>;
 }
 
-export function OngekiScoreCard({ song, state, jacketUrl, captureRef }: OngekiScoreCardProps) {
+export function OngekiScoreCard({ song, state, jacketUrl }: OngekiScoreCardProps) {
   // MusicDataObject: counter = fumenConst with flags_=0 -> truncated integer;
   // the "+" is a separate sprite gated by isFumenConstPlus, not a counter glyph.
   const levelInt = Number.parseInt(state.level, 10);
@@ -62,7 +58,7 @@ export function OngekiScoreCard({ song, state, jacketUrl, captureRef }: OngekiSc
       : state.speed;
 
   return (
-    <div className="ongeki-scorecard" ref={captureRef}>
+    <div className="ongeki-scorecard">
       {/* setNativeSize + pivot (1,1): top-right corner pinned at (310,0). */}
       <img
         className={`osc-base ${state.difficulty === "lunatic" ? "lunatic" : ""}`}

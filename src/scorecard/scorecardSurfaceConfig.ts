@@ -42,7 +42,6 @@ export const SHOW_PANEL_CARDS = false;
 export const SHOW_CHUNI_CONFIRMED_START = false;
 /** Keep unfinished/destructive workbench actions out of the UI for now. */
 export const SHOW_SCORECARD_RESET = false;
-export const SHOW_SCORECARD_EXPORT = false;
 
 export const COMBO_OPTIONS: Array<{ value: MaiComboBadge; label: string }> = [
   { value: "none", label: "—" },

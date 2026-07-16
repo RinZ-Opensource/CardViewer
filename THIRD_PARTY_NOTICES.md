@@ -43,8 +43,8 @@ Copyright 2021 The Zen Maru Gothic Project Authors
 
 ## Private/local font boundary
 
-Font files under the ignored `private-assets/fonts/` tree are local inputs,
-not repository contents, part of the public bundle, or served by the public
-Cloudflare runtime. No license or redistribution right for those files is
-asserted by this notice. The seven OFL-licensed Zen font binaries listed above
-are the only font binaries intentionally distributed in the public bundle.
+Privately licensed font files are external producer inputs. They are not
+repository contents, part of the public bundle, or served by the Cloudflare
+runtime. No license or redistribution right for those files is asserted by this
+notice. The seven OFL-licensed Zen font binaries listed above are the only font
+binaries intentionally distributed in the public bundle.

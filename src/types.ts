@@ -1,11 +1,11 @@
-export type PrintFieldType = "text" | "multiline" | "number" | "bool" | "select" | "metadata";
+type PrintFieldType = "text" | "multiline" | "number" | "bool" | "select" | "metadata";
 
-export type PrintFieldOption = {
+type PrintFieldOption = {
   value: string;
   label: string;
 };
 
-export type PrintField = {
+type PrintField = {
   key: string;
   label: string;
   fieldType: PrintFieldType;
@@ -13,13 +13,13 @@ export type PrintField = {
   options?: PrintFieldOption[];
 };
 
-export type AssetLayer = {
+type AssetLayer = {
   key: string;
   label: string;
   path: string;
 };
 
-export type CardGame = "CHU" | "MAI" | "MU3";
+type CardGame = "CHU" | "MAI" | "MU3";
 
 export type CardRecord = {
   id: string;
@@ -45,7 +45,7 @@ export type CardRecord = {
   editedPrintFields?: string[];
 };
 
-export type ScanStats = {
+type ScanStats = {
   chuCards: number;
   maiCards: number;
   maiCardTypes: number;
@@ -65,7 +65,7 @@ export type ScanResult = {
   warnings: string[];
 };
 
-export type OnlineManifestShardInfo = {
+type OnlineManifestShardInfo = {
   key: string;
   game: string;
   href: string;
@@ -87,67 +87,4 @@ export type OnlineManifestShard = {
   cards: CardRecord[];
 };
 
-export type PrintFieldValue = string | boolean;
-export type CardEdits = Record<string, PrintFieldValue>;
-export type LoadedImageDataUrl = {
-  path: string;
-  dataUrl: string;
-};
-export type LoadedAssetDataUrls = {
-  signature: string;
-  urls: Record<string, string>;
-};
-export type QrSource = string | { data: Uint8ClampedArray; mode: "byte" }[];
 export type ViewMode = "2d" | "3d";
-export type DeploymentMode = "private" | "public";
-export type Bounds = {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-};
-export type OfficialFontKey = "kaku40" | "maru32" | "kaku16";
-
-export type UnityGlyph = {
-  index: number;
-  uv: [number, number, number, number];
-  vert: [number, number, number, number];
-  advance: number;
-};
-
-export type UnityFontMetrics = {
-  name: string;
-  lineSpacing: number;
-  characterSpacing: number;
-  texture: string;
-  width: number;
-  height: number;
-  chars: Record<string, UnityGlyph>;
-};
-
-export type TmpGlyph = {
-  id: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  xOffset: number;
-  yOffset: number;
-  xAdvance: number;
-  scale: number;
-};
-
-export type TmpFontMetrics = {
-  name: string;
-  fontInfo: {
-    PointSize: number;
-    LineHeight: number;
-    Ascender: number;
-    Descender: number;
-    Padding: number;
-  };
-  texture: string;
-  width: number;
-  height: number;
-  glyphs: Record<string, TmpGlyph>;
-};

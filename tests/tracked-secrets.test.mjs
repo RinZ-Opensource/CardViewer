@@ -79,3 +79,17 @@ test("fails when a tracked working-tree file gains an unstaged secret", async (t
 
   assertSecretFailure(runScanner(repo), secret);
 });
+
+for (const fileName of [".env.private", ".env.public"]) {
+  test(`fails when ${fileName} is force-tracked even without token-shaped content`, async (t) => {
+    const repo = await temporaryRepository(t);
+    await writeFile(path.join(repo, fileName), "VITE_SAFE_EXAMPLE=value\n");
+    runGit(repo, "add", "--force", "--", fileName);
+
+    const result = runScanner(repo);
+
+    assert.equal(result.status, 1, result.stderr || result.stdout);
+    assert.match(result.stderr, /ENV_FILE/);
+    assert.match(result.stderr, new RegExp(fileName.replaceAll(".", "\\.")));
+  });
+}

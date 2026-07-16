@@ -13,12 +13,9 @@ dist/
 __pycache__/
 *.py[cod]
 
-# Local environment files and credentials. The two deployment-mode files are
-# intentionally tracked; they contain no credentials.
+# Local environment files and credentials.
 .env
 .env.*
-!/.env.private
-!/.env.public
 .dev.vars
 .dev.vars.*
 .envrc
@@ -27,6 +24,11 @@ __pycache__/
 .netrc
 auth.json
 credentials.json
+credentials.yml
+credentials.yaml
+secret.json
+secret.yml
+secret.yaml
 service-account*.json
 service_account*.json
 firebase-adminsdk*.json
@@ -45,22 +47,15 @@ id_dsa
 id_ecdsa
 id_ed25519
 
-# Rust / Tauri outputs
-src-tauri/target/
-
-# Mobile source, repository documentation and reproducible tooling are tracked.
-# Their generated outputs are ignored here or by a directory-local .gitignore.
-
-# Private generated assets and distributable packs
-private-assets/fonts/fot/*
-!private-assets/fonts/fot/.gitkeep
-private-assets/official/*
-!private-assets/official/.gitkeep
-*.cmpack
-private-assets.zip
+# Source extraction, desktop/mobile tooling, and private inputs live in an
+# external workspace. The deployment-boundary test also rejects forced adds.
+/src-tauri/
+/mobile/
+/private-assets/
+/scripts/scorecard-extract/
 
 # Vite's public/ tree is always copied into dist. Official assets and privately
-# licensed fonts must live under private-assets/ and reach public deployments through R2.
+# licensed fonts must reach public deployments only through the reviewed R2 route.
 public/official/
 public/fonts/private/
 
@@ -68,10 +63,3 @@ public/fonts/private/
 *.bak
 sprite_test.py
 holo_compare_output/
-
-# Score-card extraction reference dumps are reproducible from private inputs.
-/scripts/scorecard-extract/*_tree.json
-/scripts/scorecard-extract/*_tree.txt
-/scripts/scorecard-extract/*_dump.json
-/scripts/scorecard-extract/ongeki_guid_cache.json
-/scripts/scorecard-extract/chk_montage_*.png

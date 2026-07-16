@@ -1,4 +1,3 @@
-import React from "react";
 import { FitText } from "./FitText";
 import {
   CHUNI_BOX_BPM_DIGIT_WIDTH,
@@ -28,13 +27,11 @@ import { jacketImgProps } from "./songdb";
 /**
  * Design space: CHU_UI_Select_00_v10.srd :: CHU_UI_Select_musicbox_00, the
  * 454x610 decide frame (C_start_head/C_base); the neutral 438x584 card base
- * sits at (8,13). All coordinates are frame-relative CSS px from
- * scripts/scorecard-extract/chuni_musicbox_tree.json.
+ * sits at (8,13). All coordinates are frame-relative CSS px from the external
+ * CHUNITHM MusicBox reference dump.
  */
 export const CHUNI_MUSICBOX_WIDTH = 454;
 export const CHUNI_MUSICBOX_HEIGHT = 610;
-/** Export at 3x so text and sprites survive typical chat-app downscaling. */
-export const CHUNI_MUSICBOX_EXPORT_WIDTH = CHUNI_MUSICBOX_WIDTH * 3;
 
 /*
  * C_score_num (CNUM): digit cell 16x20 with kerning -2 -> 14px advance; comma
@@ -103,10 +100,9 @@ interface ChuniMusicBoxCardProps {
   state: ChuniScoreState;
   /** Overrides the sample song's jacket when set. */
   jacketUrl?: string;
-  captureRef?: React.Ref<HTMLDivElement>;
 }
 
-export function ChuniMusicBoxCard({ song, state, jacketUrl, captureRef }: ChuniMusicBoxCardProps) {
+export function ChuniMusicBoxCard({ song, state, jacketUrl }: ChuniMusicBoxCardProps) {
   const isWorldsEnd = state.difficulty === "worldsend";
 
   const levelDigits = state.level.replace(/\D/g, "").slice(0, 2) || "0";
@@ -131,7 +127,7 @@ export function ChuniMusicBoxCard({ song, state, jacketUrl, captureRef }: ChuniM
   const bpmLeft = BPM_CENTER_X - (bpmDigits.length * BPM_PITCH) / 2;
 
   return (
-    <div className="chuni-musicbox-card" ref={captureRef}>
+    <div className="chuni-musicbox-card">
       {/* Difficulty-coloured card base; SCORE:/BPM: labels baked in. */}
       <img className="cmb-base" src={chuniBoxBase(state.difficulty)} alt="" />
 

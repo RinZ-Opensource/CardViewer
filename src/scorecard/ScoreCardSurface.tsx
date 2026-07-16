@@ -1,29 +1,23 @@
 import React from "react";
-import { exportNodeAsPng, renderNodeToPng } from "../exportPng";
 import {
-  CHUNI_MUSICBOX_EXPORT_WIDTH,
   CHUNI_MUSICBOX_HEIGHT,
   CHUNI_MUSICBOX_WIDTH,
 } from "./ChuniMusicBoxCard";
 import {
-  CHUNI_SCORECARD_EXPORT_WIDTH,
   CHUNI_SCORECARD_HEIGHT,
   CHUNI_SCORECARD_WIDTH,
 } from "./ChuniScoreCard";
 import { ChuniScoreCardEditor } from "./ChuniScoreCardEditor";
 import {
-  MAI_SCORECARD_EXPORT_WIDTH,
   MAI_SCORECARD_HEIGHT,
   MAI_SCORECARD_WIDTH,
 } from "./MaiScoreCard";
 import { MaiScoreCardEditor } from "./MaiScoreCardEditor";
 import {
-  ONGEKI_MUSICBT_EXPORT_WIDTH,
   ONGEKI_MUSICBT_HEIGHT,
   ONGEKI_MUSICBT_WIDTH,
 } from "./OngekiMusicBtCard";
 import {
-  ONGEKI_SCORECARD_EXPORT_WIDTH,
   ONGEKI_SCORECARD_HEIGHT,
   ONGEKI_SCORECARD_WIDTH,
 } from "./OngekiScoreCard";
@@ -87,9 +81,6 @@ export function ScoreCardSurface() {
     updateChuni,
     updateOngeki,
   } = useScoreCardState();
-  const [exportingPng, setExportingPng] = React.useState(false);
-  const [exportError, setExportError] = React.useState("");
-  const captureRef = React.useRef<HTMLDivElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
   const [stageScale, setStageScale] = React.useState(1);
   const [assetStatus, setAssetStatus] = React.useState<"checking" | "ready" | "error">(
@@ -117,7 +108,6 @@ export function ScoreCardSurface() {
   const { songDb, retrySongDb } = useScoreCardSongDb(game);
 
   function resetCurrentCard() {
-    setExportError("");
     if (game === "mai") {
       setState(defaultState());
     } else if (game === "chuni") {
@@ -149,31 +139,14 @@ export function ScoreCardSurface() {
 
   usePersistScoreCardState({ game, state, chuniState, setChuniState, ongekiState });
 
-  // Dev-only automation hooks for generating sample PNGs from the console.
+  // Dev-only state hook used by visual checks from the console.
   React.useEffect(() => {
     if (!import.meta.env.DEV) return;
     const scope = window as unknown as Record<string, unknown>;
     scope.__setScorecardState = (next: MaiScoreState) =>
       setState((current) => ({ ...current, ...next }));
-    scope.__renderScorecardPng = async () => {
-      const target = captureRef.current;
-      if (!target) return null;
-      const images = Array.from(target.querySelectorAll("img"));
-      await Promise.all(
-        images.map((image) =>
-          image.complete
-            ? Promise.resolve()
-            : new Promise((resolve) => {
-                image.addEventListener("load", resolve, { once: true });
-                image.addEventListener("error", resolve, { once: true });
-              }),
-        ),
-      );
-      return renderNodeToPng(target, target.offsetWidth * 3);
-    };
     return () => {
       delete scope.__setScorecardState;
-      delete scope.__renderScorecardPng;
     };
   }, []);
 
@@ -264,43 +237,6 @@ export function ScoreCardSurface() {
     setOngekiState(createOngekiDifficultySelection(ongekiSong, difficulty));
   }
 
-  async function exportPng() {
-    const target = captureRef.current;
-    if (!target || !song) return;
-    // Filenames carry the card type so panel/select exports don't collide.
-    const exportName =
-      game === "mai"
-        ? `maimai-${song.title}-${state.difficulty}`
-        : game === "chuni"
-          ? chuniState.cardType === "musicbox"
-            ? `chunithm-musicbox-${chuniSong.title}-${chuniState.difficulty}`
-            : `chunithm-${chuniSong.title}-${chuniState.difficulty}`
-          : ongekiState.cardType === "musicbt"
-            ? `ongeki-musicbt-${ongekiSong.title}-${ongekiState.difficulty}`
-            : `ongeki-${ongekiSong.title}-${ongekiState.difficulty}`;
-    const exportWidth =
-      game === "mai"
-        ? MAI_SCORECARD_EXPORT_WIDTH
-        : game === "chuni"
-          ? chuniState.cardType === "musicbox"
-            ? CHUNI_MUSICBOX_EXPORT_WIDTH
-            : CHUNI_SCORECARD_EXPORT_WIDTH
-          : ongekiState.cardType === "musicbt"
-            ? ONGEKI_MUSICBT_EXPORT_WIDTH
-            : ONGEKI_SCORECARD_EXPORT_WIDTH;
-    try {
-      setExportError("");
-      setExportingPng(true);
-      await exportNodeAsPng(target, exportName, exportWidth);
-    } catch (err) {
-      setExportError(
-        `Export failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    } finally {
-      setExportingPng(false);
-    }
-  }
-
   if (!song || !chart) {
     return <div className="scorecard-empty">No songs available.</div>;
   }
@@ -384,13 +320,9 @@ export function ScoreCardSurface() {
         chuniState={chuniState}
         ongekiSong={ongekiSong}
         ongekiState={ongekiState}
-        captureRef={captureRef}
         stageRef={stageRef}
         stageScale={stageScale}
         assetStatus={assetStatus}
-        exportingPng={exportingPng}
-        exportError={exportError}
-        onExport={exportPng}
       />
     </main>
   );

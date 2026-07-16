@@ -10,8 +10,8 @@
 // File names must match the otoge-db jacket file name for the song (the
 // hashed `image`/`image_url` value in music-ex.json, e.g. 30eb032b16877275.png)
 // — that is the key the app's /hd-jackets URL is built from. Game-extracted
-// art under private-assets/official/scorecard/{game}/ uses game-native names
-// (jacket_11818.png, UI_Jacket_0001.png, ...), so rename/map it first.
+// art produced by the external asset workspace uses game-native names
+// (jacket_11818.png, UI_Jacket_0001.png, ...), so rename or map it first.
 
 import { readdirSync } from "node:fs";
 import { extname, join } from "node:path";

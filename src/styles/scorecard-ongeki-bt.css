@@ -1,10 +1,9 @@
 /* ---------------------------------------------------------------------------
  * O.N.G.E.K.I. music-select MusicBt card (ANM_SWH_MusicBt.prefab)
- * Design space: the 278x458 PAT_DF_base plate; the capture root is padded
+ * Design space: the 278x458 PAT_DF_base plate; the render root is padded
  * (16px left/right/bottom for the Lunatic plate glow, 22px top for the boss
- * VS block) to 310x496 so overhanging art survives the PNG export. All
- * plate-relative coordinates come from
- * scripts/scorecard-extract/ongeki_musicbt_tree.{json,txt}.
+ * VS block) to 310x496 so overhanging art remains visible. Plate-relative
+ * coordinates come from the external asset-extraction reference data.
  * ------------------------------------------------------------------------- */
 
 .ongeki-musicbt-card {
@@ -93,7 +92,7 @@
 
 /* MU3UICounter glyphs: white sheet cells positioned inline. The counters
    multiply grayscale vertex colours onto the white ink, which is exactly a
-   brightness() filter (export-safe, unlike mask-image). */
+   brightness() filter without requiring per-glyph mask images. */
 .omb-glyph {
   position: absolute;
 }
@@ -241,7 +240,7 @@
 }
 
 /* Rights strip: pivot (0,0.5) at x=275 grows right, hanging off the card
-   (focused-state overlay; clipped by the PNG export). Base pre-baked from
+   (focused-state overlay; clipped by the card container). Base pre-baked from
    the 26x48 9-slice; art height 48 stretched onto the 54.7px cast box. */
 .omb-rights-base {
   position: absolute;

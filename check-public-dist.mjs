@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,16 +7,22 @@ const distRoot = process.argv[2]
   ? path.resolve(process.cwd(), process.argv[2])
   : path.resolve(projectRoot, "dist");
 
-const forbiddenRoots = [
-  path.resolve(distRoot, "official"),
-  path.resolve(distRoot, "fonts", "private"),
-];
+const publicAssetPolicy = JSON.parse(
+  readFileSync(path.resolve(projectRoot, "public-asset-policy.json"), "utf8"),
+);
+const allowedFiles = new Set([
+  ...publicAssetPolicy.allowedPublicFiles,
+  ...publicAssetPolicy.allowedGeneratedDistFiles,
+]);
+const allowedPatterns = publicAssetPolicy.allowedGeneratedDistPatterns.map(
+  (pattern) => new RegExp(pattern),
+);
 
-function findForbiddenFiles(root) {
+function collectOutputFiles(root) {
   if (!existsSync(root)) return [];
 
   const pending = [root];
-  const forbidden = [];
+  const files = [];
 
   while (pending.length > 0) {
     const current = pending.pop();
@@ -25,13 +31,16 @@ function findForbiddenFiles(root) {
       if (entry.isDirectory()) {
         pending.push(entryPath);
       } else {
-        // Treat every file, symlink and other special entry as a leak.
-        forbidden.push(entryPath);
+        // Treat symlinks and special entries as files that require review.
+        files.push({
+          path: path.relative(distRoot, entryPath).split(path.sep).join("/"),
+          regular: entry.isFile(),
+        });
       }
     }
   }
 
-  return forbidden;
+  return files.sort((left, right) => left.path.localeCompare(right.path));
 }
 
 if (!existsSync(distRoot) || !statSync(distRoot).isDirectory()) {
@@ -41,21 +50,42 @@ if (!existsSync(distRoot) || !statSync(distRoot).isDirectory()) {
   process.exit(1);
 }
 
-const forbidden = forbiddenRoots.flatMap(findForbiddenFiles);
+const outputEntries = collectOutputFiles(distRoot);
+const regularPaths = new Set(
+  outputEntries.filter((entry) => entry.regular).map((entry) => entry.path),
+);
+const unexpected = outputEntries.filter(
+  (entry) =>
+    !entry.regular ||
+    (!allowedFiles.has(entry.path) &&
+      !allowedPatterns.some((pattern) => pattern.test(entry.path))),
+);
+const missingFiles = [...allowedFiles].filter((file) => !regularPaths.has(file)).sort();
+const missingPatterns = allowedPatterns.filter(
+  (pattern) => ![...regularPaths].some((file) => pattern.test(file)),
+);
 
-if (forbidden.length > 0) {
+if (unexpected.length > 0 || missingFiles.length > 0 || missingPatterns.length > 0) {
   console.error(
-    `[cardviewer-public-dist] Public output contains ${forbidden.length} forbidden official/private asset file(s):`,
+    `[cardviewer-public-dist] Public output does not match the reviewed artifact policy:`,
   );
   const visibleLimit = 20;
-  for (const filePath of forbidden.slice(0, visibleLimit)) {
-    console.error(`  - ${path.relative(distRoot, filePath).split(path.sep).join("/")}`);
+  const findings = [
+    ...unexpected.map(
+      (entry) =>
+        `unexpected: ${entry.path}${entry.regular ? "" : " (non-regular entry)"}`,
+    ),
+    ...missingFiles.map((file) => `missing: ${file}`),
+    ...missingPatterns.map((pattern) => `missing generated match: ${pattern}`),
+  ];
+  for (const finding of findings.slice(0, visibleLimit)) {
+    console.error(`  - ${finding}`);
   }
-  if (forbidden.length > visibleLimit) {
-    console.error(`  - ... and ${forbidden.length - visibleLimit} more`);
+  if (findings.length > visibleLimit) {
+    console.error(`  - ... and ${findings.length - visibleLimit} more`);
   }
   console.error("Refusing to treat this directory as a deployable public artifact.");
   process.exit(1);
 }
 
-console.log(`[cardviewer-public-dist] PASS: ${distRoot} contains no forbidden official/private assets.`);
+console.log(`[cardviewer-public-dist] PASS: ${distRoot} contains only reviewed public output paths.`);

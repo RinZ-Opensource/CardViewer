@@ -1,8 +1,8 @@
 /* ---------------------------------------------------------------------------
  * CHUNITHM music-select music box (CHU_UI_Select_musicbox_00)
  * Design space: the 454x610 decide frame; the neutral 438x584 card base sits
- * at (8,13). Coordinates are frame-relative CSS px from
- * scripts/scorecard-extract/chuni_musicbox_tree.{json,txt}.
+ * at (8,13). Coordinates are frame-relative CSS px from the external
+ * CHUNITHM MusicBox reference dump.
  * ------------------------------------------------------------------------- */
 
 .chuni-musicbox-card {
@@ -199,7 +199,7 @@
 }
 
 /* Confirm state (A_start_in rest pose): pre-baked decide frame + banner.
-   The idle alpha pulse (A_start_eff) is skipped so exports are deterministic. */
+   The idle alpha pulse (A_start_eff) is skipped for a stable preview. */
 .cmb-decide-frame {
   position: absolute;
   left: 0;

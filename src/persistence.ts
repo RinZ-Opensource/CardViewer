@@ -1,11 +1,9 @@
-import type { CardEdits } from "./types";
-
-export interface StorageLike {
+interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 }
 
-export interface StoredRecordOptions {
+interface StoredRecordOptions {
   allowedValues?: Readonly<Record<string, readonly unknown[]>>;
 }
 
@@ -110,37 +108,4 @@ export function loadStoredRecord<State extends object>(
   storage: StorageLike | null = browserStorage(),
 ): State {
   return parseStoredRecord(readLocalStorage(key, storage), fallback, options);
-}
-
-/** Parse the nested card-edit map, retaining only string/boolean field values. */
-export function parseStoredCardEdits(raw: string | null): Record<string, CardEdits> {
-  if (!raw) return {};
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return {};
-  }
-  if (!isRecord(parsed)) return {};
-
-  const edits: Record<string, CardEdits> = Object.create(null) as Record<string, CardEdits>;
-  for (const [cardKey, candidate] of Object.entries(parsed)) {
-    if (!isRecord(candidate)) continue;
-    const cardEdits: CardEdits = Object.create(null) as CardEdits;
-    for (const [fieldKey, value] of Object.entries(candidate)) {
-      if (typeof value === "string" || typeof value === "boolean") {
-        cardEdits[fieldKey] = value;
-      }
-    }
-    if (Object.keys(cardEdits).length > 0) edits[cardKey] = cardEdits;
-  }
-  return edits;
-}
-
-export function loadStoredCardEdits(
-  key: string,
-  storage: StorageLike | null = browserStorage(),
-): Record<string, CardEdits> {
-  return parseStoredCardEdits(readLocalStorage(key, storage));
 }

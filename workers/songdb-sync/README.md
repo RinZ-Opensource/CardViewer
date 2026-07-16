@@ -2,8 +2,8 @@
 
 Cloudflare Worker that mirrors [otoge-db](https://github.com/zvuc/otoge-db) song
 metadata and jackets into R2 and serves them with
-`Access-Control-Allow-Origin: *`, so the score-card song picker and the
-html-to-image PNG export work from any origin.
+`Access-Control-Allow-Origin: *`, so the browser score-card song picker works
+from any origin.
 
 ## Routes
 
@@ -81,9 +81,9 @@ node scripts/upload-hd-jackets.mjs maimai D:\path\to\hd-jackets --bucket <your-e
 
 Files must be named after the otoge-db jacket file (the hashed
 `image`/`image_url` value in `music-ex.json`, e.g. `30eb032b16877275.png`) so
-the `/hd-jackets/{game}/{file}` lookup matches. Game-extracted jackets under
-`private-assets/official/scorecard/{game}/` use game-native names
-(`jacket_11818.png`, `UI_Jacket_0001.png`, ...) and need renaming/mapping first.
+the `/hd-jackets/{game}/{file}` lookup matches. Game-extracted jackets produced
+by the external asset workspace use game-native names (`jacket_11818.png`,
+`UI_Jacket_0001.png`, ...) and need renaming or a mapping before upload.
 
 ## Score-card official asset tier
 
@@ -102,11 +102,9 @@ official/scorecard/ongeki/boss/boss-map.json
 official/scorecard/ongeki/boss/v1/UI_Card_Icon_<id>.png
 ```
 
-Prepare the three jacket bundles with
-`scripts/scorecard-extract/prepare_hd_jackets.py`; export the ONGEKI opponent
-mapping and original icons with
-`scripts/scorecard-extract/export_ongeki_boss_assets.py`. Both tools support
-`--verify-only`. Generate deterministic `wrangler r2 bulk put` manifests with
-`scripts/cloudflare/prepare_r2_bulk_manifest.mjs` and upload each image type
-with its matching content type. Upload the small JSON manifests last so a new
-version is never advertised before its images are present.
+Prepare and verify the jacket bundles and ONGEKI opponent assets in the external
+asset workspace. Bring only the reviewed publication objects and inventory to
+this deployment workflow. Generate deterministic `wrangler r2 bulk put`
+manifests with `scripts/cloudflare/prepare_r2_bulk_manifest.mjs` and upload each
+image type with its matching content type. Upload the small JSON manifests last
+so a new version is never advertised before its images are present.

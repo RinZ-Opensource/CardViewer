@@ -1,4 +1,3 @@
-import React from "react";
 import { FitText } from "./FitText";
 import {
   CHUNI_BASE_CROP,
@@ -18,14 +17,12 @@ import { ChuniScoreState, ChuniSong } from "./chuniTypes";
 /**
  * Design space: CHU_UI_Playing_00_v10.srd music-info panel — PAT_base_left's
  * 586x182 box at frame (1334,0). All coordinates are panel-relative CSS px
- * from scripts/scorecard-extract/chuni_musicinfo_tree.json; the static TRS2
- * pose IS the on-screen rest pose (only the Lumina-VERSE root slide/fade and
- * the WE star reveal animate).
+ * from the external CHUNITHM MusicInfo reference dump; the static TRS2 pose is
+ * the on-screen rest pose (only the Lumina-VERSE root slide/fade and the WE
+ * star reveal animate).
  */
 export const CHUNI_SCORECARD_WIDTH = 586;
 export const CHUNI_SCORECARD_HEIGHT = 182;
-/** Export at 3x so text and sprites survive typical chat-app downscaling. */
-export const CHUNI_SCORECARD_EXPORT_WIDTH = CHUNI_SCORECARD_WIDTH * 3;
 
 /*
  * CNUM digit-run layout, read from the cast dumps: anchor4b tracks the pivot
@@ -88,10 +85,9 @@ interface ChuniScoreCardProps {
   state: ChuniScoreState;
   /** Overrides the sample song's jacket when set. */
   jacketUrl?: string;
-  captureRef?: React.Ref<HTMLDivElement>;
 }
 
-export function ChuniScoreCard({ song, state, jacketUrl, captureRef }: ChuniScoreCardProps) {
+export function ChuniScoreCard({ song, state, jacketUrl }: ChuniScoreCardProps) {
   // C_level_nomal vs C_level_we are mutually exclusive branches.
   const isWorldsEnd = state.difficulty === "worldsend";
   const levelDigits = state.level.replace(/\D/g, "");
@@ -104,7 +100,7 @@ export function ChuniScoreCard({ song, state, jacketUrl, captureRef }: ChuniScor
   const star = CHUNI_WE_STAR[starIndex];
 
   return (
-    <div className="chuni-scorecard" ref={captureRef}>
+    <div className="chuni-scorecard">
       {/* Difficulty-coloured base; "TRACK" + difficulty name baked in. */}
       <img className="csc-base" src={chuniCrop(CHUNI_BASE_CROP[state.difficulty])} alt="" />
 

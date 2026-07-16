@@ -1,55 +1,19 @@
 import React from "react";
-import { EditorPanel } from "./EditorPanel";
-import { exportNodeAsPng } from "./exportPng";
-import { applyEdits } from "./cardData";
-import { effectiveCardEdits, SHARED_PLAYER_EDITS_KEY } from "./cardEdits";
 import { buildFilterConfig, cardMatchesFilters, uniqueOptions } from "./cardFilters";
-import { selectedAssetSignature, usesPrimaryImageDataUrl } from "./cardAssets";
 import { isSupportedCardRecord } from "./cardSupport";
 import { PreviewStage } from "./cards";
-import {
-  CARD_LIST_OVERSCAN,
-  CARD_ROW_HEIGHT,
-  CARD_WIDTH,
-  DEPLOYMENT_MODE,
-  OfficialFontContext,
-  TmpFontContext,
-  canInvokeTauri,
-} from "./constants";
-import { useCardEdits, useCardListViewport, useOfficialFonts, useScanResult, useSelectedAssetDataUrls, useSelectedImageDataUrl, useThumbnailLoader } from "./hooks";
+import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT } from "./constants";
+import { useCardListViewport, useScanResult, useSelectedImageDataUrl, useThumbnailLoader } from "./hooks";
 import { THUMBNAIL_BUFFER_ROWS } from "./imageLoader";
 import { CardRecord, ViewMode } from "./types";
-
-/** Keep the unfinished CardViewer export workflow out of the UI for now. */
-const SHOW_CARD_EXPORT = false;
 
 export function App() {
   const [selectedId, setSelectedId] = React.useState<string>("");
   const [query, setQuery] = React.useState("");
   const [cardFilters, setCardFilters] = React.useState<Record<string, string>>({});
   const [viewMode, setViewMode] = React.useState<ViewMode>("3d");
-  const cardCaptureRef = React.useRef<HTMLDivElement | null>(null);
-  const [exportingPng, setExportingPng] = React.useState(false);
   const { cardListRef, cardListViewport, updateCardListScroll } = useCardListViewport();
-  const { officialFonts, tmpFont } = useOfficialFonts();
-  const { edits, updateCardField, updatePlayerField, resetCardEdits, resetPlayerEdits } = useCardEdits();
-  const {
-    scanResult,
-    status,
-    source,
-    error,
-    setError,
-    loading,
-    retry,
-    packageRoot,
-    scanPackageRoot,
-  } = useScanResult(setSelectedId);
-  const [packageRootDraft, setPackageRootDraft] = React.useState(packageRoot);
-  const tauriAvailable = canInvokeTauri();
-
-  React.useEffect(() => {
-    setPackageRootDraft(packageRoot);
-  }, [packageRoot]);
+  const { scanResult, status, source, loading, retry } = useScanResult(setSelectedId);
 
   const cards = scanResult?.cards ?? [];
   const displayCards = React.useMemo(
@@ -60,56 +24,38 @@ export function App() {
     () => uniqueOptions(displayCards.map((card) => card.game)),
     [displayCards],
   );
-  const selectedBase = displayCards.find((card) => card.dataName === selectedId) ?? null;
-  const selectedEdits = selectedBase ? effectiveCardEdits(edits, selectedBase) : undefined;
-  const selectedCardEdits = selectedBase ? edits[selectedBase.dataName] : undefined;
-  const selected = selectedBase
-    ? applyEdits(selectedBase, selectedEdits)
-    : null;
-  const selectedImagePath =
-    selected && usesPrimaryImageDataUrl(selected)
-      ? selected.imagePath ?? selected.thumbnailPath ?? ""
-      : "";
-  const selectedAssetsSignature = React.useMemo(
-    () => selectedAssetSignature(selected, scanResult?.streamingAssets),
-    [scanResult?.streamingAssets, selected],
-  );
+  const selected = displayCards.find((card) => card.dataName === selectedId) ?? null;
+  const selectedImagePath = selected?.imagePath ?? selected?.thumbnailPath ?? "";
   const imageDataUrl = useSelectedImageDataUrl(selected, selectedImagePath);
-  const assetDataUrls = useSelectedAssetDataUrls(
-    selected,
-    selectedAssetsSignature,
-    scanResult?.streamingAssets,
-  );
 
   // One lowercased haystack per card, so typing only re-runs cheap substring
-  // checks; rebuilt only when the cards or their edits change.
+  // checks; rebuilt only when the manifest cards change.
   const searchIndex = React.useMemo(() => {
     const index = new Map<string, string>();
     for (const card of displayCards) {
-      const merged = applyEdits(card, effectiveCardEdits(edits, card));
       index.set(
         card.dataName,
         [
-          merged.id,
-          merged.dataName,
-          merged.displayName,
-          merged.characterName,
-          merged.skillName,
-          merged.skillText,
-          ...merged.printFields.map((field) => field.value),
+          card.id,
+          card.dataName,
+          card.displayName,
+          card.characterName,
+          card.skillName,
+          card.skillText,
+          ...card.printFields.map((field) => field.value),
         ]
           .join(" ")
           .toLocaleLowerCase(),
       );
     }
     return index;
-  }, [displayCards, edits]);
+  }, [displayCards]);
   // Defer the query so the search input stays responsive while the (possibly
   // large) list re-filters in a non-blocking pass.
   const deferredQuery = React.useDeferredValue(query);
   const filterConfig = React.useMemo(
-    () => buildFilterConfig(displayCards, edits, cardFilters),
-    [displayCards, edits, cardFilters],
+    () => buildFilterConfig(displayCards, cardFilters),
+    [displayCards, cardFilters],
   );
 
   React.useEffect(() => {
@@ -152,11 +98,11 @@ export function App() {
   const filteredCards = React.useMemo(() => {
     const normalized = deferredQuery.trim().toLocaleLowerCase();
     return displayCards.filter((card) => {
-      if (!cardMatchesFilters(card, effectiveCardEdits(edits, card), cardFilters)) return false;
+      if (!cardMatchesFilters(card, cardFilters)) return false;
       if (normalized.length === 0) return true;
       return (searchIndex.get(card.dataName) ?? "").includes(normalized);
     });
-  }, [displayCards, edits, cardFilters, deferredQuery, searchIndex]);
+  }, [displayCards, cardFilters, deferredQuery, searchIndex]);
 
   React.useEffect(() => {
     if (filteredCards.length === 0) {
@@ -283,65 +229,10 @@ export function App() {
     });
   }
 
-  async function exportCardPng() {
-    // Capture .card-face (not just .official-card) so the holo is included for
-    // every game: MU3 paints it inside the card, MAI overlays it on top.
-    const target = cardCaptureRef.current;
-    if (!target || !selected) return;
-    try {
-      setExportingPng(true);
-      // Let the button repaint to its "Exporting…" state before the heavy,
-      // main-thread rasterization below briefly blocks the UI.
-      await new Promise((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve(null))),
-      );
-      await exportNodeAsPng(
-        target,
-        selected.displayName || selected.dataName || "card",
-        CARD_WIDTH,
-      );
-    } catch (err) {
-      setError(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setExportingPng(false);
-    }
-  }
-
   return (
-    <OfficialFontContext.Provider value={officialFonts}>
-      <TmpFontContext.Provider value={tmpFont}>
-      <main className="app-shell">
+    <main className="app-shell">
       <aside className="sidebar" aria-label="Card browser">
         <section className="filters">
-          {tauriAvailable ? (
-            <form
-              className="package-root-form"
-              aria-label="Local CardMaker package"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const normalized = packageRootDraft.trim();
-                setPackageRootDraft(normalized);
-                scanPackageRoot(normalized);
-              }}
-            >
-              <input
-                className="path-input"
-                value={packageRootDraft}
-                onChange={(event) => setPackageRootDraft(event.target.value)}
-                placeholder="CardMaker package folder"
-                aria-label="CardMaker package folder"
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <button
-                type="submit"
-                className="primary-button"
-                disabled={loading || !packageRootDraft.trim()}
-              >
-                Scan folder
-              </button>
-            </form>
-          ) : null}
           <div className="search-field">
             <svg
               className="search-icon"
@@ -379,16 +270,16 @@ export function App() {
               ))}
             </div>
           ) : null}
-          {loading || source === "mock" || source === "error" ? (
+          {loading || source === "mock" ? (
             <div
-              className={`data-source-status${source === "mock" || source === "error" ? " degraded" : ""}`}
+              className={`data-source-status${source === "mock" ? " degraded" : ""}`}
               role="status"
               aria-live="polite"
             >
               <span>{status}</span>
-              {source === "mock" || (source === "error" && packageRoot) ? (
+              {source === "mock" ? (
                 <button type="button" className="ghost-button" onClick={retry} disabled={loading}>
-                  {source === "mock" ? "Retry manifest" : "Retry"}
+                  Retry manifest
                 </button>
               ) : null}
             </div>
@@ -458,7 +349,6 @@ export function App() {
               >
               {virtualCards.map((card, windowIndex) => {
                 const cardIndex = virtualStart + windowIndex;
-                const merged = applyEdits(card, effectiveCardEdits(edits, card));
                 const active = selected?.dataName === card.dataName;
                 const thumb = thumbCache[card.dataName];
                 return (
@@ -478,12 +368,11 @@ export function App() {
                       {thumb ? <img src={thumb} alt="" decoding="async" /> : <span>{card.game}</span>}
                     </span>
                     <span className="row-main">
-                      <strong>{merged.displayName}</strong>
+                      <strong>{card.displayName}</strong>
                       <small>
                         {card.dataName} / {card.recordType}
                       </small>
                     </span>
-                    {edits[card.dataName] ? <span className="chip-edited">edited</span> : null}
                   </button>
                 );
               })}
@@ -532,73 +421,12 @@ export function App() {
           </div>
         </div>
 
-        <div className="preview-and-editor">
-          <PreviewStage
-            card={selected}
-            imageDataUrl={imageDataUrl}
-            assetDataUrls={assetDataUrls}
-            mode={viewMode}
-            captureRef={cardCaptureRef}
-          />
-          {DEPLOYMENT_MODE === "private" ? (
-            <EditorPanel
-              card={selectedBase}
-              edits={selectedEdits}
-              onChange={(fieldKey, value) => { if (selected) updateCardField(selected, fieldKey, value); }}
-              onPlayerChange={(fieldKey, value) => { if (selected) updatePlayerField(fieldKey, value); }}
-              onReset={() => { if (selected) resetCardEdits(selected); }}
-              onResetPlayer={resetPlayerEdits}
-              canReset={Boolean(selectedCardEdits && Object.keys(selectedCardEdits).length > 0)}
-              canResetPlayer={Boolean(
-                edits[SHARED_PLAYER_EDITS_KEY] &&
-                Object.keys(edits[SHARED_PLAYER_EDITS_KEY]).length > 0
-              )}
-            />
-          ) : (
-            <aside
-              className="editor-panel empty public-editor-notice"
-              aria-label="Card editor"
-            >
-              Editing is unavailable in the public asset build because that renderer does not
-              apply print fields.
-            </aside>
-          )}
-        </div>
+        <PreviewStage
+          card={selected}
+          imageDataUrl={imageDataUrl}
+          mode={viewMode}
+        />
       </section>
-      {error ? (
-        <div className="error-toast" role="alert">
-          <span className="error-toast-text">{error}</span>
-        </div>
-      ) : null}
-
-      {SHOW_CARD_EXPORT && selected ? (
-        <button
-          type="button"
-          className="export-fab"
-          onClick={exportCardPng}
-          disabled={exportingPng}
-          title="Export current card as PNG"
-          aria-label="Export current card as PNG"
-        >
-          <svg
-            className="export-fab-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          <span>{exportingPng ? "Exporting…" : "Export"}</span>
-        </button>
-      ) : null}
       </main>
-      </TmpFontContext.Provider>
-    </OfficialFontContext.Provider>
   );
 }

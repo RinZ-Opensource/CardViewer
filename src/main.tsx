@@ -9,10 +9,7 @@ import "./styles/scorecard-chuni.css";
 import "./styles/scorecard-chuni-box.css";
 import "./styles/scorecard-ongeki.css";
 import "./styles/scorecard-ongeki-bt.css";
-import { installPrivateFontFaces } from "./fonts";
 import { AppShell } from "./AppShell";
-
-installPrivateFontFaces();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error('Missing #root element; cannot mount the app.');

@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Apply the saved light/dark/system theme before first paint (no flash).
-         External same-origin file so the Tauri CSP (script-src 'self') allows it. -->
+    <!-- Apply the saved light/dark/system theme before first paint. Keeping the
+         bootstrap in a same-origin file supports a strict script-src 'self' CSP. -->
     <script src="/theme-init.js"></script>
     <title>ConfigArc Card Viewer</title>
   </head>

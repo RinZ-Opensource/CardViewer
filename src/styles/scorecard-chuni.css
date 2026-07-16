@@ -1,8 +1,8 @@
 /* ---------------------------------------------------------------------------
  * CHUNITHM playing-screen music-info panel
  * Design space: CHU_UI_Playing_00_v10.srd, PAT_base_left's 586x182 box at
- * frame (1334,0). All coordinates are panel-relative CSS px from
- * scripts/scorecard-extract/chuni_musicinfo_tree.{json,txt}.
+ * frame (1334,0). All coordinates are panel-relative CSS px from the external
+ * CHUNITHM MusicInfo reference dump.
  * ------------------------------------------------------------------------- */
 
 .chuni-scorecard {

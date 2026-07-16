@@ -1,13 +1,12 @@
-import { applyEdits, fieldString, mu3RarityKind } from "./cardData";
-import { effectiveCardEdits } from "./cardEdits";
-import { CardEdits, CardRecord } from "./types";
+import { fieldString, mu3RarityKind } from "./cardData";
+import { CardRecord } from "./types";
 
-export type FilterOption = {
+type FilterOption = {
   value: string;
   label: string;
 };
 
-export type CardFilterConfig = {
+type CardFilterConfig = {
   key: string;
   label: string;
   placeholder: string;
@@ -31,7 +30,6 @@ const GAME_FACETS: Record<string, Array<{ key: string; label: string }>> = {
 
 export function buildFilterConfig(
   cards: CardRecord[],
-  edits: Record<string, CardEdits>,
   activeFilters: Record<string, string>,
 ): CardFilterConfig[] {
   const games = uniqueOptions(cards.map((card) => card.game));
@@ -40,18 +38,14 @@ export function buildFilterConfig(
   const facets = GAME_FACETS[selectedGame];
   if (!facets) return filters;
 
-  // Merge each card's edits once, then derive every facet's options from the
-  // merged cards (instead of re-running applyEdits per card per facet).
-  const mergedGameCards = cards
-    .filter((card) => card.game === selectedGame)
-    .map((card) => applyEdits(card, effectiveCardEdits(edits, card)));
+  const gameCards = cards.filter((card) => card.game === selectedGame);
   for (const facet of facets) {
     pushFilter(
       filters,
       facet.key,
       facet.label,
       facet.label,
-      uniqueOptions(mergedGameCards.map((card) => mergedCardFilterValue(card, facet.key))),
+      uniqueOptions(gameCards.map((card) => cardFilterValue(card, facet.key))),
     );
   }
 
@@ -79,31 +73,30 @@ function naturalCompare(left: string, right: string) {
   return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
 }
 
-export function cardMatchesFilters(card: CardRecord, edits: CardEdits | undefined, filters: Record<string, string>) {
-  const merged = applyEdits(card, edits);
+export function cardMatchesFilters(card: CardRecord, filters: Record<string, string>) {
   for (const [key, expected] of Object.entries(filters)) {
     if (!expected) continue;
-    if (mergedCardFilterValue(merged, key) !== expected) return false;
+    if (cardFilterValue(card, key) !== expected) return false;
   }
   return true;
 }
 
-function mergedCardFilterValue(merged: CardRecord, key: string) {
+function cardFilterValue(card: CardRecord, key: string) {
   switch (key) {
     case "game":
-      return merged.game;
+      return card.game;
     case "mai.type":
-      return maiTypeName(fieldString(merged, "typeId"));
+      return maiTypeName(fieldString(card, "typeId"));
     case "mai.character":
-      return firstCardField(merged, ["charaName", "characterName"]) || merged.characterName || merged.displayName;
+      return firstCardField(card, ["charaName", "characterName"]) || card.characterName || card.displayName;
     case "mai.version":
-      return normalizedVersion(firstCardField(merged, ["verCharaId", "version", "versionId", "releaseVersion"]));
+      return normalizedVersion(firstCardField(card, ["verCharaId", "version", "versionId", "releaseVersion"]));
     case "mu3.rarity":
-      return mu3RarityKind(merged);
+      return mu3RarityKind(card);
     case "mu3.character":
-      return firstCardField(merged, ["baseCharacterName", "characterName", "nameForCommonModel"]) || merged.characterName || merged.displayName;
+      return firstCardField(card, ["baseCharacterName", "characterName", "nameForCommonModel"]) || card.characterName || card.displayName;
     case "mu3.version":
-      return normalizedVersion(firstCardField(merged, ["cardNo", "version", "versionId", "releaseVersion", "verCharaId"]));
+      return normalizedVersion(firstCardField(card, ["cardNo", "version", "versionId", "releaseVersion", "verCharaId"]));
     default:
       return "";
   }

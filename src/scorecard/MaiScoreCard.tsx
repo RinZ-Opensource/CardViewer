@@ -1,4 +1,3 @@
-import React from "react";
 import { FitText } from "./FitText";
 import {
   MAI_COMBO_SPRITE,
@@ -24,8 +23,6 @@ import { MaiChart, MaiScoreState, MaiSong } from "./types";
  */
 export const MAI_SCORECARD_WIDTH = 420;
 export const MAI_SCORECARD_HEIGHT = 690;
-/** Export at 3x so text and sprites survive typical chat-app downscaling. */
-export const MAI_SCORECARD_EXPORT_WIDTH = MAI_SCORECARD_WIDTH * 3;
 
 /** Top-left of each glyph's 48x60 cell in the UI_NUM_MLevel_xx atlas (192x240). */
 const LEVEL_CELLS: Record<string, [number, number]> = {
@@ -90,10 +87,9 @@ interface MaiScoreCardProps {
   chart: MaiChart;
   state: MaiScoreState;
   maxDxScore: number;
-  captureRef?: React.Ref<HTMLDivElement>;
 }
 
-export function MaiScoreCard({ song, chart, state, maxDxScore, captureRef }: MaiScoreCardProps) {
+export function MaiScoreCard({ song, chart, state, maxDxScore }: MaiScoreCardProps) {
   const suffix = MAI_DIFF_SUFFIX[chart.difficulty];
   const achievement = formatAchievement(state.achievement);
   const rank = maiRankForAchievement(Number.parseFloat(achievement));
@@ -116,7 +112,7 @@ export function MaiScoreCard({ song, chart, state, maxDxScore, captureRef }: Mai
   const bpmText = song.bpm >= 0 ? String(Math.trunc(song.bpm)).padStart(3, "0") : "???";
 
   return (
-    <div className="mai-scorecard" ref={captureRef}>
+    <div className="mai-scorecard">
       <div className="msc-body">
         {/* Frame: baked jacket window, EXPERT wordmark, navy title band, white
             info panel and the pale clear-circles. */}

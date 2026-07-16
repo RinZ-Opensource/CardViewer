@@ -3,12 +3,10 @@ import { CardRecord, OnlineManifestIndex, OnlineManifestShard, ScanResult } from
 
 // Cap concurrent shard fetches and bound each request, so a many-shard manifest
 // can't open hundreds of connections or hang on a stalled response.
-export const SHARD_FETCH_CONCURRENCY = 6;
-export const MANIFEST_FETCH_TIMEOUT_MS = 30_000;
-// Kept as an alias for callers/tests that referenced the old shard-only name.
-export const SHARD_FETCH_TIMEOUT_MS = MANIFEST_FETCH_TIMEOUT_MS;
+const SHARD_FETCH_CONCURRENCY = 6;
+const MANIFEST_FETCH_TIMEOUT_MS = 30_000;
 
-export async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, signal ? { signal } : undefined);
   if (!response.ok) {
     throw new Error(`${url} unavailable: ${response.status}`);
@@ -67,20 +65,20 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-export function siblingManifestUrl(manifestUrl: string, fileName: string) {
+function siblingManifestUrl(manifestUrl: string, fileName: string) {
   const base = typeof window === "undefined" ? "http://localhost/" : window.location.href;
   const url = new URL(manifestUrl, base);
   url.pathname = url.pathname.replace(/[^/]*$/, fileName);
   return url.toString();
 }
 
-export function resolveManifestHref(href: string, manifestUrl: string) {
+function resolveManifestHref(href: string, manifestUrl: string) {
   const pageBase = typeof window === "undefined" ? "http://localhost/" : window.location.href;
   const absoluteManifestUrl = new URL(manifestUrl, pageBase);
   return new URL(href, absoluteManifestUrl).toString();
 }
 
-export function scanResultFromIndex(index: OnlineManifestIndex, cards: CardRecord[]): ScanResult {
+function scanResultFromIndex(index: OnlineManifestIndex, cards: CardRecord[]): ScanResult {
   return {
     packageRoot: index.packageRoot,
     streamingAssets: index.streamingAssets,

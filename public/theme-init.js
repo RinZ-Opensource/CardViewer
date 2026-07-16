@@ -2,10 +2,9 @@
    no flash of the light theme for dark-mode users. Mirrors the resolution logic
    in src/theme.ts (storage key "cv-theme"); keep the two in sync.
 
-   This is a classic same-origin script (loaded render-blocking from <head>)
-   rather than an inline <script> on purpose: the Tauri desktop build's CSP is
-   `script-src 'self'` with no 'unsafe-inline', which would block an inline
-   script but allows this external file. */
+   This is a classic same-origin script loaded from <head>, rather than an
+   inline script, so the public app remains compatible with a strict
+   `script-src 'self'` policy without `unsafe-inline`. */
 (function () {
   try {
     var pref = localStorage.getItem("cv-theme");

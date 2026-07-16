@@ -1,95 +1,84 @@
 # ConfigArc CardViewer
 
-A React/Vite/Tauri viewer for CardMaker resources, with card rendering for CHU,
-MAI, and MU3 plus score-card previews for CHUNITHM, maimai, and O.N.G.E.K.I.
+ConfigArc CardViewer is a React/Vite web application for CHU, MAI, and MU3
+card previews plus CHUNITHM, maimai, and O.N.G.E.K.I. score-card previews. This
+repository contains only the public Cloudflare deployment surface.
 
-## Deployment modes
+## Deployment architecture
 
-| Mode | Intended use | Local-only inputs |
-| --- | --- | --- |
-| `private` | Tauri, LAN, and controlled local previews | `private-assets/official` is served as `/official`; `private-assets/fonts/fot` is served as `/fonts/private` |
-| `public` | Cloudflare Pages or another public static deployment | The private-assets Vite plugin is disabled; only reviewed `/official/*` keys may be served from R2 at runtime |
+Cloudflare Pages serves the Vite bundle from `dist/`. A Pages Function maps the
+reviewed `/official/*` request surface to an R2 binding named `ASSETS_BUCKET`.
+The optional song-database Worker supplies public metadata and jacket fallbacks.
 
-Official assets and privately licensed fonts are not repository content. Keep
-them under `private-assets/`; do not place copies in Vite's `public/` directory.
-Vite always copies `public/` into `dist`, even in public mode, so a local
-`public/official` or `public/fonts/private` directory can contaminate a public
-artifact. Inspect `dist` before any direct upload.
+Official source packages, licensed fonts, extraction utilities, desktop or
+device runtimes, and generated working directories are maintained outside this
+repository. They are not copied into the Vite build. External producers may
+publish only reviewed output objects to R2.
 
-The Cloudflare deployment uses a Pages Function to serve a narrow, reviewed
-subset of `/official/*` from an R2 binding named `ASSETS_BUCKET`. It does not
-deploy `/fonts/private/*`; commercially licensed fonts remain available only to
-private Vite/Tauri workflows. Those runtime assets are separate from the public
-Vite bundle. See
-[docs/online-preview.md](docs/online-preview.md) for the asset layout, local
-preview boundary, and deployment checklist.
+The browser-facing asset contract is:
+
+- `/official/generated/cards.json` is the default card manifest.
+- `/official/generated/cards.index.json` and its referenced game shards form
+  the sharded manifest contract.
+- Manifest asset URLs must stay under the allowlisted `/official/generated/**`
+  route.
+- Score-card maps and images use `/official/scorecard/**`.
+- Published files must be `.json`, `.png`, `.jpg`, `.jpeg`, or `.webp`.
+- Versioned image keys are uploaded before the JSON files that reference them.
+
+The Pages Function additionally exposes one reviewed root card-back resource. See
+[the Cloudflare runbook](docs/online-preview.md) for the complete allowlist,
+publication order, cache policy, and verification gates.
 
 ## Commands
 
-Use Node.js 22.20.0, as pinned by the root `.node-version` file. Rust uses the
-1.95.0 toolchain, formatter, and linter declared in `rust-toolchain.toml`.
-Mobile .NET commands use the latest installed .NET 8 feature band selected by
-`global.json`.
-
-Install both locked JavaScript toolchains and the pinned Python dependency used
-by the Rust image-export tests after a clean checkout:
+Use Node.js 22.20.0, pinned by `.node-version`.
 
 ```powershell
 npm.cmd ci
 npm.cmd --prefix workers/songdb-sync ci
-python -m pip install --requirement src-tauri/requirements-test.txt --only-binary=:all:
-```
 
-```powershell
-npm.cmd run dev:private
-npm.cmd run dev:public
-npm.cmd run build:private
-npm.cmd run build:public
-npm.cmd run check
-npm.cmd run check:all
-npm.cmd run check:mobile
+npm.cmd run dev
+npm.cmd run build
+npm.cmd run preview
 npm.cmd run preview:cloudflare
-npm.cmd run tauri:dev
-npm.cmd run tauri:build
+npm.cmd run check
 ```
 
-The Tauri viewer has no machine-specific default package directory. If an
-exported manifest is unavailable, enter the local CardMaker package folder in
-the sidebar; that value is stored only in the desktop webview's local storage.
-Browser and Cloudflare builds neither read nor embed the local path.
+Every development and build command targets the fixed public Cloudflare
+runtime. `build` checks the complete `public/` tree against
+`public-asset-policy.json`, then verifies that `dist` contains only reviewed
+static files and Vite entry bundles. `check` runs the secret scan,
+deployment-boundary tests, frontend and Function tests, the public build, and
+the Worker checks. It does not publish Pages, mutate R2, or perform a live edge
+verification.
 
-`build:public` refuses to run while local files exist under `public/official` or
-`public/fonts/private`, and verifies the completed `dist` before returning
-success. `check` scans tracked files for common secret formats, regression-tests
-that scanner, and tests the dist guard, Pages Function behavior, persisted-state
-validation, and cache/task scheduling. It then runs the public build,
-syntax-checks the Function, and type-checks plus behavior-tests the songdb
-Worker. It is not a live R2 integration test.
-The static `dist` guard and the runtime R2 allowlist are independent release
-gates; passing either one does not validate the other. `check:all` also checks
-Rust formatting and Clippy lints, runs the Rust/Tauri test suite against the
-locked Cargo dependencies, and builds the dependency-free .NET mobile
-Runtime/Smoke projects. The mobile build gate does not compile the external
-Unity bridge or validate Unity 5.6, Android packaging, or a device runtime.
+`VITE_CARD_MANIFEST_URL` may select another public, credential-free card
+manifest URL. `VITE_SONGDB_BASE_URL` may select the optional public Worker
+origin. Both values are embedded in browser code at build time and must never
+contain secrets.
 
-`VITE_SONGDB_BASE_URL` may be supplied at dev/build time to use the optional
-song database Worker. It is a public endpoint setting, not a secret. If it is
-unset, the score-card picker uses its built-in public data fallback.
+## Repository layout
 
-## Repository boundaries
+- `src/`: React application and renderers.
+- `public/`: reviewed redistributable static files copied verbatim by Vite.
+- `public-asset-policy.json`: exact allowlist for copied and generated files.
+- `functions/`: allowlisted Pages Function for R2-backed official assets.
+- `workers/songdb-sync/`: optional public song metadata Worker.
+- `scripts/cloudflare/`: deterministic R2 publication-manifest helper.
+- `tests/`: frontend, Function, artifact, secret, and repository-boundary tests.
+- `docs/online-preview.md`: Cloudflare build, R2, cache, and release runbook.
+- `docs/repository-map.md`: maintained source and external-input boundaries.
 
-- [Repository map](docs/repository-map.md): maintained products, local/private
-  inputs, generated output, and the source-only mobile prototype.
-- [Cloudflare runbook](docs/online-preview.md): Pages, Functions, R2, caching,
-  and public artifact checks.
-- [Score-card extraction tools](scripts/scorecard-extract/README.md): how local
-  private source assets are converted into reproducible renderer inputs.
-- [Mobile pack contract](docs/mobile-pack.md): experimental `.cmpack` format and
-  source-only mobile runtime boundary.
+Do not place any unreviewed file under `public/`; in particular, official
+assets, licensed fonts, environment files, and credentials never belong there.
+Vite copies that directory into `dist` even when Git ignores a file. An
+intentional static-file change therefore requires an explicit policy update,
+and the completed artifact is checked independently.
 
 ## License
 
-Released under the [MIT License](LICENSE). The license covers the source code in
-this repository only; it grants no rights to third-party assets or fonts used
-locally or served from an external asset store. Redistributable bundled fonts
-and their OFL terms are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Released under the [MIT License](LICENSE). The license covers source code in
+this repository only; it grants no rights to third-party assets or fonts.
+Redistributable bundled fonts and their notices are listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

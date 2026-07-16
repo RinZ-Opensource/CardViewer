@@ -105,7 +105,7 @@ export function chuniSelectSprite(texture: string, cropIndex: number) {
   return `${CHUNI_SCORECARD_ROOT}/${texture}_${cropIndex}.png`;
 }
 
-/** Pre-baked statics (scripts/scorecard-extract/prebake_scorecard_statics.py). */
+/** Static 9-slice assets pre-baked by the external asset producer. */
 export function chuniBakedSprite(name: string) {
   return `${CHUNI_SCORECARD_ROOT}/${name}.png`;
 }
@@ -169,8 +169,8 @@ export const CHUNI_BOX_SCORE_COMMA_CROP = 41;
 
 /**
  * C_bpm_num digits: white ink tinted by vertex color #313C4E in-game, so we
- * ship pre-baked tinted copies (CSS filters can't multiply a non-gray color
- * export-safely). Digit 3's crop is 11px wide, the rest 12 (12px pitch).
+ * ship pre-baked tinted copies because CSS filters cannot multiply an exact
+ * non-gray color. Digit 3's crop is 11px wide, the rest 12 (12px pitch).
  */
 export function chuniBoxBpmDigit(digit: number) {
   return chuniBakedSprite(`baked_musicbox_bpm_${digit}`);
