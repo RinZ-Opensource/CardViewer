@@ -12,8 +12,11 @@ must remain local.
   persistence and priority-aware image-task scheduling used by the frontend.
 - `src/scorecard/`: score-card components, public fallback song samples, song
   database adapters, asset lookup helpers, isolated score-input sanitizers,
-  default-state factories, and surface configuration. This is part of the web
-  app, not the Android CardMaker prototype.
+  default-state factories, and surface configuration. `ScoreCardSurface`
+  coordinates state and card rendering, the three `*ScoreCardEditor` files own
+  their controlled form UI, and `useScoreCardSongDb` owns lazy song-database
+  loading and retry state. This is part of the web app, not the Android
+  CardMaker prototype.
 - `src-tauri/`: Tauri desktop shell plus Rust scanners and exporters. The
   `export_mobile_pack` binary is a local pack-building tool; its presence does
   not make Android a supported release target. The image IPC reader serves only
@@ -34,10 +37,11 @@ must remain local.
   layers, card assets cannot depend on cards, hooks, or the app shell,
   holographic mask math and state types remain type-only leaves below the React
   renderer, score-card surface configuration cannot depend on React,
-  persistence, or card components, and default-state factories are limited to
-  samples and state types. It runs under `npm run check` alongside the
-  holographic mask math, score-card model, frontend reliability, secret-scanner,
-  public-dist, and Pages Function suites.
+  persistence, or card components, default-state factories are limited to
+  samples and state types, and the score-card editors remain controlled UI
+  leaves below the surface and song-database hook. It runs under `npm run check`
+  alongside the holographic mask math, score-card model, frontend reliability,
+  secret-scanner, public-dist, and Pages Function suites.
 - `.github/workflows/ci.yml`: read-only pull-request and `main` validation for
   the web checks, pinned Rust formatting/lints/locked tests, and the
   dependency-free .NET mobile Runtime/Smoke build; it does not deploy or

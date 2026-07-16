@@ -64,6 +64,50 @@ const boundaries = [
       "./OngekiMusicBtCard",
     ],
   },
+  {
+    file: "src/scorecard/MaiScoreCardEditor.tsx",
+    allowed: [
+      "./SongPicker",
+      "./maiScore",
+      "./scorecardInput",
+      "./scorecardSurfaceConfig",
+      "./songdb",
+      "./types",
+    ],
+  },
+  {
+    file: "src/scorecard/ChuniScoreCardEditor.tsx",
+    allowed: [
+      "./SongPicker",
+      "./chuniAssets",
+      "./chuniTypes",
+      "./scorecardInput",
+      "./scorecardSurfaceConfig",
+      "./songdb",
+    ],
+  },
+  {
+    file: "src/scorecard/OngekiScoreCardEditor.tsx",
+    allowed: [
+      "./SongPicker",
+      "./ongekiAssets",
+      "./ongekiTypes",
+      "./scorecardInput",
+      "./scorecardSurfaceConfig",
+      "./songdb",
+    ],
+  },
+  {
+    file: "src/scorecard/useScoreCardSongDb.ts",
+    allowed: [
+      "react",
+      "./chuniTypes",
+      "./ongekiTypes",
+      "./scorecardSurfaceConfig",
+      "./songdb",
+      "./types",
+    ],
+  },
 ];
 
 const holoMaskTypeExports = [
@@ -163,7 +207,7 @@ for (const boundary of boundaries) {
       }
     }
 
-    for (const forbidden of boundary.forbidden) {
+    for (const forbidden of boundary.forbidden ?? []) {
       assert.equal(
         imported.includes(normalizeModule(forbidden)),
         false,
@@ -232,4 +276,145 @@ test("frontend source does not embed machine-specific absolute paths", async () 
   }
 
   assert.deepEqual(violations, []);
+});
+
+function jsxTagNames(sourceFile) {
+  const names = [];
+  function visit(node) {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      names.push(node.tagName.getText(sourceFile));
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return names;
+}
+
+test("ScoreCardSurface delegates each controlled game editor", async () => {
+  const file = "src/scorecard/ScoreCardSurface.tsx";
+  const source = await readFile(path.join(projectRoot, file), "utf8");
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const tags = jsxTagNames(sourceFile);
+
+  for (const editor of [
+    "MaiScoreCardEditor",
+    "ChuniScoreCardEditor",
+    "OngekiScoreCardEditor",
+  ]) {
+    assert.equal(tags.filter((tag) => tag === editor).length, 1, `${editor} must render once`);
+  }
+  for (const delegated of ["SongPicker", "input", "select", "label"]) {
+    assert.equal(tags.includes(delegated), false, `Surface must delegate ${delegated}`);
+  }
+});
+
+test("ScoreCardSurface delegates song database loading to its hook", async () => {
+  const file = "src/scorecard/ScoreCardSurface.tsx";
+  const source = await readFile(path.join(projectRoot, file), "utf8");
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const forbidden = new Set([
+    "invalidateSongDbCache",
+    "loadChuniSongs",
+    "loadMaiSongs",
+    "loadOngekiSongs",
+  ]);
+  const imported = [];
+
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !statement.importClause?.namedBindings ||
+      !ts.isNamedImports(statement.importClause.namedBindings)
+    ) {
+      continue;
+    }
+    for (const element of statement.importClause.namedBindings.elements) {
+      imported.push(element.propertyName?.text ?? element.name.text);
+    }
+  }
+
+  assert.deepEqual(imported.filter((name) => forbidden.has(name)), []);
+});
+
+for (const editor of [
+  "src/scorecard/MaiScoreCardEditor.tsx",
+  "src/scorecard/ChuniScoreCardEditor.tsx",
+  "src/scorecard/OngekiScoreCardEditor.tsx",
+]) {
+  test(`${editor} remains a controlled UI leaf`, async () => {
+    const source = await readFile(path.join(projectRoot, editor), "utf8");
+    const sourceFile = ts.createSourceFile(
+      editor,
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
+    const tags = jsxTagNames(sourceFile);
+    assert.equal(tags.filter((tag) => tag === "SongPicker").length, 1);
+
+    const forbiddenHooks = [];
+    function visit(node) {
+      if (ts.isCallExpression(node)) {
+        const expression = node.expression;
+        const name = ts.isIdentifier(expression)
+          ? expression.text
+          : ts.isPropertyAccessExpression(expression)
+            ? expression.name.text
+            : "";
+        if (["useState", "useEffect", "useReducer", "useRef"].includes(name)) {
+          forbiddenHooks.push(name);
+        }
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(sourceFile);
+    assert.deepEqual(forbiddenHooks, []);
+  });
+}
+
+test("unfinished score-card actions remain disabled", async () => {
+  const file = "src/scorecard/scorecardSurfaceConfig.ts";
+  const source = await readFile(path.join(projectRoot, file), "utf8");
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const expected = new Set([
+    "SHOW_PANEL_CARDS",
+    "SHOW_CHUNI_CONFIRMED_START",
+    "SHOW_SCORECARD_RESET",
+    "SHOW_SCORECARD_EXPORT",
+  ]);
+  const disabled = new Set();
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (
+        ts.isIdentifier(declaration.name) &&
+        expected.has(declaration.name.text) &&
+        declaration.initializer?.kind === ts.SyntaxKind.FalseKeyword
+      ) {
+        disabled.add(declaration.name.text);
+      }
+    }
+  }
+
+  assert.deepEqual([...disabled].sort(), [...expected].sort());
 });
