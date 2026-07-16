@@ -43,6 +43,8 @@ must remain local.
   `scanner/export/manifest.rs`; target-specific asset policies remain separate.
   `scanner/export/online.rs` owns the online export pipeline, including WebP
   transcodes, thumbnails, pruning, URL rewriting, and MAI composites.
+  `scanner/export/mobile.rs` owns mobile pack selection, staging, Unity bundle
+  indexing, raw-data inclusion, integrity manifests, and cmpack assembly.
 - `functions/`: Cloudflare Pages Function for serving an allowlisted subset of
   `/official/*` from the `ASSETS_BUCKET` R2 binding. Public Cloudflare does not
   serve `/fonts/private/*`.
