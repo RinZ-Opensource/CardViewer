@@ -64,11 +64,11 @@ validation, and cache/task scheduling. It then runs the public build,
 syntax-checks the Function, and type-checks the songdb Worker. It is not an R2
 integration test.
 The static `dist` guard and the runtime R2 allowlist are independent release
-gates; passing either one does not validate the other. `check:all` also runs the
-Rust/Tauri test suite against the locked Cargo dependencies and builds the
-dependency-free .NET mobile Runtime/Smoke projects. The mobile build gate does
-not compile the external Unity bridge or validate Unity 5.6, Android packaging,
-or a device runtime.
+gates; passing either one does not validate the other. `check:all` also checks
+Rust formatting, runs the Rust/Tauri test suite against the locked Cargo
+dependencies, and builds the dependency-free .NET mobile Runtime/Smoke
+projects. The mobile build gate does not compile the external Unity bridge or
+validate Unity 5.6, Android packaging, or a device runtime.
 
 `VITE_SONGDB_BASE_URL` may be supplied at dev/build time to use the optional
 song database Worker. It is a public endpoint setting, not a secret. If it is
