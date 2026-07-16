@@ -174,6 +174,12 @@ isolated Android SDK, and JDK8 were wired through
 `CardMakerMobile.main.obb`. Those outputs are ignored local artifacts, not
 repository releases, and that build was not rerun for this cleanup.
 
+The tracked batch helper uses a neutral `ConfigArc` company name and requires
+the external Unity editor to be launched with `-buildTarget android`; switching
+targets from inside batch mode is not supported. This source-level default does
+not validate the external project's manifest, icon, splash, signing identity,
+or final APK metadata.
+
 The build script temporarily externalizes `Assets/StreamingAssets` during
 Android packaging, so official resources are not intended to be embedded into
 the APK; any resumed prototype must obtain them through the local mobile

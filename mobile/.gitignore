@@ -2,6 +2,11 @@
 **/obj/
 **/__pycache__/
 **/imported/
+**/.cmpack-staging/
+**/StreamingAssets.mobilebuild_externalized*/
+**/Assets/
+**/ProjectSettings/
+**/Packages/
 **/Library/
 **/Temp/
 **/Logs/

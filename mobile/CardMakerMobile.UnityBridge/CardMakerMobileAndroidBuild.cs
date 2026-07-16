@@ -16,6 +16,12 @@ namespace CardMakerMobile.UnityBridge
         {
             ConfigureAndroidToolchain();
 
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
+            {
+                throw new InvalidOperationException(
+                    "Android is not the active build target. Start Unity with -buildTarget android.");
+            }
+
             string outputPath = ArgumentValue("-mobileApkPath");
             if (string.IsNullOrEmpty(outputPath))
             {
@@ -32,9 +38,8 @@ namespace CardMakerMobile.UnityBridge
                 Directory.CreateDirectory(outputDir);
             }
 
-            PlayerSettings.companyName = "jp.co.sega-interactive";
+            PlayerSettings.companyName = "ConfigArc";
             PlayerSettings.productName = "CardMakerMobile";
-            EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android);
             SetAndroidApplicationIdentifier("com.local.cardmaker.mobile");
             PlayerSettings.Android.bundleVersionCode = 1;
             SetAndroidSdkVersion("minSdkVersion", "AndroidApiLevel25", "AndroidApiLevel23", "AndroidApiLevel21", "AndroidApiLevel19", "AndroidApiLevel16");

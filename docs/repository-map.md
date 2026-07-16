@@ -34,8 +34,8 @@ must remain local.
   holographic mask math, score-card model, frontend reliability, secret-scanner,
   public-dist, and Pages Function suites.
 - `.github/workflows/ci.yml`: read-only pull-request and `main` validation for
-  the web checks and locked Rust tests; it does not deploy or reference
-  repository secrets.
+  the web checks, locked Rust tests, and the dependency-free .NET mobile
+  Runtime/Smoke build; it does not deploy or reference repository secrets.
 - `docs/online-preview.md`: authoritative public/private build and Cloudflare
   deployment runbook.
 - `public/`: repository-safe static files copied verbatim by Vite. It may hold
@@ -56,13 +56,18 @@ must remain local.
 
 This code is not imported by the React application, Tauri desktop runtime,
 Cloudflare Pages Functions, or the score-card Worker. There is no supported
-Android release, Android CI job, or committed APK/OBB in this repository.
+Android release, Unity/Android build job, or committed APK/OBB in this
+repository. The ordinary .NET CI job compiles only Runtime and CmpackSmoke; it
+does not establish Unity or Android compatibility.
 Historical local Android build claims are archived in
 `cardmaker-mobile-android-plan.md`; they are not current verification.
 
 Tracking the source-only prototype is reasonable, but it must not pull in an
 external Unity project, official data, generated packs, imported pack contents,
-or .NET build output.
+or .NET build output. `npm run check:mobile-boundary` scans the exact Git index
+and changed working-tree variants under `mobile/`; it rejects those generated
+areas, target-specific patchers, Android/pack deliverables, DLLs, and binary
+content even if an ignored file was added with `git add --force`.
 
 ## Cloudflare and Asset Boundary
 
@@ -113,7 +118,11 @@ These must stay out of commits:
 - `node_modules/`, `dist/`, `.wrangler/`, `.venv/`, and `.analysis/`
 - `src-tauri/target/`
 - `mobile/**/bin/`, `mobile/**/obj/`, and `mobile/**/__pycache__/`
-- mobile imported/output directories such as `mobile/**/imported/`
+- mobile imported/staging areas such as `mobile/**/imported/`,
+  `mobile/**/.cmpack-staging/`, and
+  `mobile/**/StreamingAssets.mobilebuild_externalized*/`
+- external Unity project roots below `mobile/`, including `Assets/`,
+  `ProjectSettings/`, and `Packages/`
 - Unity project outputs such as `Library/`, `Temp/`, `Logs/`, `Build/`,
   `Builds/`, and `UserSettings/` if a Unity project is ever placed below
   `mobile/`
