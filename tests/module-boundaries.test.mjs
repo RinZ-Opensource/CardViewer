@@ -31,6 +31,27 @@ const boundaries = [
       "./OngekiMusicBtCard",
     ],
   },
+  {
+    file: "src/scorecard/scorecardDefaults.ts",
+    allowed: [
+      "./sampleSongs",
+      "./types",
+      "./chuniSamples",
+      "./chuniTypes",
+      "./ongekiSamples",
+      "./ongekiTypes",
+    ],
+    forbidden: [
+      "react",
+      "./ScoreCardSurface",
+      "../persistence",
+      "./MaiScoreCard",
+      "./ChuniScoreCard",
+      "./ChuniMusicBoxCard",
+      "./OngekiScoreCard",
+      "./OngekiMusicBtCard",
+    ],
+  },
 ];
 
 function importedModules(file, source) {
@@ -77,6 +98,17 @@ for (const boundary of boundaries) {
   test(`${boundary.file} respects its frontend module boundary`, async () => {
     const source = await readFile(path.join(projectRoot, boundary.file), "utf8");
     const imported = importedModules(boundary.file, source).map(normalizeModule);
+
+    if (boundary.allowed) {
+      const allowed = boundary.allowed.map(normalizeModule);
+      for (const importedModule of imported) {
+        assert.equal(
+          allowed.includes(importedModule),
+          true,
+          `${boundary.file} may not import ${importedModule}`,
+        );
+      }
+    }
 
     for (const forbidden of boundary.forbidden) {
       assert.equal(
