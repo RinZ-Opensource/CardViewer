@@ -1,0 +1,19 @@
+**/bin/
+**/obj/
+**/__pycache__/
+**/imported/
+**/Library/
+**/Temp/
+**/Logs/
+**/Build/
+**/Builds/
+**/UserSettings/
+*.py[cod]
+*.apk
+*.aab
+*.obb
+*.log
+
+# Local integration patcher embeds target-specific matching snippets. Keep it
+# outside the public repository until provenance and redistribution are reviewed.
+CardMakerMobile.UnityBridge/patch_unity_project.py

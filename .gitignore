@@ -4,10 +4,10 @@ dist/
 
 # Local analysis and extracted reference material
 .analysis/
-.analysis/package-sample/CardMaker_Data/Managed/*.dll
 
 # Local tooling caches
 .claude/
+.vscode/
 .venv/
 .wrangler/
 __pycache__/
@@ -16,11 +16,8 @@ __pycache__/
 # Rust / Tauri outputs
 src-tauri/target/
 
-# Excluded from this repo (mobile migration is still pending). Keep the
-# Cloudflare runbook tracked while the remaining local planning docs stay out.
-mobile/
-docs/*
-!docs/online-preview.md
+# Mobile source, repository documentation and reproducible tooling are tracked.
+# Their generated outputs are ignored here or by a directory-local .gitignore.
 
 # Private generated assets and distributable packs
 private-assets/fonts/fot/*
@@ -30,8 +27,8 @@ private-assets/official/*
 *.cmpack
 private-assets.zip
 
-# Vite's public/ tree is always copied into dist. Official assets and licensed
-# fonts must live under private-assets/ and reach public deployments through R2.
+# Vite's public/ tree is always copied into dist. Official assets and privately
+# licensed fonts must live under private-assets/ and reach public deployments through R2.
 public/official/
 public/fonts/private/
 
@@ -39,4 +36,10 @@ public/fonts/private/
 *.bak
 sprite_test.py
 holo_compare_output/
-/scripts/
+
+# Score-card extraction reference dumps are reproducible from private inputs.
+/scripts/scorecard-extract/*_tree.json
+/scripts/scorecard-extract/*_tree.txt
+/scripts/scorecard-extract/*_dump.json
+/scripts/scorecard-extract/ongeki_guid_cache.json
+/scripts/scorecard-extract/chk_montage_*.png

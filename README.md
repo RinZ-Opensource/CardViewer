@@ -10,9 +10,9 @@ MAI, and MU3 plus score-card previews for CHUNITHM, maimai, and O.N.G.E.K.I.
 | `private` | Tauri, LAN, and controlled previews | `private-assets/official` is served as `/official`; `private-assets/fonts/fot` is served as `/fonts/private` |
 | `public` | Cloudflare Pages or another public static deployment | The private-assets Vite plugin is disabled |
 
-Official assets and licensed fonts are not repository content. Keep them under
-`private-assets/`; do not place copies in Vite's `public/` directory. Vite always
-copies `public/` into `dist`, even in public mode, so a local
+Official assets and privately licensed fonts are not repository content. Keep
+them under `private-assets/`; do not place copies in Vite's `public/` directory.
+Vite always copies `public/` into `dist`, even in public mode, so a local
 `public/official` or `public/fonts/private` directory can contaminate a public
 artifact. Inspect `dist` before any direct upload.
 
@@ -53,8 +53,20 @@ test. `check:all` also runs the Rust/Tauri check.
 song database Worker. It is a public endpoint setting, not a secret. If it is
 unset, the score-card picker uses its built-in public data fallback.
 
+## Repository boundaries
+
+- [Repository map](docs/repository-map.md): maintained products, local/private
+  inputs, generated output, and the source-only mobile prototype.
+- [Cloudflare runbook](docs/online-preview.md): Pages, Functions, R2, caching,
+  and public artifact checks.
+- [Score-card extraction tools](scripts/scorecard-extract/README.md): how local
+  private source assets are converted into reproducible renderer inputs.
+- [Mobile pack contract](docs/mobile-pack.md): experimental `.cmpack` format and
+  source-only mobile runtime boundary.
+
 ## License
 
 Released under the [MIT License](LICENSE). The license covers the source code in
 this repository only; it grants no rights to third-party assets or fonts used
-locally or served from an external asset store.
+locally or served from an external asset store. Redistributable bundled fonts
+and their OFL terms are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
