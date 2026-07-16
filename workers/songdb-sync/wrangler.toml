@@ -10,7 +10,7 @@ crons = ["17 19 * * *"]
 
 [[r2_buckets]]
 binding = "SONGDB"
-# The existing CardViewer bucket (APAC; also serves official/generated/... via
-# the cv-assets.wahleak.net custom domain). The worker only reads/writes keys
-# under the songdb/ prefix, so it coexists with the objects already there.
+# The existing CardViewer bucket is shared with reviewed public asset keys. The
+# worker only reads/writes under songdb/. Do not attach a bucket-level public
+# domain that would bypass the Pages Function allowlist for other prefixes.
 bucket_name = "cardviewer-assets"

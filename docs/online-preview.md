@@ -2,7 +2,8 @@
 
 This document describes the current public/private asset boundary. It does not
 name a production project, account, bucket, or URL. Supply those values through
-the deployment environment; never commit credentials or tokens.
+the deployment environment; never commit credentials or tokens. Repository or
+documentation changes do not publish anything by themselves.
 
 ## Architecture
 
@@ -11,31 +12,43 @@ different sources:
 
 ```text
 Cloudflare Pages
-├─ dist/                         public Vite bundle
-├─ /official/*                  Pages Function -> R2 ASSETS_BUCKET
-└─ /fonts/private/*             Pages Function -> R2 ASSETS_BUCKET
+|- dist/                         public Vite bundle
+`- /official/*                  allowlisted Pages Function -> R2 ASSETS_BUCKET
 
 Optional song database Worker
-└─ VITE_SONGDB_BASE_URL         metadata, mirrored jackets, HD jacket tier
+`- VITE_SONGDB_BASE_URL         metadata, mirrored jackets, HD jacket tier
 ```
 
-The Pages Functions are:
+The public asset Function is:
 
 - `functions/official/[[path]].js`
-- `functions/fonts/private/[[path]].js`
 
-Both require an R2 binding named exactly `ASSETS_BUCKET`. The request path,
-without its leading slash, is the R2 key. For example:
+It requires an R2 binding named exactly `ASSETS_BUCKET`. It accepts only these
+public key spaces and exact root objects:
+
+- `official/generated/**`
+- `official/scorecard/**`
+- `official/C310Busb_CardBack.png`
+- `official/UI_Card_Horo_Rainbow_Hard.png`
+- `official/UI_Card_Horo_Pattern_00.png`
+
+Within those locations, the Function serves only `.json`, `.png`, `.jpg`,
+`.jpeg`, and `.webp` files. It rejects hidden, empty, dot, traversal, or
+otherwise abnormal path segments before reading R2. Example mappings are:
 
 | Request | R2 key |
 | --- | --- |
 | `/official/generated/cards.index.json` | `official/generated/cards.index.json` |
 | `/official/scorecard/mai/jackets/jacket-map.json` | `official/scorecard/mai/jackets/jacket-map.json` |
-| `/fonts/private/example.otf` | `fonts/private/example.otf` |
+| `/official/C310Busb_CardBack.png` | `official/C310Busb_CardBack.png` |
 
-Configure the binding for every Cloudflare environment that must serve these
-routes. A successful static Pages deployment does not prove that the R2 binding
-exists or that the required objects were uploaded.
+Every other R2 object is inaccessible through the Pages route, even when it is
+present in the bound bucket. Do not expose the bucket or a broader prefix on a
+public R2 custom domain, because that would bypass the Function allowlist.
+Configure the binding for every Cloudflare environment that must serve the
+route. A successful static Pages deployment does not prove that the R2 binding
+exists, that its allowlist is active, or that the required objects were
+uploaded.
 
 ## Source asset boundary
 
@@ -49,11 +62,20 @@ private-assets/fonts/fot/
 In private mode, Vite serves them as `/official/*` and `/fonts/private/*`. During
 a private build it copies them to `dist/official` and `dist/fonts/private`, with
 `private-assets/official/generated` excluded unless explicitly requested.
+These font routes and copies are for private Vite/Tauri use only. The public
+Cloudflare deployment has no `/fonts/private/*` Function or licensed-font
+fallback in R2.
 
 Do not maintain a second copy under `public/official` or
 `public/fonts/private`. Vite copies everything below `public/` into `dist` in
 all modes. `.gitignore` affects Git only and cannot prevent that copy. Those
 directories therefore make a local public build unsafe for direct upload.
+
+The local `private-assets/official/generated` tree is also a working directory,
+not a publication unit. It may contain logs, scripts, command files, PID files,
+and other local output beside renderer assets. Never upload the directory as a
+whole. Generate and review the extension-specific R2 bulk manifests, and upload
+only the entries approved for the public prefix.
 
 ## Private development and export
 
@@ -144,29 +166,37 @@ The command must report `PASS`. Also inspect unexpected large files before a
 direct upload. A clean Cloudflare Git checkout normally lacks ignored local
 inputs, but that is not a substitute for checking the built artifact.
 
+This static artifact guard is the first publication gate: it proves that the
+public `dist` does not contain forbidden asset trees. The `/official/*` Function
+allowlist is a separate runtime gate: it constrains which objects can be read
+from R2. Neither gate substitutes for the other, so verify both before any live
+deployment.
+
 Do not treat any of the following as an equivalent deployment:
 
 - uploading only `dist` to a generic static host;
 - a Dashboard drag-and-drop flow that does not deploy the Pages Functions;
 - a Pages environment without the `ASSETS_BUCKET` binding;
-- a bucket containing manifests but not their referenced images.
+- a bucket containing manifests but not their referenced images;
+- a public R2 custom domain or bucket route that bypasses the Function
+  allowlist.
 
 ## Local preview boundary
 
 `npm.cmd run dev:public` and `npm.cmd run preview:public` run Vite only. They do
 not execute Cloudflare Pages Functions and they do not read R2. Consequently,
-same-origin `/official/*` requests should return 404 in a clean public preview.
-If they unexpectedly succeed, first check for leaked files under `public/` or
-`dist/`.
+same-origin `/official/*` and `/fonts/private/*` requests should return 404 in a
+clean public preview. If they unexpectedly succeed, first check for leaked files
+under `public/` or `dist/`.
 
 Use the previews for different questions:
 
 | Preview | What it verifies | What it does not verify |
 | --- | --- | --- |
 | `npm.cmd run dev:private` | UI and renderers with local `private-assets` | Pages Functions, R2 bindings, edge caching |
-| `npm.cmd run dev:public` | public-mode UI and fallback behavior | `/official/*`, private fonts, R2 |
+| `npm.cmd run dev:public` | public-mode UI and fallback behavior | `/official/*`, R2 |
 | `npm.cmd run build:public` + Vite preview | final static bundle | Pages Functions and R2 |
-| Wrangler Pages dev with an R2 binding | Functions and request-to-key routing against a local R2 namespace | production objects, production bindings, live edge cache |
+| Wrangler Pages dev with an R2 binding | allowlisted `/official/*` routing and negative-path behavior against a local R2 namespace | production objects, production bindings, live edge cache |
 
 Wrangler is pinned by the songdb Worker toolchain and exposed through the root
 preview command. A representative local Functions preview is:
@@ -183,15 +213,18 @@ point an unreviewed local command at production storage.
 
 Local verification and live verification are separate gates. Before declaring
 the deployment healthy, request at least the app shell, one generated manifest,
-one score-card UI sprite, and one card/jacket asset from the deployed origin.
+one score-card asset, and one approved root resource from the deployed origin.
+Also confirm that a disallowed `/official/*` key, a hidden or traversal-shaped
+path, an unsupported extension, and `/fonts/private/*` all return a non-success
+response without exposing an R2 object.
 
 ## R2 publication and caching
 
 `/official/*` JSON responses currently use a short browser TTL with
-`stale-while-revalidate`; non-JSON official assets and private fonts are cached
-for one year with `immutable`. Therefore:
+`stale-while-revalidate`; allowlisted non-JSON official assets are cached for
+one year with `immutable`. Therefore:
 
-- use versioned keys when the bytes of an image, atlas, or font change;
+- use versioned keys when the bytes of an image or atlas change;
 - upload referenced images before publishing a JSON map or manifest that points
   to them;
 - publish small maps and manifests last;
@@ -212,8 +245,11 @@ official/scorecard/ongeki/boss/v1/<file>
 ```
 
 The preparation tools are documented in `workers/songdb-sync/README.md`. They
-can generate deterministic bulk-upload manifests; upload each binary group with
-the correct content type, then upload the corresponding JSON map last.
+can generate deterministic, extension-specific bulk-upload manifests and reject
+unknown file types. Review the resulting keys, upload only approved manifest
+entries into `official/generated/**` or `official/scorecard/**`, upload each
+binary group with the correct content type, then upload the corresponding JSON
+map last. Do not bulk-upload the source directory itself.
 
 ## Song database endpoint
 
@@ -238,10 +274,11 @@ If a desktop build embeds a custom Worker origin, add that exact origin to both
 directive to arbitrary HTTPS origins. Web/Cloudflare builds are not governed by
 the Tauri CSP.
 
-The Worker and Pages Functions may share one physical R2 bucket, but they use
+The Worker and Pages Function may share one physical R2 bucket, but they use
 separate bindings and key prefixes: the Worker uses `SONGDB` and `songdb/*`,
-while Pages uses `ASSETS_BUCKET` and serves `official/*` plus
-`fonts/private/*`.
+while Pages uses `ASSETS_BUCKET` and can serve only the approved `official/*`
+keys listed above. Objects elsewhere in a shared bucket are not public through
+Pages and must not be exposed through a bucket-level custom domain.
 
 ## Deployment checklist
 
@@ -250,9 +287,14 @@ while Pages uses `ASSETS_BUCKET` and serves `official/*` plus
 2. Confirm the automatic `check:public-dist` step reports `PASS`.
 3. Confirm any required `VITE_SONGDB_BASE_URL` or
    `VITE_CARD_MANIFEST_URL` value is a public, credential-free URL.
-4. Publish versioned R2 binaries first and their JSON maps/manifests last.
-5. Confirm the Pages environment has an `ASSETS_BUCKET` R2 binding.
-6. Deploy the public bundle together with the repository's Pages Functions.
-7. Verify the deployed app shell and representative `/official/*` requests.
+4. Generate, verify, and review R2 bulk manifests; publish only approved
+   `.json`, `.png`, `.jpg`, `.jpeg`, and `.webp` entries. Upload versioned
+   binaries first and their JSON maps/manifests last.
+5. Confirm the Pages environment has an `ASSETS_BUCKET` R2 binding and no
+   public custom domain or broader route on the bucket/prefix.
+6. Deploy the public bundle with the allowlisted `/official/*` Function and
+   without a `/fonts/private/*` Function.
+7. Verify approved requests succeed and disallowed keys, abnormal paths,
+   unsupported extensions, and `/fonts/private/*` do not.
 8. Record separately what was built, locally verified, live verified, and
    deployed.

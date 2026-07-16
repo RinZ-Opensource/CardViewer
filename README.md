@@ -7,8 +7,8 @@ MAI, and MU3 plus score-card previews for CHUNITHM, maimai, and O.N.G.E.K.I.
 
 | Mode | Intended use | Local-only inputs |
 | --- | --- | --- |
-| `private` | Tauri, LAN, and controlled previews | `private-assets/official` is served as `/official`; `private-assets/fonts/fot` is served as `/fonts/private` |
-| `public` | Cloudflare Pages or another public static deployment | The private-assets Vite plugin is disabled |
+| `private` | Tauri, LAN, and controlled local previews | `private-assets/official` is served as `/official`; `private-assets/fonts/fot` is served as `/fonts/private` |
+| `public` | Cloudflare Pages or another public static deployment | The private-assets Vite plugin is disabled; only reviewed `/official/*` keys may be served from R2 at runtime |
 
 Official assets and privately licensed fonts are not repository content. Keep
 them under `private-assets/`; do not place copies in Vite's `public/` directory.
@@ -16,9 +16,11 @@ Vite always copies `public/` into `dist`, even in public mode, so a local
 `public/official` or `public/fonts/private` directory can contaminate a public
 artifact. Inspect `dist` before any direct upload.
 
-The Cloudflare deployment uses Pages Functions to serve `/official/*` and
-`/fonts/private/*` from an R2 binding named `ASSETS_BUCKET`. Those runtime
-assets are separate from the public Vite bundle. See
+The Cloudflare deployment uses a Pages Function to serve a narrow, reviewed
+subset of `/official/*` from an R2 binding named `ASSETS_BUCKET`. It does not
+deploy `/fonts/private/*`; commercially licensed fonts remain available only to
+private Vite/Tauri workflows. Those runtime assets are separate from the public
+Vite bundle. See
 [docs/online-preview.md](docs/online-preview.md) for the asset layout, local
 preview boundary, and deployment checklist.
 
@@ -45,9 +47,12 @@ npm.cmd run tauri:build
 
 `build:public` refuses to run while local files exist under `public/official` or
 `public/fonts/private`, and verifies the completed `dist` before returning
-success. `check` tests the dist guard, runs that public build, syntax-checks both
-Pages Functions, and type-checks the songdb Worker. It is not an R2 integration
-test. `check:all` also runs the Rust/Tauri check.
+success. `check` scans tracked files for common secret formats, tests the dist
+guard and Pages Function behavior, runs the public build, syntax-checks the
+Function, and type-checks the songdb Worker. It is not an R2 integration test.
+The static `dist` guard and the runtime R2 allowlist are independent release
+gates; passing either one does not validate the other. `check:all` also runs the
+Rust/Tauri check.
 
 `VITE_SONGDB_BASE_URL` may be supplied at dev/build time to use the optional
 song database Worker. It is a public endpoint setting, not a secret. If it is

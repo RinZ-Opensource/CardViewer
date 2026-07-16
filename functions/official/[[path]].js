@@ -1,54 +1,135 @@
-// Cloudflare Pages Function: serve EVERYTHING under /official/* from R2.
-// Covers the static sprites/fonts atlases (UI_*.png, FONT_*.json) AND the
-// generated card data + assets under /official/generated/*.
-// Requires an R2 bucket binding named ASSETS_BUCKET on the Pages project.
-//
-// Responses are stored in the Cloudflare edge cache (Cache API) so that, after
-// the first request, subsequent users are served from the edge without
-// re-invoking the Worker's R2 lookup. The browser-facing Cache-Control still
-// distinguishes mutable manifests (short TTL) from immutable assets.
-export async function onRequest({ request, env, waitUntil }) {
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    return new Response("Method Not Allowed", { status: 405 });
+// Cloudflare Pages Function: serve the reviewed public subset of /official/*
+// from the ASSETS_BUCKET R2 binding. Prefixes alone are not a sufficient
+// boundary because the source bucket also contains scripts and diagnostic
+// files, so every request must pass both a path allowlist and an extension
+// allowlist before R2 is consulted.
+
+const ALLOWED_ROOT_KEYS = new Set([
+  "official/C310Busb_CardBack.png",
+  "official/UI_Card_Horo_Rainbow_Hard.png",
+  "official/UI_Card_Horo_Pattern_00.png",
+]);
+
+const ALLOWED_EXTENSIONS = new Set([".json", ".png", ".jpg", ".jpeg", ".webp"]);
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
+
+function rawPathname(rawUrl) {
+  const match = /^[a-z][a-z\d+.-]*:\/\/[^/?#]*(\/[^?#]*)?(?:[?#].*)?$/i.exec(rawUrl);
+  return match ? match[1] || "/" : null;
+}
+
+function publicObjectKey(rawUrl) {
+  const pathname = rawPathname(rawUrl);
+  if (!pathname) return null;
+
+  const rawSegments = pathname.split("/");
+  if (rawSegments[0] !== "" || rawSegments[1] !== "official") return null;
+
+  const relativeSegments = [];
+  for (const rawSegment of rawSegments.slice(2)) {
+    if (!rawSegment) return null;
+
+    let segment;
+    try {
+      segment = decodeURIComponent(rawSegment);
+    } catch {
+      return null;
+    }
+
+    if (
+      !segment ||
+      segment.startsWith(".") ||
+      segment.includes("/") ||
+      segment.includes("\\") ||
+      segment.includes("%") ||
+      segment.includes("?") ||
+      segment.includes("#") ||
+      CONTROL_CHARACTERS.test(segment)
+    ) {
+      return null;
+    }
+
+    relativeSegments.push(segment);
   }
 
-  const url = new URL(request.url);
-  const cache = caches.default;
-  // Key the edge cache on a normalized GET request so HEAD shares the entry.
+  if (relativeSegments.length === 0) return null;
+
+  const leaf = relativeSegments.at(-1);
+  const extensionAt = leaf.lastIndexOf(".");
+  if (extensionAt <= 0 || !ALLOWED_EXTENSIONS.has(leaf.slice(extensionAt).toLowerCase())) {
+    return null;
+  }
+
+  const key = ["official", ...relativeSegments].join("/");
+  if (relativeSegments.length === 1) {
+    return ALLOWED_ROOT_KEYS.has(key) ? key : null;
+  }
+
+  const publicPrefix = relativeSegments[0];
+  return publicPrefix === "generated" || publicPrefix === "scorecard" ? key : null;
+}
+
+function unavailableBindingResponse() {
+  return new Response("ASSETS_BUCKET binding is not configured", {
+    status: 503,
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
+export async function onRequest({ request, env, waitUntil }) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method Not Allowed", {
+      status: 405,
+      headers: { Allow: "GET, HEAD" },
+    });
+  }
+
+  const rawUrl = String(request.url);
+  const key = publicObjectKey(rawUrl);
+  if (!key) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  if (typeof env?.ASSETS_BUCKET?.get !== "function") {
+    return unavailableBindingResponse();
+  }
+
+  const url = new URL(rawUrl);
+  url.search = "";
+  url.hash = "";
+
+  const cache = globalThis.caches.default;
+  // Query parameters do not select a different R2 object. Normalize them out,
+  // and use GET so GET and HEAD share one edge-cache entry.
   const cacheKey = new Request(url.toString(), { method: "GET" });
 
   let response = await cache.match(cacheKey);
   if (!response) {
-    // "/official/generated/cards.json" -> "official/generated/cards.json"
-    const key = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
-
     const object = await env.ASSETS_BUCKET.get(key);
-    if (!object || !object.body) {
+    if (!object || object.body == null) {
       return new Response("Not found", { status: 404 });
     }
 
     const headers = new Headers();
     object.writeHttpMetadata(headers);
-    headers.set("etag", object.httpEtag);
-    // Manifests change; images/atlases don't. stale-while-revalidate lets a
-    // revisiting browser paint from the (slightly stale) cached manifest
-    // immediately while it refreshes in the background, instead of blocking on
-    // a revalidation round-trip.
+    if (object.httpEtag) headers.set("etag", object.httpEtag);
     headers.set(
       "Cache-Control",
       key.endsWith(".json")
         ? "public, max-age=60, stale-while-revalidate=86400"
         : "public, max-age=31536000, immutable",
     );
-    // Ensure JSON carries a correct content-type even if the R2 object lacks
-    // one, so Cloudflare applies brotli/gzip and clients parse it correctly.
     if (key.endsWith(".json") && !headers.get("content-type")) {
       headers.set("content-type", "application/json; charset=utf-8");
     }
 
     response = new Response(object.body, { headers });
-    // Populate the edge cache for the next user without blocking this response.
-    waitUntil(cache.put(cacheKey, response.clone()));
+    const cacheWrite = cache.put(cacheKey, response.clone());
+    if (typeof waitUntil === "function") {
+      waitUntil(cacheWrite);
+    } else {
+      await cacheWrite;
+    }
   }
 
   if (request.method === "HEAD") {

@@ -13,6 +13,38 @@ dist/
 __pycache__/
 *.py[cod]
 
+# Local environment files and credentials. The two deployment-mode files are
+# intentionally tracked; they contain no credentials.
+.env
+.env.*
+!/.env.private
+!/.env.public
+.dev.vars
+.dev.vars.*
+.envrc
+.npmrc
+.pypirc
+.netrc
+auth.json
+credentials.json
+service-account*.json
+service_account*.json
+firebase-adminsdk*.json
+secrets.json
+secrets.yml
+secrets.yaml
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.kdbx
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+
 # Rust / Tauri outputs
 src-tauri/target/
 

@@ -14,8 +14,9 @@ must remain local.
 - `src-tauri/`: Tauri desktop shell plus Rust scanners and exporters. The
   `export_mobile_pack` binary is a local pack-building tool; its presence does
   not make Android a supported release target.
-- `functions/`: Cloudflare Pages Functions for serving `/official/*` and
-  `/fonts/private/*` from the `ASSETS_BUCKET` R2 binding.
+- `functions/`: Cloudflare Pages Function for serving an allowlisted subset of
+  `/official/*` from the `ASSETS_BUCKET` R2 binding. Public Cloudflare does not
+  serve `/fonts/private/*`.
 - `workers/songdb-sync/`: optional Cloudflare Worker that mirrors public song
   metadata used by the score-card picker.
 - `scripts/cloudflare/` and `scripts/scorecard-extract/`: repository maintenance
@@ -52,19 +53,41 @@ or .NET build output.
 
 The public deployment has two independent layers:
 
-1. `npm run build:public` creates the Pages static bundle.
-2. Pages Functions serve runtime `/official/*` and `/fonts/private/*` requests
-   from R2.
+1. `npm run build:public` creates and checks the Pages static bundle.
+2. The Pages Function applies the runtime R2 allowlist for `/official/*`.
+
+These are separate release gates. A clean `dist` does not prove that R2 is
+restricted, and a correct Function allowlist does not make a contaminated
+static bundle safe.
 
 Local official assets and licensed private fonts belong under
 `private-assets/official/` and `private-assets/fonts/fot/`. A public build
 deliberately fails if files appear under `public/official/` or
 `public/fonts/private/`, and the completed `dist` is checked again.
+Licensed fonts are available only to private Vite/Tauri workflows; the public
+Cloudflare deployment has no private-font Function.
+
+The public Function accepts only `official/generated/**`,
+`official/scorecard/**`, and these reviewed root resources:
+
+- `official/C310Busb_CardBack.png`
+- `official/UI_Card_Horo_Rainbow_Hard.png`
+- `official/UI_Card_Horo_Pattern_00.png`
+
+It additionally restricts files to `.json`, `.png`, `.jpg`, `.jpeg`, or
+`.webp` and rejects hidden or abnormal path segments. Everything else in R2 is
+outside the Pages route. Do not attach a public custom domain directly to the
+bucket or a broader prefix, because that bypasses this boundary.
 
 Score-card jackets, O.N.G.E.K.I. boss assets, and JSON maps published to R2 use
 the `official/scorecard/...` key space. They are runtime assets, not files to
 copy into `public/`. The score-card picker can still use its built-in public
 fallback when the optional song database Worker is not configured.
+
+The local `private-assets/official/generated` tree may contain logs, scripts,
+command files, PID files, and other local output. It is not safe to mirror as a
+directory. Only resources present in reviewed, extension-specific R2 bulk
+manifests belong in the public bucket/prefix.
 
 See `online-preview.md` for the complete R2 key layout and deployment checks.
 
