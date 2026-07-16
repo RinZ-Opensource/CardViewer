@@ -16,9 +16,11 @@ __pycache__/
 # Rust / Tauri outputs
 src-tauri/target/
 
-# Excluded from this repo (mobile is moving to its own repository; docs kept local)
+# Excluded from this repo (mobile migration is still pending). Keep the
+# Cloudflare runbook tracked while the remaining local planning docs stay out.
 mobile/
-docs/
+docs/*
+!docs/online-preview.md
 
 # Private generated assets and distributable packs
 private-assets/fonts/fot/*
@@ -28,11 +30,10 @@ private-assets/official/*
 *.cmpack
 private-assets.zip
 
-# Official game assets and commercial fonts (copyrighted, kept local only)
-public/official/*
-!public/official/.gitkeep
-public/fonts/private/*
-!public/fonts/private/.gitkeep
+# Vite's public/ tree is always copied into dist. Official assets and licensed
+# fonts must live under private-assets/ and reach public deployments through R2.
+public/official/
+public/fonts/private/
 
 # Throwaway local scratch files
 *.bak

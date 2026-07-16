@@ -20,9 +20,10 @@ skipped when the stored sha-256 matches).
 
 ## Bucket binding
 
-The worker binds your **existing** CardViewer bucket (the one already hosting
-the online-preview assets) — no new bucket is created. Edit `wrangler.toml`
-and replace the `bucket_name` placeholder with that bucket's name.
+The worker binds the existing CardViewer bucket (the one already hosting the
+online-preview assets); no new bucket is created. The tracked `wrangler.toml`
+currently names `cardviewer-assets`. Confirm that non-secret resource name is
+correct for the target Cloudflare account before deploying a fork.
 
 Coexistence is by key prefix: everything this worker reads or writes lives
 under `songdb/` (`songdb/data/...`, `songdb/jackets/...`,
@@ -37,14 +38,13 @@ configuration is needed.
 
 ```powershell
 cd workers/songdb-sync
-npm install
-npm run typecheck
+npm ci
+npm run check
 
-# One-time: point wrangler.toml bucket_name at your existing bucket, then
-# create the manual-sync secret.
-npx wrangler secret put SYNC_TOKEN
+# One-time: create the manual-sync secret with the pinned local Wrangler.
+npm exec --offline -- wrangler secret put SYNC_TOKEN
 
-npx wrangler deploy
+npm run deploy
 ```
 
 Manual sync (optional — the cron and lazy bootstrap cover normal operation):

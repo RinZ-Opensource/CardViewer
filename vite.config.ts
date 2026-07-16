@@ -1,4 +1,4 @@
-import { createReadStream, cpSync, existsSync, mkdirSync, statSync } from "node:fs";
+import { createReadStream, cpSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv, type Plugin } from "vite";
@@ -6,6 +6,11 @@ import react from "@vitejs/plugin-react";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 const privateAssetsRoot = path.resolve(projectRoot, "private-assets");
+
+const forbiddenPublicAssetRoots = [
+  path.resolve(projectRoot, "public", "official"),
+  path.resolve(projectRoot, "public", "fonts", "private"),
+];
 
 const privateAssetRoutes = [
   { route: "/official/", source: "official", out: "official" },
@@ -19,6 +24,55 @@ function isEnabledFlag(value: string | undefined) {
 function isInside(parent: string, candidate: string) {
   const relative = path.relative(parent, candidate);
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function findForbiddenPublicAssets(root: string) {
+  if (!existsSync(root)) return [];
+
+  const pending = [root];
+  const forbidden: string[] = [];
+
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current) continue;
+
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const entryPath = path.resolve(current, entry.name);
+      if (entry.isDirectory()) {
+        pending.push(entryPath);
+      } else {
+        // Files, symlinks and other special entries are all forbidden: Vite may
+        // copy them even though Git ignores the public asset directory.
+        forbidden.push(entryPath);
+      }
+    }
+  }
+
+  return forbidden;
+}
+
+function assertPublicAssetsAreIsolated(command: "build" | "serve") {
+  const forbidden = forbiddenPublicAssetRoots.flatMap(findForbiddenPublicAssets);
+  if (forbidden.length === 0) return;
+
+  const visibleLimit = 12;
+  const visibleFiles = forbidden.slice(0, visibleLimit).map((filePath) => {
+    const relative = path.relative(projectRoot, filePath).split(path.sep).join("/");
+    return `  - ${relative}`;
+  });
+  if (forbidden.length > visibleLimit) {
+    visibleFiles.push(`  - ... and ${forbidden.length - visibleLimit} more`);
+  }
+
+  const action = command === "build" ? "build the public deployment" : "start the public dev server";
+  throw new Error(
+    [
+      `[cardviewer-public-assets] Refusing to ${action}.`,
+      "Vite copies everything under public/ into the output, including Git-ignored files.",
+      "Move official assets to private-assets/ (or remove the local public copies) before continuing:",
+      ...visibleFiles,
+    ].join("\n"),
+  );
 }
 
 function contentType(filePath: string) {
@@ -119,8 +173,15 @@ function privateAssetsPlugin(
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, projectRoot, "");
   const deploymentMode = env.VITE_DEPLOYMENT_MODE ?? (mode === "public" ? "public" : "private");
-  const privateAssetsEnabled = deploymentMode !== "public";
+  // `--mode public` must stay fail-closed even if a local environment file
+  // accidentally asks for the private deployment mode.
+  const publicDeployment = mode === "public" || deploymentMode === "public";
+  const privateAssetsEnabled = !publicDeployment;
   const copyGeneratedAssets = isEnabledFlag(env.CARDVIEWER_COPY_GENERATED_ASSETS);
+
+  if (publicDeployment) {
+    assertPublicAssetsAreIsolated(command);
+  }
 
   return {
     plugins: [react(), privateAssetsPlugin(privateAssetsEnabled, command, copyGeneratedAssets)],
