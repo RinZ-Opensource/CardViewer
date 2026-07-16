@@ -51,6 +51,11 @@ npm.cmd run tauri:dev
 npm.cmd run tauri:build
 ```
 
+The Tauri viewer has no machine-specific default package directory. If an
+exported manifest is unavailable, enter the local CardMaker package folder in
+the sidebar; that value is stored only in the desktop webview's local storage.
+Browser and Cloudflare builds neither read nor embed the local path.
+
 `build:public` refuses to run while local files exist under `public/official` or
 `public/fonts/private`, and verifies the completed `dist` before returning
 success. `check` scans tracked files for common secret formats, regression-tests

@@ -1,8 +1,8 @@
 import React from "react";
 import { DeploymentMode, OfficialFontKey, TmpFontMetrics, UnityFontMetrics } from "./types";
 
-export const DEFAULT_PACKAGE_ROOT = "I:\\package";
 export const EDIT_STORAGE_KEY = "configarc-card-viewer.print-edits";
+export const PACKAGE_ROOT_STORAGE_KEY = "configarc-card-viewer.package-root";
 export const EXPLICIT_STATIC_MANIFEST_URL = import.meta.env.VITE_CARD_MANIFEST_URL?.trim() ?? "";
 export const STATIC_MANIFEST_URL = EXPLICIT_STATIC_MANIFEST_URL || "/official/generated/cards.json";
 export const CARD_TILT_X_MAX = 26;

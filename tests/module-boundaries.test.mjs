@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -122,6 +122,20 @@ function normalizeModule(specifier) {
     .toLowerCase();
 }
 
+async function collectTypeScriptFiles(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const absolute = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await collectTypeScriptFiles(absolute)));
+    } else if (/\.tsx?$/i.test(entry.name)) {
+      files.push(absolute);
+    }
+  }
+  return files;
+}
+
 for (const boundary of boundaries) {
   test(`${boundary.file} respects its frontend module boundary`, async () => {
     const source = await readFile(path.join(projectRoot, boundary.file), "utf8");
@@ -186,4 +200,36 @@ test("src/holo.tsx preserves the public holo mask type exports", async () => {
   }
 
   assert.deepEqual(exported.sort(), [...holoMaskTypeExports].sort());
+});
+
+test("frontend source does not embed machine-specific absolute paths", async () => {
+  const sourceRoot = path.join(projectRoot, "src");
+  const violations = [];
+
+  for (const absolute of await collectTypeScriptFiles(sourceRoot)) {
+    const source = await readFile(absolute, "utf8");
+    const relative = path.relative(projectRoot, absolute);
+    const sourceFile = ts.createSourceFile(
+      relative,
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      absolute.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    );
+
+    function visit(node) {
+      if (
+        (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) &&
+        /^[A-Za-z]:[\\/]/.test(node.text)
+      ) {
+        const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+        violations.push(`${relative}:${position.line + 1} (${node.text})`);
+      }
+      ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+  }
+
+  assert.deepEqual(violations, []);
 });

@@ -7,7 +7,15 @@ import { buildFilterConfig, cardMatchesFilters, uniqueOptions } from "./cardFilt
 import { selectedAssetSignature, usesPrimaryImageDataUrl } from "./cardAssets";
 import { isSupportedCardRecord } from "./cardSupport";
 import { PreviewStage } from "./cards";
-import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT, CARD_WIDTH, DEPLOYMENT_MODE, OfficialFontContext, TmpFontContext } from "./constants";
+import {
+  CARD_LIST_OVERSCAN,
+  CARD_ROW_HEIGHT,
+  CARD_WIDTH,
+  DEPLOYMENT_MODE,
+  OfficialFontContext,
+  TmpFontContext,
+  canInvokeTauri,
+} from "./constants";
 import { useCardEdits, useCardListViewport, useOfficialFonts, useScanResult, useSelectedAssetDataUrls, useSelectedImageDataUrl, useThumbnailLoader } from "./hooks";
 import { THUMBNAIL_BUFFER_ROWS } from "./imageLoader";
 import { CardRecord, ViewMode } from "./types";
@@ -25,7 +33,23 @@ export function App() {
   const { cardListRef, cardListViewport, updateCardListScroll } = useCardListViewport();
   const { officialFonts, tmpFont } = useOfficialFonts();
   const { edits, updateCardField, updatePlayerField, resetCardEdits, resetPlayerEdits } = useCardEdits();
-  const { scanResult, status, source, error, setError, loading, retry } = useScanResult(setSelectedId);
+  const {
+    scanResult,
+    status,
+    source,
+    error,
+    setError,
+    loading,
+    retry,
+    packageRoot,
+    scanPackageRoot,
+  } = useScanResult(setSelectedId);
+  const [packageRootDraft, setPackageRootDraft] = React.useState(packageRoot);
+  const tauriAvailable = canInvokeTauri();
+
+  React.useEffect(() => {
+    setPackageRootDraft(packageRoot);
+  }, [packageRoot]);
 
   const cards = scanResult?.cards ?? [];
   const displayCards = React.useMemo(
@@ -289,6 +313,35 @@ export function App() {
       <main className="app-shell">
       <aside className="sidebar" aria-label="Card browser">
         <section className="filters">
+          {tauriAvailable ? (
+            <form
+              className="package-root-form"
+              aria-label="Local CardMaker package"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const normalized = packageRootDraft.trim();
+                setPackageRootDraft(normalized);
+                scanPackageRoot(normalized);
+              }}
+            >
+              <input
+                className="path-input"
+                value={packageRootDraft}
+                onChange={(event) => setPackageRootDraft(event.target.value)}
+                placeholder="CardMaker package folder"
+                aria-label="CardMaker package folder"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={loading || !packageRootDraft.trim()}
+              >
+                Scan folder
+              </button>
+            </form>
+          ) : null}
           <div className="search-field">
             <svg
               className="search-icon"
@@ -333,9 +386,9 @@ export function App() {
               aria-live="polite"
             >
               <span>{status}</span>
-              {source === "mock" || source === "error" ? (
+              {source === "mock" || (source === "error" && packageRoot) ? (
                 <button type="button" className="ghost-button" onClick={retry} disabled={loading}>
-                  Retry manifest
+                  {source === "mock" ? "Retry manifest" : "Retry"}
                 </button>
               ) : null}
             </div>

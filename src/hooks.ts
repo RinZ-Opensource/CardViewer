@@ -4,12 +4,22 @@ import { assetLayerLoadPriority, visibleAssetLayers } from "./cardAssets";
 import { maiLinkedPrintEdits } from "./cardData";
 import { PLAYER_EDIT_KEYS, SHARED_PLAYER_EDITS_KEY, sharedPlayerEdits } from "./cardEdits";
 import { isSupportedCardRecord } from "./cardSupport";
-import { DEFAULT_PACKAGE_ROOT, EDIT_STORAGE_KEY, USE_OFFICIAL_ASSETS, canInvokeTauri } from "./constants";
+import {
+  EDIT_STORAGE_KEY,
+  PACKAGE_ROOT_STORAGE_KEY,
+  USE_OFFICIAL_ASSETS,
+  canInvokeTauri,
+} from "./constants";
 import { loadOfficialFonts, loadOfficialTmpFont } from "./fonts";
 import { isStaticAssetPath, readCachedImageDataUrl } from "./imageLoader";
 import { loadStaticScanResult } from "./manifest";
 import { mockScanResult } from "./mockData";
-import { loadStoredCardEdits, writeLocalStorageJson } from "./persistence";
+import {
+  loadStoredCardEdits,
+  readLocalStorage,
+  writeLocalStorage,
+  writeLocalStorageJson,
+} from "./persistence";
 import { CardEdits, CardRecord, LoadedAssetDataUrls, LoadedImageDataUrl, OfficialFontKey, PrintFieldValue, ScanResult, TmpFontMetrics, UnityFontMetrics } from "./types";
 
 // Loads the official Unity + TMP fonts; no-op outside the private deployment.
@@ -40,9 +50,9 @@ export function useOfficialFonts() {
   return { officialFonts, tmpFont };
 }
 
-// Loads the card scan once on mount: exported static manifest first, then a
-// mock dataset in the browser, then the Tauri package scan as a fallback.
-// `setSelectedId` is threaded in so a completed load can seed the selection.
+// Loads the exported manifest first, then browser samples or a saved Tauri
+// package folder. A manual desktop folder submission skips the manifest so the
+// user's explicit selection cannot be masked by bundled development data.
 export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction<string>>) {
   const [scanResult, setScanResult] = React.useState<ScanResult | null>(null);
   const [status, setStatus] = React.useState("Ready");
@@ -50,8 +60,11 @@ export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction
   const [loading, setLoading] = React.useState(true);
   const [source, setSource] = React.useState<"loading" | "manifest" | "tauri" | "mock" | "error">("loading");
   const [reloadToken, setReloadToken] = React.useState(0);
+  const [loadMode, setLoadMode] = React.useState<"auto" | "package">("auto");
+  const [packageRoot, setPackageRoot] = React.useState(() =>
+    canInvokeTauri() ? readLocalStorage(PACKAGE_ROOT_STORAGE_KEY)?.trim() ?? "" : "",
+  );
   const loadSequenceRef = React.useRef(0);
-  const packageRoot = DEFAULT_PACKAGE_ROOT;
 
   React.useEffect(() => {
     if (!error) return;
@@ -79,33 +92,46 @@ export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction
       };
 
       try {
-        setStatus("Loading exported manifest");
-        try {
-          const result = await loadStaticScanResult((partial, loadedCards, totalCards) => {
+        if (loadMode === "auto") {
+          setStatus("Loading exported manifest");
+          try {
+            const result = await loadStaticScanResult((partial, loadedCards, totalCards) => {
+              if (!isCurrentLoad()) return;
+              applyScanResult(partial);
+              setStatus(
+                `Loaded ${loadedCards.toLocaleString()} of ${totalCards.toLocaleString()} exported records`,
+              );
+            });
             if (!isCurrentLoad()) return;
-            applyScanResult(partial);
-            setStatus(
-              `Loaded ${loadedCards.toLocaleString()} of ${totalCards.toLocaleString()} exported records`,
-            );
-          });
-          if (!isCurrentLoad()) return;
-          applyScanResult(result);
-          setSource("manifest");
-          setStatus(`Loaded ${result.cards.length.toLocaleString()} exported records`);
-          return;
-        } catch (manifestError) {
-          if (!tauriAvailable) {
-            const result = mockScanResult(packageRoot);
-            if (!isCurrentLoad()) return;
-            console.warn("Exported manifest unavailable; using bundled samples", manifestError);
             applyScanResult(result);
-            setSource("mock");
-            setStatus(
-              `Manifest unavailable — showing ${result.cards.length.toLocaleString()} bundled sample records`,
-            );
+            setSource("manifest");
+            setStatus(`Loaded ${result.cards.length.toLocaleString()} exported records`);
             return;
+          } catch (manifestError) {
+            if (!tauriAvailable) {
+              const result = mockScanResult("bundled-samples");
+              if (!isCurrentLoad()) return;
+              console.warn("Exported manifest unavailable; using bundled samples", manifestError);
+              applyScanResult(result);
+              setSource("mock");
+              setStatus(
+                `Manifest unavailable — showing ${result.cards.length.toLocaleString()} bundled sample records`,
+              );
+              return;
+            }
+            if (!packageRoot) {
+              throw new Error("Choose a CardMaker package folder, then select Scan folder.");
+            }
+            setStatus("Manifest unavailable; scanning saved package folder");
           }
-          setStatus("Manifest unavailable; scanning package");
+        } else {
+          if (!tauriAvailable) {
+            throw new Error("Local package scanning is available only in the desktop app.");
+          }
+          if (!packageRoot) {
+            throw new Error("Choose a CardMaker package folder, then select Scan folder.");
+          }
+          setStatus("Scanning package folder");
         }
 
         const result = await invoke<ScanResult>("scan_package", { packageRoot });
@@ -115,7 +141,7 @@ export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction
         setStatus(`Loaded ${result.cards.length.toLocaleString()} records`);
       } catch (err) {
         if (!isCurrentLoad()) return;
-        setError(String(err));
+        setError(err instanceof Error ? err.message : String(err));
         setSource("error");
         setStatus("Scan failed");
       } finally {
@@ -124,13 +150,42 @@ export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction
     };
 
     void scanPackage();
-  }, [reloadToken, setSelectedId]);
+  }, [loadMode, packageRoot, reloadToken, setSelectedId]);
 
   const retry = React.useCallback(() => {
     setReloadToken((current) => current + 1);
   }, []);
 
-  return { scanResult, status, source, error, setError, loading, retry };
+  const scanPackageRoot = React.useCallback((nextRoot: string) => {
+    const normalized = nextRoot.trim();
+    if (!normalized) {
+      setError("Choose a CardMaker package folder, then select Scan folder.");
+      setSource("error");
+      setStatus("Package folder required");
+      return;
+    }
+    if (!canInvokeTauri()) {
+      setError("Local package scanning is available only in the desktop app.");
+      setSource("error");
+      return;
+    }
+    setPackageRoot(normalized);
+    writeLocalStorage(PACKAGE_ROOT_STORAGE_KEY, normalized);
+    setLoadMode("package");
+    setReloadToken((current) => current + 1);
+  }, []);
+
+  return {
+    scanResult,
+    status,
+    source,
+    error,
+    setError,
+    loading,
+    retry,
+    packageRoot,
+    scanPackageRoot,
+  };
 }
 
 // Owns the persisted print-edit state and the mutations against it. Per-card
