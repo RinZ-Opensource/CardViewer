@@ -26,6 +26,8 @@ preview boundary, and deployment checklist.
 
 ## Commands
 
+Use Node.js 22.20.0, as pinned by the root `.node-version` file.
+
 Install both locked JavaScript toolchains after a clean checkout:
 
 ```powershell
@@ -47,9 +49,11 @@ npm.cmd run tauri:build
 
 `build:public` refuses to run while local files exist under `public/official` or
 `public/fonts/private`, and verifies the completed `dist` before returning
-success. `check` scans tracked files for common secret formats, tests the dist
-guard and Pages Function behavior, runs the public build, syntax-checks the
-Function, and type-checks the songdb Worker. It is not an R2 integration test.
+success. `check` scans tracked files for common secret formats, regression-tests
+that scanner, and tests the dist guard, Pages Function behavior, persisted-state
+validation, and cache/task scheduling. It then runs the public build,
+syntax-checks the Function, and type-checks the songdb Worker. It is not an R2
+integration test.
 The static `dist` guard and the runtime R2 allowlist are independent release
 gates; passing either one does not validate the other. `check:all` also runs the
 Rust/Tauri check.

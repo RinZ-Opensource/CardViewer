@@ -9,6 +9,7 @@ import { loadOfficialFonts, loadOfficialTmpFont } from "./fonts";
 import { isStaticAssetPath, readCachedImageDataUrl } from "./imageLoader";
 import { loadStaticScanResult } from "./manifest";
 import { mockScanResult } from "./mockData";
+import { loadStoredCardEdits, writeLocalStorageJson } from "./persistence";
 import { CardEdits, CardRecord, LoadedAssetDataUrls, LoadedImageDataUrl, OfficialFontKey, PrintFieldValue, ScanResult, TmpFontMetrics, UnityFontMetrics } from "./types";
 
 // Loads the official Unity + TMP fonts; no-op outside the private deployment.
@@ -136,18 +137,12 @@ export function useScanResult(setSelectedId: React.Dispatch<React.SetStateAction
 // edits are keyed by dataName; player-data edits (name / rating / friend code)
 // are shared across cards under a single key.
 export function useCardEdits() {
-  const [edits, setEdits] = React.useState<Record<string, CardEdits>>(() => {
-    const raw = localStorage.getItem(EDIT_STORAGE_KEY);
-    if (!raw) return {};
-    try {
-      return JSON.parse(raw) as Record<string, CardEdits>;
-    } catch {
-      return {};
-    }
-  });
+  const [edits, setEdits] = React.useState<Record<string, CardEdits>>(() =>
+    loadStoredCardEdits(EDIT_STORAGE_KEY),
+  );
 
   React.useEffect(() => {
-    localStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(edits));
+    writeLocalStorageJson(EDIT_STORAGE_KEY, edits);
   }, [edits]);
 
   const updateCardField = React.useCallback((card: CardRecord, fieldKey: string, value: PrintFieldValue) => {
@@ -334,23 +329,40 @@ export function useSelectedAssetDataUrls(
 // in the LRU imageDataUrlCache, so scrolling back re-resolves instantly.
 export const THUMB_CACHE_MAX_ENTRIES = 2048;
 
+type ThumbnailCacheEntry = {
+  path: string;
+  dataUrl: string;
+};
+
 // Loads thumbnails for the given cards, batching state updates per frame and
 // de-duplicating in-flight/cached requests.
 export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
-  const [thumbCache, setThumbCache] = React.useState<Record<string, string>>({});
-  const thumbCacheRef = React.useRef<Record<string, string>>({});
-  const thumbPendingRef = React.useRef<Set<string>>(new Set());
+  const [thumbCache, setThumbCache] = React.useState<Record<string, ThumbnailCacheEntry>>({});
+  const thumbCacheRef = React.useRef<Record<string, ThumbnailCacheEntry>>({});
+  const thumbPendingRef = React.useRef<Map<string, string>>(new Map());
   // Insertion order of cached keys, used to evict oldest-first (FIFO).
   const thumbOrderRef = React.useRef<string[]>([]);
-  const desiredThumbKeysRef = React.useRef<Set<string>>(new Set());
-  const loadedThumbsRef = React.useRef<Array<{ dataName: string; dataUrl: string }>>([]);
+  const desiredThumbPathsRef = React.useRef<Map<string, string>>(new Map());
+  const loadedThumbsRef = React.useRef<Array<ThumbnailCacheEntry & { dataName: string }>>([]);
   const pendingFrameRef = React.useRef(0);
   const mountedRef = React.useRef(false);
 
-  // Keep this current during render, before an already-running request can
-  // settle. Results from an older effect are still useful when its key remains
-  // in the caller's latest thumbnail window.
-  desiredThumbKeysRef.current = new Set(thumbnailCards.map((card) => card.dataName));
+  const desiredThumbPaths = React.useMemo(
+    () =>
+      new Map(
+        thumbnailCards.flatMap((card) => {
+          const path = card.thumbnailPath ?? card.imagePath;
+          return path ? [[card.dataName, path] as const] : [];
+        }),
+      ),
+    [thumbnailCards],
+  );
+
+  // Publish only committed paths. Layout effects run before the passive effect
+  // below starts loads, while abandoned concurrent renders cannot mutate this ref.
+  React.useLayoutEffect(() => {
+    desiredThumbPathsRef.current = desiredThumbPaths;
+  }, [desiredThumbPaths]);
 
   React.useEffect(() => {
     mountedRef.current = true;
@@ -372,19 +384,27 @@ export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
     const pendingLoads = thumbnailCards
       .map((card) => {
         const thumbPath = card.thumbnailPath ?? card.imagePath;
-        if (!thumbPath || thumbCacheRef.current[card.dataName] || thumbPendingRef.current.has(card.dataName)) {
+        if (
+          !thumbPath ||
+          thumbCacheRef.current[card.dataName]?.path === thumbPath ||
+          thumbPendingRef.current.get(card.dataName) === thumbPath
+        ) {
           return null;
         }
         if (!canInvokeTauri() && !isStaticAssetPath(thumbPath)) return null;
-        thumbPendingRef.current.add(card.dataName);
+        thumbPendingRef.current.set(card.dataName, thumbPath);
         return readCachedImageDataUrl(thumbPath)
-          .then((dataUrl) => ({ dataName: card.dataName, dataUrl }))
+          .then((dataUrl) => ({ dataName: card.dataName, path: thumbPath, dataUrl }))
           .catch(() => null)
           .finally(() => {
-            thumbPendingRef.current.delete(card.dataName);
+            if (thumbPendingRef.current.get(card.dataName) === thumbPath) {
+              thumbPendingRef.current.delete(card.dataName);
+            }
           });
       })
-      .filter((load): load is Promise<{ dataName: string; dataUrl: string } | null> => Boolean(load));
+      .filter(
+        (load): load is Promise<(ThumbnailCacheEntry & { dataName: string }) | null> => Boolean(load),
+      );
 
     if (!pendingLoads.length) return;
 
@@ -400,10 +420,12 @@ export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
         let next = prev;
         const order = thumbOrderRef.current;
         for (const entry of nextEntries) {
-          if (!desiredThumbKeysRef.current.has(entry.dataName)) continue;
-          if (next[entry.dataName]) continue;
+          if (desiredThumbPathsRef.current.get(entry.dataName) !== entry.path) continue;
+          if (next[entry.dataName]?.path === entry.path) continue;
           if (next === prev) next = { ...prev };
-          next[entry.dataName] = entry.dataUrl;
+          next[entry.dataName] = { path: entry.path, dataUrl: entry.dataUrl };
+          const existingIndex = order.indexOf(entry.dataName);
+          if (existingIndex >= 0) order.splice(existingIndex, 1);
           order.push(entry.dataName);
         }
         if (next === prev) return next;
@@ -415,8 +437,13 @@ export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
         return next;
       });
     };
-    const queueLoadedThumb = (entry: { dataName: string; dataUrl: string }) => {
-      if (!mountedRef.current || !desiredThumbKeysRef.current.has(entry.dataName)) return;
+    const queueLoadedThumb = (entry: ThumbnailCacheEntry & { dataName: string }) => {
+      if (
+        !mountedRef.current ||
+        desiredThumbPathsRef.current.get(entry.dataName) !== entry.path
+      ) {
+        return;
+      }
       loadedThumbsRef.current.push(entry);
       if (!pendingFrameRef.current) {
         pendingFrameRef.current = window.requestAnimationFrame(flushLoadedThumbs);
@@ -431,5 +458,13 @@ export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
     });
   }, [thumbnailCards]);
 
-  return thumbCache;
+  return React.useMemo(() => {
+    const urls: Record<string, string> = {};
+    thumbnailCards.forEach((card) => {
+      const path = card.thumbnailPath ?? card.imagePath;
+      const cached = thumbCache[card.dataName];
+      if (path && cached?.path === path) urls[card.dataName] = cached.dataUrl;
+    });
+    return urls;
+  }, [thumbCache, thumbnailCards]);
 }

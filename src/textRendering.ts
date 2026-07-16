@@ -168,12 +168,15 @@ export function clearCanvas(canvas: HTMLCanvasElement) {
   context?.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-// The atlas cache holds one image per font texture (unbounded is fine). The
-// per-glyph canvas cache can grow with text variety, so bound it with an LRU.
+// The atlas cache holds one image per font texture. The per-glyph canvas cache
+// can grow with text variety and backing-store size, so bound both dimensions.
 export const tmpAtlasCache = new Map<string, Promise<HTMLImageElement>>();
 export const TMP_GLYPH_CANVAS_CACHE_MAX = 4096;
+export const TMP_GLYPH_CANVAS_CACHE_MAX_BYTES = 128 * 1024 * 1024;
 export const tmpGlyphCanvasCache = new LruMap<string, HTMLCanvasElement>({
   maxEntries: TMP_GLYPH_CANVAS_CACHE_MAX,
+  maxBytes: TMP_GLYPH_CANVAS_CACHE_MAX_BYTES,
+  sizeOf: (canvas) => canvas.width * canvas.height * 4,
 });
 
 export function loadTmpAtlas(font: TmpFontMetrics) {
@@ -189,6 +192,10 @@ export function loadTmpAtlas(font: TmpFontMetrics) {
     image.src = src;
   });
   tmpAtlasCache.set(src, promise);
+  // A transient network/decode failure must not poison this texture forever.
+  void promise.catch(() => {
+    if (tmpAtlasCache.get(src) === promise) tmpAtlasCache.delete(src);
+  });
   return promise;
 }
 
@@ -382,7 +389,12 @@ export function renderTmpGlyphCanvas(
   },
 ) {
   const cacheKey = [
+    atlas.currentSrc || atlas.src,
     glyph.id,
+    glyph.x,
+    glyph.y,
+    glyph.width,
+    glyph.height,
     width,
     height,
     options.kind,
@@ -590,4 +602,3 @@ export function unityGlyph(font: UnityFontMetrics, char: string) {
   const code = char.codePointAt(0) ?? 0;
   return font.chars[String(code)] ?? font.chars[MISSING_GLYPH_CODEPOINT] ?? font.chars[QUESTION_MARK_CODEPOINT];
 }
-

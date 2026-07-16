@@ -1,6 +1,12 @@
 import React from "react";
 import { exportNodeAsPng, renderNodeToPng } from "../exportPng";
 import {
+  loadStoredRecord,
+  readLocalStorage,
+  writeLocalStorage,
+  writeLocalStorageJson,
+} from "../persistence";
+import {
   CHUNI_MUSICBOX_EXPORT_WIDTH,
   CHUNI_MUSICBOX_HEIGHT,
   CHUNI_MUSICBOX_WIDTH,
@@ -47,7 +53,7 @@ import {
   ChuniStartBanner,
   ChuniSuccessLamp,
 } from "./chuniTypes";
-import { MAI_DIFFICULTY_LABEL } from "./maiScore";
+import { MAI_DIFFICULTY_LABEL, MAI_DIFFICULTY_ORDER } from "./maiScore";
 import { ONGEKI_DIFFICULTY_LABEL, ONGEKI_DIFFICULTY_ORDER } from "./ongekiAssets";
 import { ONGEKI_SAMPLE_SONGS } from "./ongekiSamples";
 import {
@@ -65,6 +71,7 @@ import {
   chuniChartFields,
   chuniHasChart,
   chuniPreferredDifficulty,
+  invalidateSongDbCache,
   loadChuniSongs,
   loadMaiSongs,
   loadOngekiSongs,
@@ -197,8 +204,38 @@ const ONGEKI_ATTRIBUTE_OPTIONS: Array<{ value: OngekiAttribute; label: string }>
   { value: "leaf", label: "LEAF" },
 ];
 
+const MAI_STORAGE_OPTIONS = {
+  allowedValues: {
+    difficulty: MAI_DIFFICULTY_ORDER,
+    comboBadge: COMBO_OPTIONS.map((option) => option.value),
+    syncBadge: SYNC_OPTIONS.map((option) => option.value),
+  },
+};
+
+const CHUNI_STORAGE_OPTIONS = {
+  allowedValues: {
+    difficulty: CHUNI_DIFFICULTY_ORDER,
+    weStars: WE_STAR_OPTIONS,
+    cardType: ["panel", "musicbox"],
+    successLamp: CHUNI_SUCCESS_OPTIONS.map((option) => option.value),
+    comboLamp: CHUNI_COMBO_OPTIONS.map((option) => option.value),
+    fullChainLamp: CHUNI_FCHAIN_OPTIONS.map((option) => option.value),
+    startBanner: CHUNI_BANNER_OPTIONS.map((option) => option.value),
+  },
+};
+
+const ONGEKI_STORAGE_OPTIONS = {
+  allowedValues: {
+    difficulty: ONGEKI_DIFFICULTY_ORDER,
+    cardType: ["panel", "musicbt"],
+    battleRank: ONGEKI_BATTLE_RANK_OPTIONS.map((option) => option.value),
+    fcLamp: ONGEKI_FC_OPTIONS.map((option) => option.value),
+    bossAttribute: ONGEKI_ATTRIBUTE_OPTIONS.map((option) => option.value),
+  },
+};
+
 function loadGame(): ScoreCardGame {
-  const stored = localStorage.getItem(GAME_STORAGE_KEY);
+  const stored = readLocalStorage(GAME_STORAGE_KEY);
   return GAMES.some((game) => game.key === stored) ? (stored as ScoreCardGame) : "mai";
 }
 
@@ -310,23 +347,17 @@ function defaultOngekiState(): OngekiScoreState {
   };
 }
 
-function loadStored<State>(key: string, fallback: () => State): State {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback();
-    return { ...fallback(), ...(JSON.parse(raw) as Partial<State>) };
-  } catch {
-    return fallback();
-  }
-}
-
 export function ScoreCardSurface() {
   const [game, setGame] = React.useState<ScoreCardGame>(loadGame);
   const [state, setState] = React.useState<MaiScoreState>(() =>
-    loadStored(SCORE_STORAGE_KEY, defaultState),
+    loadStoredRecord(SCORE_STORAGE_KEY, defaultState, MAI_STORAGE_OPTIONS),
   );
   const [chuniState, setChuniState] = React.useState<ChuniScoreState>(() => {
-    const stored = loadStored(CHUNI_STORAGE_KEY, defaultChuniState);
+    const stored = loadStoredRecord(
+      CHUNI_STORAGE_KEY,
+      defaultChuniState,
+      CHUNI_STORAGE_OPTIONS,
+    );
     return {
       ...stored,
       cardType: SHOW_PANEL_CARDS ? stored.cardType : "musicbox",
@@ -334,7 +365,11 @@ export function ScoreCardSurface() {
     };
   });
   const [ongekiState, setOngekiState] = React.useState<OngekiScoreState>(() => {
-    const stored = loadStored(ONGEKI_STORAGE_KEY, defaultOngekiState);
+    const stored = loadStoredRecord(
+      ONGEKI_STORAGE_KEY,
+      defaultOngekiState,
+      ONGEKI_STORAGE_OPTIONS,
+    );
     return SHOW_PANEL_CARDS ? stored : { ...stored, cardType: "musicbt" };
   });
   const [exportingPng, setExportingPng] = React.useState(false);
@@ -436,6 +471,9 @@ export function ScoreCardSurface() {
   }, [game, songDbReload]);
 
   function retrySongDb(target: ScoreCardGame) {
+    invalidateSongDbCache(
+      target === "mai" ? "maimai" : target === "chuni" ? "chunithm" : "ongeki",
+    );
     songDbStarted.current.delete(target);
     songDbRequestId.current[target] += 1;
     setSongDb((current) => ({
@@ -477,15 +515,15 @@ export function ScoreCardSurface() {
   }, [game, design.width, design.height]);
 
   React.useEffect(() => {
-    localStorage.setItem(GAME_STORAGE_KEY, game);
+    writeLocalStorage(GAME_STORAGE_KEY, game);
   }, [game]);
 
   React.useEffect(() => {
-    localStorage.setItem(SCORE_STORAGE_KEY, JSON.stringify(state));
+    writeLocalStorageJson(SCORE_STORAGE_KEY, state);
   }, [state]);
 
   React.useEffect(() => {
-    localStorage.setItem(CHUNI_STORAGE_KEY, JSON.stringify(chuniState));
+    writeLocalStorageJson(CHUNI_STORAGE_KEY, chuniState);
   }, [chuniState]);
 
   React.useEffect(() => {
@@ -496,7 +534,7 @@ export function ScoreCardSurface() {
   }, [chuniState.confirmed]);
 
   React.useEffect(() => {
-    localStorage.setItem(ONGEKI_STORAGE_KEY, JSON.stringify(ongekiState));
+    writeLocalStorageJson(ONGEKI_STORAGE_KEY, ongekiState);
   }, [ongekiState]);
 
   // Dev-only automation hooks for generating sample PNGs from the console.

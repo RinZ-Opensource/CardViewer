@@ -1,5 +1,6 @@
 import React from "react";
 import { App as CardViewerSurface } from "./App";
+import { readLocalStorage, writeLocalStorage } from "./persistence";
 import { ScoreCardSurface } from "./scorecard/ScoreCardSurface";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -17,7 +18,7 @@ function loadSurface(): SurfaceKey {
   if (SURFACES.some((surface) => surface.key === fromHash)) {
     return fromHash as SurfaceKey;
   }
-  const stored = localStorage.getItem(SURFACE_STORAGE_KEY);
+  const stored = readLocalStorage(SURFACE_STORAGE_KEY);
   return SURFACES.some((surface) => surface.key === stored)
     ? (stored as SurfaceKey)
     : "cards";
@@ -46,7 +47,7 @@ export function AppShell() {
 
   React.useEffect(() => {
     mountSurface(surface);
-    localStorage.setItem(SURFACE_STORAGE_KEY, surface);
+    writeLocalStorage(SURFACE_STORAGE_KEY, surface);
     const expectedHash = `#${surface}`;
     if (window.location.hash !== expectedHash) {
       window.history.replaceState(null, "", expectedHash);

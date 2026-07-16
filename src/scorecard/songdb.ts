@@ -141,6 +141,10 @@ interface SupplementalAssets {
 const JACKET_FILE = /^[A-Za-z0-9_.-]+\.(png|jpg|jpeg|webp)$/i;
 const officialAssetsCache = new Map<SongDbGame, Promise<SupplementalAssets>>();
 
+function hasCompleteSupplementalAssets(game: SongDbGame, assets: SupplementalAssets): boolean {
+  return Boolean(assets.jackets) && (game !== "ongeki" || Boolean(assets.ongekiBosses));
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -205,10 +209,10 @@ function officialJacketUrl(
 }
 
 function loadSupplementalAssets(game: SongDbGame): Promise<SupplementalAssets> {
-  let pending = officialAssetsCache.get(game);
+  const pending = officialAssetsCache.get(game);
   if (pending) return pending;
   const scorecardDir = OFFICIAL_SCORECARD_DIR[game];
-  pending = Promise.all([
+  const request = Promise.all([
     fetchOptionalJson(`/official/scorecard/${scorecardDir}/jackets/jacket-map.json`),
     game === "ongeki"
       ? fetchOptionalJson("/official/scorecard/ongeki/boss/boss-map.json")
@@ -217,11 +221,30 @@ function loadSupplementalAssets(game: SongDbGame): Promise<SupplementalAssets> {
     jackets: parseOfficialJacketMap(rawJackets, game),
     ongekiBosses: game === "ongeki" ? parseOngekiBossMap(rawBosses) : undefined,
   }));
-  officialAssetsCache.set(game, pending);
-  return pending;
+  officialAssetsCache.set(game, request);
+  void request.then(
+    (assets) => {
+      if (
+        !hasCompleteSupplementalAssets(game, assets) &&
+        officialAssetsCache.get(game) === request
+      ) {
+        officialAssetsCache.delete(game);
+      }
+    },
+    () => {
+      if (officialAssetsCache.get(game) === request) officialAssetsCache.delete(game);
+    },
+  );
+  return request;
 }
 
 const songCache = new Map<SongDbGame, Promise<unknown>>();
+
+/** Force the next user retry to perform fresh primary and supplemental loads. */
+export function invalidateSongDbCache(game: SongDbGame) {
+  songCache.delete(game);
+  officialAssetsCache.delete(game);
+}
 
 async function fetchSongDbEntries(game: SongDbGame): Promise<RawEntry[]> {
   const url = songdbDataUrl(game);
@@ -254,12 +277,27 @@ function loadNormalized<Song>(
 ): Promise<Song[]> {
   let pending = songCache.get(game) as Promise<Song[]> | undefined;
   if (!pending) {
-    pending = Promise.all([fetchSongDbEntries(game), loadSupplementalAssets(game)]).then(
-      ([entries, assets]) => normalize(entries, assets),
+    let hasCompleteAssets = false;
+    const request = Promise.all([fetchSongDbEntries(game), loadSupplementalAssets(game)]).then(
+      ([entries, assets]) => {
+        hasCompleteAssets = hasCompleteSupplementalAssets(game, assets);
+        return normalize(entries, assets);
+      },
     );
-    // Drop failed loads from the cache so a later tab switch can retry.
-    pending.catch(() => songCache.delete(game));
-    songCache.set(game, pending);
+    songCache.set(game, request);
+    // Empty or fallback-only results remain usable for this request, but do
+    // not poison later retry/remount attempts with an incomplete snapshot.
+    void request.then(
+      (songs) => {
+        if ((!songs.length || !hasCompleteAssets) && songCache.get(game) === request) {
+          songCache.delete(game);
+        }
+      },
+      () => {
+        if (songCache.get(game) === request) songCache.delete(game);
+      },
+    );
+    pending = request;
   }
   return pending;
 }

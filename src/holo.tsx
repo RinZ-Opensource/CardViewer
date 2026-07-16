@@ -10,6 +10,9 @@ const MASK_ALPHA_EPSILON = 8;
 // Grow the front-element mask outward by this many 1px passes so the foil is
 // reliably cleared around printed art/text edges.
 const FRONT_MASK_DILATION = 7;
+const HOLO_IMAGE_LOAD_TIMEOUT_MS = 5_000;
+const HOLO_IMAGE_LOAD_ATTEMPTS = 2;
+const HOLO_IMAGE_RETRY_DELAY_MS = 150;
 
 // Tuning for the luminance-keyed mask modes ("light-or-alpha"/"dark-or-alpha").
 // Per-image coverage gates decide whether to key off luminance at all; the
@@ -84,13 +87,15 @@ export function HoloMaterialLayer({
   lightStyle,
   game,
   maskUrl = "",
+  maskState,
 }: {
   layerClassName: string;
   lightStyle: React.CSSProperties;
   game: string;
   maskUrl?: string;
+  maskState?: HoloMaskRenderState;
 }) {
-  if (USE_OFFICIAL_ASSETS && !maskUrl) return null;
+  if (USE_OFFICIAL_ASSETS && !maskUrl && !maskState) return null;
   const maskStyle = holoMaskStyle(maskUrl);
   const foilEffectGame = game === "MAI" ? "MU3" : game;
   const foilClassName = [
@@ -99,18 +104,34 @@ export function HoloMaterialLayer({
     !USE_OFFICIAL_ASSETS ? "holo-foil-public" : "",
   ].filter(Boolean).join(" ");
   return (
-    <div className={layerClassName} style={lightStyle}>
-      <div className={foilClassName} style={maskStyle}>
-        <div className="holo-foil-darkgrain" />
-        <div className="holo-foil-base" />
-        <div className="holo-foil-flakes" />
-        <div className="holo-foil-sparkles" />
-        <div className="holo-foil-glints" />
-        <div className="holo-foil-glare" />
-      </div>
+    <div
+      className={layerClassName}
+      style={lightStyle}
+      data-export-state={maskState?.status}
+      data-export-error={maskState?.status === "error" ? maskState.error : undefined}
+      data-holo-degraded={maskState?.warnings.length ? "true" : undefined}
+      data-holo-warning={maskState?.warnings.length ? maskState.warnings.join("; ") : undefined}
+    >
+      {maskUrl ? (
+        <div className={foilClassName} style={maskStyle}>
+          <div className="holo-foil-darkgrain" />
+          <div className="holo-foil-base" />
+          <div className="holo-foil-flakes" />
+          <div className="holo-foil-sparkles" />
+          <div className="holo-foil-glints" />
+          <div className="holo-foil-glare" />
+        </div>
+      ) : null}
     </div>
   );
 }
+
+export type HoloMaskRenderState = {
+  url: string;
+  status: "pending" | "ready" | "error";
+  error: string;
+  warnings: string[];
+};
 
 export type HoloMaskImage = {
   href: string;
@@ -120,6 +141,8 @@ export type HoloMaskImage = {
   h: number;
   rotation?: number;
   maskMode?: HoloRootMaskMode;
+  /** A failed critical source invalidates the generated mask. */
+  required?: boolean;
 };
 
 export type HoloMaskRect = {
@@ -162,6 +185,7 @@ export type HoloMaskInput = {
   frontTextMasks?: HoloTmpTextMask[];
   excludeImages?: HoloMaskImage[];
   tmpFont?: TmpFontMetrics | null;
+  waitingForRequiredResources?: boolean;
   options?: HoloCssMaskOptions;
 };
 
@@ -229,7 +253,15 @@ export function MaiOfficialHoloLayer({
   const frontImages: HoloMaskImage[] = [];
   const frontRects: HoloMaskRect[] = [];
 
-  rootImages.push({ href: officialAsset("UI_CMA_Holo_CardBase_00"), x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
+  rootImages.push({
+    href: officialAsset("UI_CMA_Holo_CardBase_00"),
+    x: 0,
+    y: 0,
+    w: CARD_WIDTH,
+    h: CARD_HEIGHT,
+    maskMode: "raw",
+    required: true,
+  });
   if (maskSrc) {
     rootImages.push({ href: maskSrc, x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
   } else if (charaSrc && !hideChara) {
@@ -284,7 +316,7 @@ export function MaiOfficialHoloLayer({
   }
 
   const hasHoloMaskSource = rootImages.length > 0 || frontImages.length > 0 || frontRects.length > 0;
-  const cssMaskUrl = useOfficialHoloMask(
+  const maskState = useOfficialHoloMask(
     {
       rootImages,
       frontImages,
@@ -297,7 +329,15 @@ export function MaiOfficialHoloLayer({
     return null;
   }
 
-  return <HoloMaterialLayer layerClassName={layerClassName} lightStyle={lightStyle} game={card.game} maskUrl={cssMaskUrl} />;
+  return (
+    <HoloMaterialLayer
+      layerClassName={layerClassName}
+      lightStyle={lightStyle}
+      game={card.game}
+      maskUrl={maskState.url}
+      maskState={maskState}
+    />
+  );
 }
 
 export function Mu3OfficialHoloLayer({
@@ -312,7 +352,9 @@ export function Mu3OfficialHoloLayer({
   lightStyle: React.CSSProperties;
 }) {
   const attr = clampInt(fieldNumber(card, "attribute", 0), 0, 2);
-  const showSign = mu3NeedsSign(card) && assetDataUrls.mu3Sign && assetDataUrls.mu3SignMask;
+  const needsSign = mu3NeedsSign(card);
+  const showSign = needsSign && Boolean(assetDataUrls.mu3Sign && assetDataUrls.mu3SignMask);
+  const waitingForSignResources = needsSign && !showSign;
   const rightsId = numericField(card, "rightsId", -1);
   const rootImages: HoloMaskImage[] = [];
   const frontImages: HoloMaskImage[] = [];
@@ -331,7 +373,15 @@ export function Mu3OfficialHoloLayer({
   } = mu3CardNames(card);
 
   if (assetDataUrls.mu3Holo) {
-    rootImages.push({ href: assetDataUrls.mu3Holo, x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
+    rootImages.push({
+      href: assetDataUrls.mu3Holo,
+      x: 0,
+      y: 0,
+      w: CARD_WIDTH,
+      h: CARD_HEIGHT,
+      maskMode: "raw",
+      required: true,
+    });
   }
   if (!assetDataUrls.mu3Holo) {
     const holoBg = mu3HoloBgAsset(card);
@@ -341,18 +391,26 @@ export function Mu3OfficialHoloLayer({
       // The extracted Horo_BG_* foil sits ~12px left / 3px up of the printed BG.
       // Paint an un-nudged full-frame copy first (fills the edge the nudge would
       // leave bare), then an opaque nudged copy to register the interior.
-      rootImages.push({ href: officialAsset(holoBg), x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
+      rootImages.push({ href: officialAsset(holoBg), x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw", required: true });
       rootImages.push({ href: officialAsset(holoBg), x: 12, y: -3, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
     }
     if (holoFrameBase) {
-      rootImages.push({ href: officialAsset(holoFrameBase), x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
+      rootImages.push({ href: officialAsset(holoFrameBase), x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw", required: !holoBg });
     }
     if (assetDataUrls.mu3Mask) {
-      rootImages.push({ href: assetDataUrls.mu3Mask, x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
+      rootImages.push({ href: assetDataUrls.mu3Mask, x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw", required: !holoBg && !holoFrameBase });
       excludeImages.push({ href: assetDataUrls.mu3Mask, x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "alpha" });
     }
     if (holoFrameOverlay) {
-      rootImages.push({ href: officialAsset(holoFrameOverlay), x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "raw" });
+      rootImages.push({
+        href: officialAsset(holoFrameOverlay),
+        x: 0,
+        y: 0,
+        w: CARD_WIDTH,
+        h: CARD_HEIGHT,
+        maskMode: "raw",
+        required: !holoBg && !holoFrameBase && !assetDataUrls.mu3Mask,
+      });
     }
   }
   if (!fieldBool(card, "hideAttrRarity")) {
@@ -403,10 +461,10 @@ export function Mu3OfficialHoloLayer({
     frontImages.push({ href: assetDataUrls.mu3Rights, ...MU3_RIGHTS_RECT });
   }
   if (showSign && assetDataUrls.mu3SignMask) {
-    signMaskImages.push({ href: assetDataUrls.mu3SignMask, x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "alpha" });
+    signMaskImages.push({ href: assetDataUrls.mu3SignMask, x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "alpha", required: true });
   }
   if (showSign && assetDataUrls.mu3Sign) {
-    signClearImages.push({ href: assetDataUrls.mu3Sign, x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "alpha" });
+    signClearImages.push({ href: assetDataUrls.mu3Sign, x: 0, y: 0, w: CARD_WIDTH, h: CARD_HEIGHT, maskMode: "alpha", required: true });
   }
 
   const hasHoloMaskSource =
@@ -415,7 +473,7 @@ export function Mu3OfficialHoloLayer({
     frontRects.length > 0 ||
     frontTextMasks.length > 0 ||
     signMaskImages.length > 0;
-  const cssMaskUrl = useOfficialHoloMask(
+  const maskState = useOfficialHoloMask(
     {
       rootImages,
       frontImages,
@@ -425,6 +483,7 @@ export function Mu3OfficialHoloLayer({
       frontTextMasks,
       excludeImages,
       tmpFont,
+      waitingForRequiredResources: waitingForSignResources,
       options: { invertApplicationArea: true },
     },
     hasHoloMaskSource,
@@ -433,7 +492,15 @@ export function Mu3OfficialHoloLayer({
     return null;
   }
 
-  return <HoloMaterialLayer layerClassName={layerClassName} lightStyle={lightStyle} game={card.game} maskUrl={cssMaskUrl} />;
+  return (
+    <HoloMaterialLayer
+      layerClassName={layerClassName}
+      lightStyle={lightStyle}
+      game={card.game}
+      maskUrl={maskState.url}
+      maskState={maskState}
+    />
+  );
 }
 
 export function useOfficialHoloMask(input: HoloMaskInput, enabled: boolean) {
@@ -446,6 +513,7 @@ export function useOfficialHoloMask(input: HoloMaskInput, enabled: boolean) {
     frontTextMasks = [],
     excludeImages = [],
     tmpFont = null,
+    waitingForRequiredResources = false,
     options = {},
   } = input;
   // Serialize the raw inputs so any new mask field auto-participates in the memo
@@ -460,36 +528,66 @@ export function useOfficialHoloMask(input: HoloMaskInput, enabled: boolean) {
     signMaskImages,
     signClearImages,
     excludeImages,
+    waitingForRequiredResources,
     tmpFont: tmpFont ? [tmpFont.texture, tmpFont.fontInfo.PointSize, tmpFont.fontInfo.LineHeight, tmpFont.fontInfo.Ascender] : null,
   });
-  const [maskUrl, setMaskUrl] = React.useState("");
+  const waitingForResources = waitingForRequiredResources || (frontTextMasks.length > 0 && !tmpFont);
+  const [renderState, setRenderState] = React.useState<
+    HoloMaskRenderState & { key: string }
+  >({
+    key: "",
+    url: "",
+    status: enabled ? "pending" : "ready",
+    error: "",
+    warnings: [],
+  });
 
   React.useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     if (!enabled) {
-      setMaskUrl("");
-      return () => {
-        cancelled = true;
-      };
+      setRenderState({ key: maskKey, url: "", status: "ready", error: "", warnings: [] });
+      return () => controller.abort();
     }
-    // Keep the previous mask visible while the new one renders so toggling
-    // visibility/print flags doesn't flash the holo off for a frame.
-    renderOfficialHoloMask(input)
-      .then((url) => {
-        if (!cancelled) setMaskUrl(url);
+    setRenderState({ key: maskKey, url: "", status: "pending", error: "", warnings: [] });
+    // MU3 text exclusions depend on the TMP atlas metadata loaded by context.
+    // Treat the initial null context as waiting, not as a successful partial mask.
+    if (waitingForResources) {
+      return () => controller.abort();
+    }
+    renderOfficialHoloMask(input, controller.signal)
+      .then(({ url, warnings }) => {
+        if (!controller.signal.aborted) {
+          setRenderState({ key: maskKey, url, status: "ready", error: "", warnings });
+        }
       })
-      .catch(() => {
-        if (!cancelled) setMaskUrl("");
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setRenderState({
+            key: maskKey,
+            url: "",
+            status: "error",
+            error: holoErrorMessage(error),
+            warnings: [],
+          });
+        }
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [maskKey]);
 
-  return maskUrl;
+  // State from the previous key must never make a newly selected card look
+  // export-ready. The effect will install the matching pending state next.
+  if (renderState.key !== maskKey) {
+    return {
+      url: "",
+      status: enabled ? "pending" : "ready",
+      error: "",
+      warnings: [],
+    } satisfies HoloMaskRenderState;
+  }
+  return renderState;
 }
 
-async function renderOfficialHoloMask(input: HoloMaskInput) {
+async function renderOfficialHoloMask(input: HoloMaskInput, signal: AbortSignal) {
   const {
     rootImages,
     frontImages,
@@ -505,7 +603,7 @@ async function renderOfficialHoloMask(input: HoloMaskInput) {
   canvas.width = CARD_WIDTH;
   canvas.height = CARD_HEIGHT;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return "";
+  if (!ctx) throw new Error("The browser could not create the holo output canvas.");
 
   const rootCanvas = document.createElement("canvas");
   rootCanvas.width = CARD_WIDTH;
@@ -531,7 +629,9 @@ async function renderOfficialHoloMask(input: HoloMaskInput) {
   excludeCanvas.width = CARD_WIDTH;
   excludeCanvas.height = CARD_HEIGHT;
   const excludeCtx = excludeCanvas.getContext("2d", { willReadFrequently: true });
-  if (!rootCtx || !frontCtx || !frontTextCtx || !signMaskCtx || !signClearCtx || !excludeCtx) return "";
+  if (!rootCtx || !frontCtx || !frontTextCtx || !signMaskCtx || !signClearCtx || !excludeCtx) {
+    throw new Error("The browser could not create a holo mask canvas.");
+  }
 
   rootCtx.imageSmoothingEnabled = true;
   frontCtx.imageSmoothingEnabled = true;
@@ -540,28 +640,58 @@ async function renderOfficialHoloMask(input: HoloMaskInput) {
   signClearCtx.imageSmoothingEnabled = true;
   excludeCtx.imageSmoothingEnabled = true;
 
-  const loadImages = (images: HoloMaskImage[]) =>
+  const warnings = new Set<string>();
+  const imageLoads = new Map<string, Promise<HTMLImageElement>>();
+  const loadImage = (src: string) => {
+    const cached = imageLoads.get(src);
+    if (cached) return cached;
+    const request = loadMaskImage(src, signal);
+    imageLoads.set(src, request);
+    return request;
+  };
+  const loadImages = (images: HoloMaskImage[], group: string) =>
     Promise.all(
       images.map(async (image) => {
         try {
-          return { image, element: await loadMaskImage(image.href) };
-        } catch {
+          return { image, element: await loadImage(image.href) };
+        } catch (error) {
+          signal.throwIfAborted();
+          const label = holoImageLabel(image.href);
+          if (image.required) {
+            throw new Error(`A required ${group} holo image failed to load: ${label}.`, {
+              cause: error,
+            });
+          }
+          warnings.add(`Skipped optional ${group} image ${label}`);
           return null;
         }
       }),
     );
 
   const [loadedRootImages, loadedFrontImages, loadedSignMaskImages, loadedSignClearImages, loadedExcludeImages] = await Promise.all([
-    loadImages(rootImages),
-    loadImages(frontImages),
-    loadImages(signMaskImages),
-    loadImages(signClearImages),
-    loadImages(excludeImages),
+    loadImages(rootImages, "root"),
+    loadImages(frontImages, "front"),
+    loadImages(signMaskImages, "sign-mask"),
+    loadImages(signClearImages, "sign-clear"),
+    loadImages(excludeImages, "exclusion"),
   ]);
+  signal.throwIfAborted();
   const tmpAtlas =
     tmpFont && frontTextMasks.length
-      ? await loadTmpAtlas(tmpFont).catch(() => null)
+      ? await loadTmpAtlas(tmpFont)
       : null;
+  signal.throwIfAborted();
+
+  const loadedImageCount = [
+    ...loadedRootImages,
+    ...loadedFrontImages,
+    ...loadedSignMaskImages,
+    ...loadedSignClearImages,
+    ...loadedExcludeImages,
+  ].filter(Boolean).length;
+  if (loadedImageCount === 0 && frontRects.length === 0 && frontTextMasks.length === 0) {
+    throw new Error("No holo mask resources could be loaded.");
+  }
 
   for (const loaded of loadedRootImages) {
     if (!loaded) continue;
@@ -577,7 +707,9 @@ async function renderOfficialHoloMask(input: HoloMaskInput) {
   }
   if (tmpFont && tmpAtlas) {
     for (const mask of frontTextMasks) {
-      drawHoloTmpTextMask(frontTextCtx, mask, tmpFont, tmpAtlas);
+      if (!drawHoloTmpTextMask(frontTextCtx, mask, tmpFont, tmpAtlas)) {
+        throw new Error("A holo text exclusion failed to render.");
+      }
     }
   }
   for (const loaded of loadedSignMaskImages) {
@@ -606,6 +738,7 @@ async function renderOfficialHoloMask(input: HoloMaskInput) {
   }
   const dilatedFrontMask = dilateBinaryMask(frontMask, CARD_WIDTH, CARD_HEIGHT, FRONT_MASK_DILATION);
   const out = ctx.createImageData(CARD_WIDTH, CARD_HEIGHT);
+  let activePixels = 0;
   for (let pixel = 0, index = 0; pixel < dilatedFrontMask.length; pixel += 1, index += 4) {
     const rootAdds = rootData.data[index] > 127;
     const frontAdds = dilatedFrontMask[pixel] > 127;
@@ -624,10 +757,12 @@ async function renderOfficialHoloMask(input: HoloMaskInput) {
     out.data[index + 1] = 255;
     out.data[index + 2] = 255;
     out.data[index + 3] = alpha;
+    if (alpha > 0) activePixels += 1;
   }
 
+  if (activePixels === 0) warnings.add("Generated holo mask has no active pixels");
   ctx.putImageData(out, 0, 0);
-  return canvas.toDataURL("image/png");
+  return { url: canvas.toDataURL("image/png"), warnings: [...warnings] };
 }
 
 function binarizeRenderedPixels(imageData: ImageData) {
@@ -686,13 +821,104 @@ function dilateBinaryMask(src: Uint8ClampedArray<ArrayBufferLike>, width: number
   return current;
 }
 
-function loadMaskImage(src: string) {
+async function loadMaskImage(src: string, signal: AbortSignal) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= HOLO_IMAGE_LOAD_ATTEMPTS; attempt += 1) {
+    signal.throwIfAborted();
+    try {
+      return await loadMaskImageOnce(src, signal);
+    } catch (error) {
+      signal.throwIfAborted();
+      lastError = error;
+      if (attempt < HOLO_IMAGE_LOAD_ATTEMPTS) {
+        await waitForHoloRetry(signal);
+      }
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Failed to load holo image ${holoImageLabel(src)}.`);
+}
+
+function loadMaskImageOnce(src: string, signal: AbortSignal) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = reject;
+    image.decoding = "async";
+    let settled = false;
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      image.onload = null;
+      image.onerror = null;
+      signal.removeEventListener("abort", onAbort);
+    };
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback();
+    };
+    const onAbort = () => {
+      finish(() => {
+        image.removeAttribute("src");
+        reject(signal.reason);
+      });
+    };
+    const timeout = window.setTimeout(() => {
+      finish(() => {
+        image.removeAttribute("src");
+        reject(new Error(`Timed out while loading holo image ${holoImageLabel(src)}.`));
+      });
+    }, HOLO_IMAGE_LOAD_TIMEOUT_MS);
+    image.onload = () => finish(() => resolve(image));
+    image.onerror = () =>
+      finish(() => reject(new Error(`Failed to load holo image ${holoImageLabel(src)}.`)));
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
     image.src = src;
   });
+}
+
+function waitForHoloRetry(signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      signal.removeEventListener("abort", onAbort);
+    };
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback();
+    };
+    const onAbort = () => finish(() => reject(signal.reason));
+    const timeout = window.setTimeout(
+      () => finish(resolve),
+      HOLO_IMAGE_RETRY_DELAY_MS,
+    );
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) onAbort();
+  });
+}
+
+function holoImageLabel(src: string) {
+  if (src.startsWith("data:") || src.startsWith("blob:")) return "embedded image";
+  try {
+    const pathname = new URL(src, window.location.href).pathname;
+    return pathname.split("/").filter(Boolean).pop() || "image";
+  } catch {
+    return "image";
+  }
+}
+
+function holoErrorMessage(error: unknown) {
+  const detail = error instanceof Error && error.message
+    ? error.message
+    : "Unknown holo renderer failure.";
+  return `The holographic layer failed to render. ${detail}`;
 }
 
 function drawMaskImage(ctx: CanvasRenderingContext2D, image: HoloMaskImage, element: HTMLImageElement) {
@@ -700,7 +926,7 @@ function drawMaskImage(ctx: CanvasRenderingContext2D, image: HoloMaskImage, elem
   maskCanvas.width = CARD_WIDTH;
   maskCanvas.height = CARD_HEIGHT;
   const maskCtx = maskCanvas.getContext("2d", { willReadFrequently: true });
-  if (!maskCtx) return;
+  if (!maskCtx) throw new Error("The browser could not create a holo image canvas.");
 
   withUnityCanvasRect(maskCtx, image, (left, top, width, height) => {
     maskCtx.drawImage(element, left, top, width, height);
@@ -808,13 +1034,13 @@ function drawHoloTmpTextMask(
     verticalAlign: mask.verticalAlign ?? "top",
     maskIncludeUnderlay: mask.maskIncludeUnderlay ?? false,
   });
-  if (!rasterized) return;
+  if (!rasterized) return false;
 
   const rawCanvas = document.createElement("canvas");
   rawCanvas.width = CARD_WIDTH;
   rawCanvas.height = CARD_HEIGHT;
   const rawCtx = rawCanvas.getContext("2d", { willReadFrequently: true });
-  if (!rawCtx) return;
+  if (!rawCtx) return false;
   rawCtx.imageSmoothingEnabled = true;
   withUnityCanvasRect(rawCtx, mask, (left, top, width, height) => {
     rawCtx.drawImage(
@@ -834,6 +1060,7 @@ function drawHoloTmpTextMask(
   paintBinaryMask(output, outputMask);
   rawCtx.putImageData(output, 0, 0);
   ctx.drawImage(rawCanvas, 0, 0);
+  return true;
 }
 
 function holoMaskStyle(maskUrl: string): React.CSSProperties | undefined {
@@ -843,4 +1070,3 @@ function holoMaskStyle(maskUrl: string): React.CSSProperties | undefined {
     maskImage: `url("${maskUrl}")`,
   };
 }
-

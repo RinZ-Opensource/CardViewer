@@ -8,6 +8,8 @@ must remain local.
 
 - `src/`: React/Vite application. It contains the CHU/MAI/MU3 CardMaker viewer
   and the CHUNITHM, maimai, and O.N.G.E.K.I. score-card UI.
+- `src/persistence.ts` and `src/priorityTaskScheduler.ts`: guarded browser-state
+  persistence and priority-aware image-task scheduling used by the frontend.
 - `src/scorecard/`: score-card components, public fallback song samples, song
   database adapters, and asset lookup helpers. This is part of the web app, not
   the Android CardMaker prototype.
@@ -21,6 +23,10 @@ must remain local.
   metadata used by the score-card picker.
 - `scripts/cloudflare/` and `scripts/scorecard-extract/`: repository maintenance
   helpers for R2 manifests and score-card assets.
+- `tests/persistence.test.mjs`, `tests/cache-reliability.test.mjs`, and
+  `tests/tracked-secrets.test.mjs`: frontend reliability and secret-scanner
+  regressions run by `npm run check`, alongside the public-dist and Pages
+  Function suites.
 - `docs/online-preview.md`: authoritative public/private build and Cloudflare
   deployment runbook.
 - `public/`: repository-safe static files copied verbatim by Vite. It may hold

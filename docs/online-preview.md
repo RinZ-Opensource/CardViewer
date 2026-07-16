@@ -143,6 +143,12 @@ Configure the Cloudflare Pages Dashboard/CI build command as:
 npm run build:public
 ```
 
+The root `.node-version` pins Node.js 22.20.0. Configure Pages to honor that
+file (or set `NODE_VERSION=22.20.0` explicitly) and confirm the selected
+version in the build log. Pages Build System v3 does not infer the Node version
+from `package.json` `engines`; see Cloudflare's
+[build image documentation](https://developers.cloudflare.com/pages/configuration/build-image/).
+
 The equivalent local PowerShell command is:
 
 ```powershell
@@ -282,7 +288,8 @@ Pages and must not be exposed through a bucket-level custom domain.
 
 ## Deployment checklist
 
-1. Build from the intended commit with `npm run build:public` in CI/Dashboard
+1. Confirm the build uses the root `.node-version` (Node.js 22.20.0), then build
+   from the intended commit with `npm run build:public` in CI/Dashboard
    (`npm.cmd run build:public` in local PowerShell).
 2. Confirm the automatic `check:public-dist` step reports `PASS`.
 3. Confirm any required `VITE_SONGDB_BASE_URL` or

@@ -13,6 +13,7 @@ function runGit(args) {
   const result = spawnSync("git", args, {
     cwd: repositoryHint,
     encoding: null,
+    maxBuffer: 256 * 1024 * 1024,
     windowsHide: true,
   });
 
@@ -136,7 +137,13 @@ function trackedPaths() {
     .map((path) => path.replaceAll("\\", "/"));
 }
 
-function readTrackedFile(path) {
+function readIndexFile(path) {
+  // Scan the exact blob that the next commit would contain. Reading only the
+  // working tree can miss a secret that remains staged after a local cleanup.
+  return runGit(["show", `:${path}`]);
+}
+
+function readWorkingTreeFile(path) {
   const absolutePath = resolve(repositoryRoot, ...path.split("/"));
 
   try {
@@ -152,9 +159,7 @@ function readTrackedFile(path) {
     if (error?.code !== "ENOENT") {
       throw error;
     }
-
-    // A tracked file deleted only in the working tree still exists in the index.
-    return runGit(["show", `:${path}`]);
+    return null;
   }
 }
 
@@ -208,24 +213,30 @@ function scan() {
       }
     }
 
-    const buffer = readTrackedFile(path);
-    if (buffer === null) {
-      continue;
+    const buffers = [readIndexFile(path)];
+    const workingTreeBuffer = readWorkingTreeFile(path);
+    if (
+      workingTreeBuffer !== null &&
+      !buffers.some((buffer) => buffer.equals(workingTreeBuffer))
+    ) {
+      buffers.push(workingTreeBuffer);
     }
 
-    const text = decodeText(buffer);
-    if (text === null) {
-      continue;
-    }
+    for (const buffer of buffers) {
+      const text = decodeText(buffer);
+      if (text === null) {
+        continue;
+      }
 
-    for (const rule of contentRules) {
-      rule.pattern.lastIndex = 0;
-      for (const match of text.matchAll(rule.pattern)) {
-        findings.push({
-          rule: rule.id,
-          path,
-          line: lineNumberAt(text, match.index),
-        });
+      for (const rule of contentRules) {
+        rule.pattern.lastIndex = 0;
+        for (const match of text.matchAll(rule.pattern)) {
+          findings.push({
+            rule: rule.id,
+            path,
+            line: lineNumberAt(text, match.index),
+          });
+        }
       }
     }
   }
@@ -242,7 +253,9 @@ function scan() {
   );
 
   if (uniqueFindings.length === 0) {
-    console.log(`Tracked secret scan: PASS (${paths.length} files scanned)`);
+    console.log(
+      `Tracked secret scan: PASS (${paths.length} index path(s) plus working-tree variants scanned)`,
+    );
     return 0;
   }
 

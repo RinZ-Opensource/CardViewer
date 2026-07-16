@@ -55,11 +55,11 @@ export class LruMap<K, V> {
     // Map iterates in insertion order, so the first key is least-recently-used.
     while (
       (maxEntries !== undefined && this.map.size > maxEntries) ||
-      (maxBytes !== undefined && this.totalBytes > maxBytes && this.map.size > 1)
+      (maxBytes !== undefined && this.totalBytes > maxBytes)
     ) {
-      const oldest = this.map.keys().next().value as K | undefined;
-      if (oldest === undefined) break;
-      this.delete(oldest);
+      const oldest = this.map.keys().next();
+      if (oldest.done) break;
+      this.delete(oldest.value);
     }
   }
 }
