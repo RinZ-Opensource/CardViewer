@@ -63,8 +63,8 @@ Browser and Cloudflare builds neither read nor embed the local path.
 success. `check` scans tracked files for common secret formats, regression-tests
 that scanner, and tests the dist guard, Pages Function behavior, persisted-state
 validation, and cache/task scheduling. It then runs the public build,
-syntax-checks the Function, and type-checks the songdb Worker. It is not an R2
-integration test.
+syntax-checks the Function, and type-checks plus behavior-tests the songdb
+Worker. It is not a live R2 integration test.
 The static `dist` guard and the runtime R2 allowlist are independent release
 gates; passing either one does not validate the other. `check:all` also checks
 Rust formatting and Clippy lints, runs the Rust/Tauri test suite against the

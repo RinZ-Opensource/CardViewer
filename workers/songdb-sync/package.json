@@ -7,7 +7,8 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "check": "npm run typecheck",
+    "check": "npm run typecheck && npm test",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"

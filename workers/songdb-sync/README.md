@@ -47,6 +47,10 @@ npm exec --offline -- wrangler secret put SYNC_TOKEN
 npm run deploy
 ```
 
+`npm run check` performs both the Worker type-check and its in-memory behavior
+suite. The suite fakes R2 and upstream fetches; it does not contact Cloudflare
+or prove a live bucket binding.
+
 Manual sync (optional — the cron and lazy bootstrap cover normal operation):
 
 ```powershell

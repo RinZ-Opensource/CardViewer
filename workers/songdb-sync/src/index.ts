@@ -69,6 +69,26 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
+function originUnavailableResponse(): Response {
+  return jsonResponse(502, { error: "origin unavailable" });
+}
+
+async function fetchOrigin(url: string): Promise<Response | null> {
+  try {
+    return await fetch(url);
+  } catch {
+    return null;
+  }
+}
+
+async function readOriginBytes(origin: Response): Promise<ArrayBuffer | null> {
+  try {
+    return await origin.arrayBuffer();
+  } catch {
+    return null;
+  }
+}
+
 function bytesResponse(bytes: ArrayBuffer, contentType: string, cacheControl: string): Response {
   return new Response(bytes, {
     headers: { ...CORS, "content-type": contentType, "cache-control": cacheControl },
@@ -128,9 +148,11 @@ async function serveData(env: Env, game: Game): Promise<Response> {
   if (object) return r2Response(object, "application/json", DATA_CACHE);
   // Lazy bootstrap: the first request mirrors from GitHub, so a fresh deploy
   // needs no manual init before the app can load the database.
-  const origin = await fetch(dataOriginUrl(game));
+  const origin = await fetchOrigin(dataOriginUrl(game));
+  if (!origin) return originUnavailableResponse();
   if (!origin.ok) return jsonResponse(502, { error: `origin HTTP ${origin.status}` });
-  const bytes = await origin.arrayBuffer();
+  const bytes = await readOriginBytes(origin);
+  if (!bytes) return originUnavailableResponse();
   await putData(env, game, bytes, await sha256Hex(bytes));
   return bytesResponse(bytes, "application/json", DATA_CACHE);
 }
@@ -145,10 +167,12 @@ async function serveJacket(
   const object = await env.SONGDB.get(key);
   if (object) return r2Response(object, contentTypeFor(file), JACKET_CACHE);
   // Lazy mirror: fetch the jacket from GitHub once, keep it in R2 afterwards.
-  const origin = await fetch(`${OTOGEDB_ROOT}/${game}/jacket/${file}`);
+  const origin = await fetchOrigin(`${OTOGEDB_ROOT}/${game}/jacket/${file}`);
+  if (!origin) return originUnavailableResponse();
   if (origin.status === 404) return jsonResponse(404, { error: "not found" });
   if (!origin.ok) return jsonResponse(502, { error: `origin HTTP ${origin.status}` });
-  const bytes = await origin.arrayBuffer();
+  const bytes = await readOriginBytes(origin);
+  if (!bytes) return originUnavailableResponse();
   ctx.waitUntil(env.SONGDB.put(key, bytes, { httpMetadata: { contentType: contentTypeFor(file) } }));
   return bytesResponse(bytes, contentTypeFor(file), JACKET_CACHE);
 }

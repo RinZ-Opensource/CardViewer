@@ -25,7 +25,8 @@ must remain local.
   `/official/*` from the `ASSETS_BUCKET` R2 binding. Public Cloudflare does not
   serve `/fonts/private/*`.
 - `workers/songdb-sync/`: optional Cloudflare Worker that mirrors public song
-  metadata used by the score-card picker.
+  metadata used by the score-card picker. Its Node behavior suite covers auth,
+  route validation, R2 hits, lazy origin reads, and scheduled/manual sync.
 - `scripts/cloudflare/` and `scripts/scorecard-extract/`: repository maintenance
   helpers for R2 manifests and score-card assets.
 - `tests/module-boundaries.test.mjs` keeps shared frontend modules below their
