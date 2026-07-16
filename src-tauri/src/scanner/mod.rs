@@ -9,7 +9,7 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
     process::Command,
-    sync::{Mutex, OnceLock},
+    sync::{Mutex, OnceLock, RwLock},
     time::UNIX_EPOCH,
 };
 
@@ -35,11 +35,13 @@ const ONLINE_IMAGE_WEBP_METHOD: u8 = 6;
 const IMAGE_DATA_URL_CACHE_MAX_BYTES: usize = 256 * 1024 * 1024;
 static IMAGE_DATA_URL_CACHE: OnceLock<Mutex<ImageDataUrlCache>> = OnceLock::new();
 
-// Canonicalized content roots that `read_image_data_url` is allowed to read
-// from. Populated by every scan/export so the IPC image reader can only serve
-// files that live under a directory the user actually pointed the app at —
-// blocking directory-traversal reads of arbitrary files on disk.
-static ALLOWED_CONTENT_ROOTS: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
+// Canonicalized roots from the most recent successful UI scan. Replacing this
+// capability on each scan keeps the IPC image reader confined to the package
+// currently selected by the user and blocks directory-traversal reads.
+static ALLOWED_CONTENT_ROOTS: OnceLock<RwLock<HashSet<PathBuf>>> = OnceLock::new();
+// UI scans receive their sequence number when the backend call starts. A slow
+// older scan is therefore unable to restore its roots after a newer request.
+static LATEST_UI_SCAN_REQUEST: OnceLock<Mutex<u64>> = OnceLock::new();
 
 /// Byte-budgeted LRU cache keyed by file path. The least-recently-used entry is
 /// evicted first once the total size of cached data URLs exceeds the budget.
@@ -87,6 +89,12 @@ impl ImageDataUrlCache {
                 self.bytes = self.bytes.saturating_sub(removed.len());
             }
         }
+    }
+
+    fn clear(&mut self) {
+        self.map.clear();
+        self.order.clear();
+        self.bytes = 0;
     }
 }
 
@@ -364,6 +372,14 @@ struct MobileAssetExporter {
 }
 
 pub fn scan_package_impl(package_root: String) -> Result<ScanResult, String> {
+    let request_id = begin_ui_scan_request()?;
+    scan_package(package_root, Some(request_id))
+}
+
+fn scan_package(
+    package_root: String,
+    image_access_request: Option<u64>,
+) -> Result<ScanResult, String> {
     let root = PathBuf::from(package_root.trim());
     if !root.exists() {
         return Err(format!("Package path does not exist: {}", root.display()));
@@ -381,10 +397,6 @@ pub fn scan_package_impl(package_root: String) -> Result<ScanResult, String> {
     let mut stats = ScanStats::default();
     let mut cards = Vec::new();
     let content_roots = discover_content_roots(&root, &streaming, &mut warnings);
-    // Authorize these roots (and the package root itself) for the IPC image
-    // reader before any card image paths are handed to the frontend.
-    register_allowed_content_roots(&content_roots);
-    register_allowed_content_roots(std::slice::from_ref(&root));
 
     for content_root in &content_roots {
         scan_chu_cards(content_root, &mut cards, &mut stats, &mut warnings);
@@ -446,6 +458,12 @@ pub fn scan_package_impl(package_root: String) -> Result<ScanResult, String> {
             .then(a.record_type.cmp(&b.record_type))
             .then(a.data_name.cmp(&b.data_name))
     });
+
+    if let Some(request_id) = image_access_request {
+        let mut image_roots = content_roots.clone();
+        image_roots.push(root.clone());
+        activate_allowed_content_roots(&image_roots, request_id)?;
+    }
 
     Ok(ScanResult {
         package_root: path_string(&root),
@@ -552,14 +570,23 @@ fn dedupe_cards_keep_last(cards: &mut Vec<CardRecord>) {
 }
 
 pub fn read_image_data_url_impl(path: String) -> Result<String, String> {
-    let path = PathBuf::from(path);
-    if !path.exists() {
-        return Err(format!("Image path does not exist: {}", path.display()));
-    }
-    if !path_within_allowed_roots(&path) {
+    let requested_path = PathBuf::from(path);
+    let path = requested_path.canonicalize().map_err(|err| {
+        format!(
+            "Failed to resolve image path {}: {err}",
+            requested_path.display()
+        )
+    })?;
+    // Keep a shared capability guard through cache access and file I/O. A scan
+    // switch takes the write side of this lock, so it cannot finish revoking a
+    // package while an already-authorized read is still returning or caching it.
+    let allowed = allowed_content_roots()
+        .read()
+        .map_err(|err| format!("Failed to lock image root permissions: {err}"))?;
+    if !allowed.iter().any(|root| path.starts_with(root)) {
         return Err(format!(
             "Refusing to read image outside the scanned content roots: {}",
-            path.display()
+            requested_path.display()
         ));
     }
     let cache_key = path_string(&path);
@@ -622,33 +649,54 @@ fn image_data_url_cache() -> &'static Mutex<ImageDataUrlCache> {
         .get_or_init(|| Mutex::new(ImageDataUrlCache::new(IMAGE_DATA_URL_CACHE_MAX_BYTES)))
 }
 
-fn allowed_content_roots() -> &'static Mutex<HashSet<PathBuf>> {
-    ALLOWED_CONTENT_ROOTS.get_or_init(|| Mutex::new(HashSet::new()))
+fn allowed_content_roots() -> &'static RwLock<HashSet<PathBuf>> {
+    ALLOWED_CONTENT_ROOTS.get_or_init(|| RwLock::new(HashSet::new()))
 }
 
-/// Records the canonicalized form of each discovered content root as a location
-/// the IPC image reader is allowed to serve from. Additive across scans.
-fn register_allowed_content_roots(roots: &[PathBuf]) {
-    let Ok(mut allowed) = allowed_content_roots().lock() else {
-        return;
-    };
+fn latest_ui_scan_request() -> &'static Mutex<u64> {
+    LATEST_UI_SCAN_REQUEST.get_or_init(|| Mutex::new(0))
+}
+
+fn begin_ui_scan_request() -> Result<u64, String> {
+    let mut latest = latest_ui_scan_request()
+        .lock()
+        .map_err(|err| format!("Failed to lock UI scan sequence: {err}"))?;
+    *latest = latest
+        .checked_add(1)
+        .ok_or_else(|| "UI scan sequence exhausted".to_string())?;
+    Ok(*latest)
+}
+
+/// Replaces the current scan's image-read capability with canonicalized roots.
+/// The write guard waits for prior reads to finish; the scan sequence prevents
+/// a slower older request from restoring roots after a newer request started.
+fn activate_allowed_content_roots(roots: &[PathBuf], request_id: u64) -> Result<bool, String> {
+    let mut replacement = HashSet::new();
     for root in roots {
-        let canonical = root.canonicalize().unwrap_or_else(|_| root.clone());
-        allowed.insert(canonical);
+        let canonical = root
+            .canonicalize()
+            .map_err(|err| format!("Failed to authorize image root {}: {err}", root.display()))?;
+        replacement.insert(canonical);
     }
-}
 
-/// Returns true when `path` canonicalizes to a location inside one of the
-/// registered content roots. Canonicalizing both sides resolves `..`/symlinks
-/// so a traversal payload can't escape the allowed roots.
-fn path_within_allowed_roots(path: &Path) -> bool {
-    let Ok(canonical) = path.canonicalize() else {
-        return false;
-    };
-    let Ok(allowed) = allowed_content_roots().lock() else {
-        return false;
-    };
-    allowed.iter().any(|root| canonical.starts_with(root))
+    let mut allowed = allowed_content_roots()
+        .write()
+        .map_err(|err| format!("Failed to lock image root permissions: {err}"))?;
+    let latest = latest_ui_scan_request()
+        .lock()
+        .map_err(|err| format!("Failed to lock UI scan sequence: {err}"))?;
+    if *latest != request_id {
+        return Ok(false);
+    }
+    let mut cache = image_data_url_cache()
+        .lock()
+        .map_err(|err| format!("Failed to lock image cache: {err}"))?;
+
+    // Publish roots and clear revoked bytes while both locks are held, so an
+    // error cannot leave a half-applied capability transition.
+    *allowed = replacement;
+    cache.clear();
+    Ok(true)
 }
 
 fn remember_image_data_url(cache_key: String, data_url: &str) -> Result<(), String> {
@@ -704,7 +752,7 @@ where
     F: FnMut(String),
 {
     progress(format!("Scanning package: {}", package_root.trim()));
-    let mut scan = scan_package_impl(package_root)?;
+    let mut scan = scan_package(package_root, None)?;
     progress(format!(
         "Scan complete: {} records, {} MAI cards, {} MU3 asset cards, {} Unity bundles",
         scan.cards.len(),
@@ -833,7 +881,7 @@ where
         "Scanning package for mobile pack: {}",
         package_root.trim()
     ));
-    let mut scan = scan_package_impl(package_root)?;
+    let mut scan = scan_package(package_root, None)?;
     let package_root = PathBuf::from(&scan.package_root);
     let streaming = PathBuf::from(&scan.streaming_assets);
     let mut content_warnings = Vec::new();
@@ -4595,6 +4643,14 @@ fn unix_timestamp_secs() -> u64 {
 mod tests {
     use super::*;
 
+    static IMAGE_ACCESS_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn lock_image_access_test_state() -> std::sync::MutexGuard<'static, ()> {
+        IMAGE_ACCESS_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
     #[test]
     fn parses_chu_card_fields() {
         let xml = r#"
@@ -4948,6 +5004,7 @@ mod tests {
 
     #[test]
     fn reads_extensionless_image_by_magic() {
+        let _guard = lock_image_access_test_state();
         let dir = std::env::current_dir()
             .unwrap()
             .join("target")
@@ -4958,10 +5015,121 @@ mod tests {
 
         // The IPC reader only serves files under a registered content root (as a
         // real scan would establish before any image is requested).
-        register_allowed_content_roots(std::slice::from_ref(&dir));
+        let request_id = begin_ui_scan_request().unwrap();
+        assert!(activate_allowed_content_roots(std::slice::from_ref(&dir), request_id).unwrap());
 
         let data_url = read_image_data_url_impl(path_string(&path)).unwrap();
         assert!(data_url.starts_with("data:image/png;base64,"));
+    }
+
+    #[test]
+    fn replacing_image_roots_revokes_old_paths_and_cache_entries() {
+        let _guard = lock_image_access_test_state();
+        let base = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test-image-root-revocation");
+        let old_root = base.join("old");
+        let current_root = base.join("current");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(old_root.join("CardMaker_Data").join("StreamingAssets")).unwrap();
+        fs::create_dir_all(current_root.join("CardMaker_Data").join("StreamingAssets")).unwrap();
+        let old_image = old_root.join("old.png");
+        let current_image = current_root.join("current.png");
+        let outside_image = base.join("outside.png");
+        fs::write(&old_image, b"old-image").unwrap();
+        fs::write(&current_image, b"current-image").unwrap();
+        fs::write(&outside_image, b"outside-image").unwrap();
+
+        scan_package_impl(path_string(&old_root)).unwrap();
+        read_image_data_url_impl(path_string(&old_image)).unwrap();
+        let old_cache_key = path_string(&old_image.canonicalize().unwrap());
+        assert!(image_data_url_cache()
+            .lock()
+            .unwrap()
+            .map
+            .contains_key(&old_cache_key));
+
+        scan_package_impl(path_string(&current_root)).unwrap();
+
+        let error = read_image_data_url_impl(path_string(&old_image)).unwrap_err();
+        assert!(error.contains("outside the scanned content roots"));
+        assert!(!image_data_url_cache()
+            .lock()
+            .unwrap()
+            .map
+            .contains_key(&old_cache_key));
+        assert!(read_image_data_url_impl(path_string(&current_image)).is_ok());
+        let traversal = current_root.join("..").join("outside.png");
+        let error = read_image_data_url_impl(path_string(&traversal)).unwrap_err();
+        assert!(error.contains("outside the scanned content roots"));
+    }
+
+    #[test]
+    fn stale_ui_scan_cannot_restore_older_image_roots() {
+        let _guard = lock_image_access_test_state();
+        let base = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test-image-root-ordering");
+        let old_root = base.join("old");
+        let current_root = base.join("current");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&old_root).unwrap();
+        fs::create_dir_all(&current_root).unwrap();
+
+        let old_request = begin_ui_scan_request().unwrap();
+        let current_request = begin_ui_scan_request().unwrap();
+        assert!(
+            !activate_allowed_content_roots(std::slice::from_ref(&old_root), old_request,).unwrap()
+        );
+        assert!(activate_allowed_content_roots(
+            std::slice::from_ref(&current_root),
+            current_request,
+        )
+        .unwrap());
+
+        let allowed = allowed_content_roots().read().unwrap();
+        assert!(allowed.contains(&current_root.canonicalize().unwrap()));
+        assert!(!allowed.contains(&old_root.canonicalize().unwrap()));
+    }
+
+    #[test]
+    fn image_read_guard_delays_root_revocation() {
+        let _guard = lock_image_access_test_state();
+        let base = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test-image-root-read-guard");
+        let old_root = base.join("old");
+        let current_root = base.join("current");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&old_root).unwrap();
+        fs::create_dir_all(&current_root).unwrap();
+
+        let old_request = begin_ui_scan_request().unwrap();
+        activate_allowed_content_roots(std::slice::from_ref(&old_root), old_request).unwrap();
+        let current_request = begin_ui_scan_request().unwrap();
+        let read_guard = allowed_content_roots().read().unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let current_root_for_thread = current_root.clone();
+        let worker = std::thread::spawn(move || {
+            let result = activate_allowed_content_roots(
+                std::slice::from_ref(&current_root_for_thread),
+                current_request,
+            );
+            sender.send(result).unwrap();
+        });
+
+        assert!(receiver
+            .recv_timeout(std::time::Duration::from_millis(50))
+            .is_err());
+        drop(read_guard);
+        assert!(receiver
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap()
+            .unwrap());
+        worker.join().unwrap();
     }
 
     #[test]
@@ -5436,6 +5604,7 @@ mod tests {
         let Ok(root) = std::env::var("CARDVIEWER_SCAN_ROOT") else {
             return;
         };
+        let _guard = lock_image_access_test_state();
         if std::env::var_os("CARDVIEWER_CACHE_DIR").is_none() {
             std::env::set_var(
                 "CARDVIEWER_CACHE_DIR",
