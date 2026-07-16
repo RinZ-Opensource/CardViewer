@@ -21,7 +21,7 @@
     "check:mobile": "dotnet build mobile/CardMakerMobile.Tools/CmpackSmoke/CmpackSmoke.csproj --configuration Release",
     "check:mobile-boundary": "node scripts/security/check-mobile-boundary.mjs",
     "check:public-dist": "node check-public-dist.mjs",
-    "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo test --manifest-path src-tauri/Cargo.toml --locked",
+    "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml --locked",
     "check:worker": "npm --prefix workers/songdb-sync run check",
     "preview": "vite preview --host 127.0.0.1 --port 1421",
     "preview:cloudflare": "npm exec --prefix workers/songdb-sync --offline -- wrangler pages dev dist --r2=ASSETS_BUCKET",

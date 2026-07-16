@@ -423,13 +423,16 @@ fn scan_package(
     for content_root in &content_roots {
         mai_chara_packs.extend(scan_mai_chara_packs(content_root, &mut warnings));
     }
+    let mai_card_sources = MaiCardScanSources {
+        content_roots: &content_roots,
+        card_types: &mai_card_types,
+        charas: &mai_charas,
+        chara_packs: &mai_chara_packs,
+    };
     for content_root in &content_roots {
         scan_mai_cards(
             content_root,
-            &content_roots,
-            &mai_card_types,
-            &mai_charas,
-            &mai_chara_packs,
+            &mai_card_sources,
             &mut cards,
             &mut stats,
             &mut warnings,
@@ -1189,7 +1192,7 @@ impl OnlineAssetExporter {
                 ) as usize;
             }
 
-            if requested > 0 && requested % 100 == 0 {
+            if requested > 0 && requested.is_multiple_of(100) {
                 progress(format!(
                     "  queued {requested} referenced MAI dynamic assets"
                 ));
@@ -1345,7 +1348,7 @@ impl OnlineAssetExporter {
             .map(|path| path_string(&path))
             .unwrap_or_default();
         let worker_count = unity_worker_count().min(total).max(1);
-        let chunk_size = (total + worker_count - 1) / worker_count;
+        let chunk_size = total.div_ceil(worker_count);
         progress(format!(
             "Extracting {total} Unity image assets across {worker_count} worker process(es)"
         ));
@@ -2566,12 +2569,16 @@ fn scan_mai_chara_packs(
     packs
 }
 
+struct MaiCardScanSources<'a> {
+    content_roots: &'a [PathBuf],
+    card_types: &'a HashMap<i32, MaiCardTypeInfo>,
+    charas: &'a HashMap<i32, MaiCharaInfo>,
+    chara_packs: &'a HashMap<i32, MaiCharaPackInfo>,
+}
+
 fn scan_mai_cards(
     content_root: &Path,
-    content_roots: &[PathBuf],
-    card_types: &HashMap<i32, MaiCardTypeInfo>,
-    charas: &HashMap<i32, MaiCharaInfo>,
-    chara_packs: &HashMap<i32, MaiCharaPackInfo>,
+    sources: &MaiCardScanSources<'_>,
     cards: &mut Vec<CardRecord>,
     stats: &mut ScanStats,
     warnings: &mut Vec<String>,
@@ -2588,10 +2595,10 @@ fn scan_mai_cards(
                 xml_path,
                 &xml,
                 content_root,
-                content_roots,
-                card_types,
-                charas,
-                chara_packs,
+                sources.content_roots,
+                sources.card_types,
+                sources.charas,
+                sources.chara_packs,
             )),
             Err(err) => Err(format!("Failed to read {}: {err}", xml_path.display())),
         })
@@ -3159,7 +3166,7 @@ fn parse_mai_card(
                 "metadata",
                 chara_pack
                     .map(|pack| format_mai_chara_choices(pack, charas))
-                    .unwrap_or_else(String::new),
+                    .unwrap_or_default(),
             ),
             print_field(
                 "uniqueId",
@@ -3955,7 +3962,7 @@ fn read_vfs_name(
 fn read_le_i32(bytes: &[u8], offset: usize) -> Result<i32, String> {
     // checked_add avoids the integer overflow that `offset + 4` would hit for a
     // near-usize::MAX offset (which would wrap and pass the bounds check).
-    if offset.checked_add(4).map_or(true, |end| end > bytes.len()) {
+    if offset.checked_add(4).is_none_or(|end| end > bytes.len()) {
         return Err(format!("i32 read out of bounds at {offset}"));
     }
     Ok(i32::from_le_bytes([
@@ -3967,7 +3974,7 @@ fn read_le_i32(bytes: &[u8], offset: usize) -> Result<i32, String> {
 }
 
 fn read_le_i64(bytes: &[u8], offset: usize) -> Result<i64, String> {
-    if offset.checked_add(8).map_or(true, |end| end > bytes.len()) {
+    if offset.checked_add(8).is_none_or(|end| end > bytes.len()) {
         return Err(format!("i64 read out of bounds at {offset}"));
     }
     Ok(i64::from_le_bytes([
@@ -4366,9 +4373,9 @@ fn run_mai_composite_script(
 ) -> Result<(), String> {
     let mut errors = Vec::new();
     for candidate in candidates {
-        let mut command = Command::new(&candidate);
+        let mut command = Command::new(candidate);
         command
-            .arg(&script_path)
+            .arg(script_path)
             .arg(output_root)
             .arg(public_base_url);
         match command.output() {
@@ -4559,7 +4566,7 @@ fn ustar_header(archive_name: &str, size: u64) -> Result<[u8; 512], String> {
 
 fn split_ustar_name(archive_name: &str) -> Result<(String, String), String> {
     let normalized = archive_name.replace('\\', "/");
-    if normalized.as_bytes().len() <= 100 {
+    if normalized.len() <= 100 {
         return Ok((normalized, String::new()));
     }
     let mut best = None;
@@ -4569,7 +4576,7 @@ fn split_ustar_name(archive_name: &str) -> Result<(String, String), String> {
         }
         let prefix = &normalized[..index];
         let name = &normalized[index + 1..];
-        if prefix.as_bytes().len() <= 155 && name.as_bytes().len() <= 100 {
+        if prefix.len() <= 155 && name.len() <= 100 {
             best = Some((name.to_string(), prefix.to_string()));
         }
     }
@@ -4907,12 +4914,7 @@ mod tests {
         assert!(card.asset_layers.iter().any(|layer| layer.key == "mu3Mask"));
         assert!(card.asset_layers.iter().any(|layer| layer.key == "mu3Holo"));
 
-        let layers = mu3_asset_layers(
-            &asset_dir.parent().unwrap().to_path_buf(),
-            Some(100001),
-            Some(2),
-            Some(1),
-        );
+        let layers = mu3_asset_layers(asset_dir.parent().unwrap(), Some(100001), Some(2), Some(1));
         for key in ["mu3Grade", "mu3Rights", "mu3Sign", "mu3SignMask"] {
             assert!(layers.iter().any(|layer| layer.key == key), "missing {key}");
         }

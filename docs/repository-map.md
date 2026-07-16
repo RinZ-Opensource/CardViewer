@@ -38,9 +38,9 @@ must remain local.
   holographic mask math, score-card model, frontend reliability, secret-scanner,
   public-dist, and Pages Function suites.
 - `.github/workflows/ci.yml`: read-only pull-request and `main` validation for
-  the web checks, Rust formatting and locked tests, and the dependency-free .NET
-  mobile Runtime/Smoke build; it does not deploy or reference repository
-  secrets.
+  the web checks, pinned Rust formatting/lints/locked tests, and the
+  dependency-free .NET mobile Runtime/Smoke build; it does not deploy or
+  reference repository secrets.
 - `docs/online-preview.md`: authoritative public/private build and Cloudflare
   deployment runbook.
 - `public/`: repository-safe static files copied verbatim by Vite. It may hold

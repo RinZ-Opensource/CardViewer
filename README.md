@@ -26,8 +26,10 @@ preview boundary, and deployment checklist.
 
 ## Commands
 
-Use Node.js 22.20.0, as pinned by the root `.node-version` file. Mobile .NET
-commands use the latest installed .NET 8 feature band selected by `global.json`.
+Use Node.js 22.20.0, as pinned by the root `.node-version` file. Rust uses the
+1.95.0 toolchain, formatter, and linter declared in `rust-toolchain.toml`.
+Mobile .NET commands use the latest installed .NET 8 feature band selected by
+`global.json`.
 
 Install both locked JavaScript toolchains and the pinned Python dependency used
 by the Rust image-export tests after a clean checkout:
@@ -65,10 +67,10 @@ syntax-checks the Function, and type-checks the songdb Worker. It is not an R2
 integration test.
 The static `dist` guard and the runtime R2 allowlist are independent release
 gates; passing either one does not validate the other. `check:all` also checks
-Rust formatting, runs the Rust/Tauri test suite against the locked Cargo
-dependencies, and builds the dependency-free .NET mobile Runtime/Smoke
-projects. The mobile build gate does not compile the external Unity bridge or
-validate Unity 5.6, Android packaging, or a device runtime.
+Rust formatting and Clippy lints, runs the Rust/Tauri test suite against the
+locked Cargo dependencies, and builds the dependency-free .NET mobile
+Runtime/Smoke projects. The mobile build gate does not compile the external
+Unity bridge or validate Unity 5.6, Android packaging, or a device runtime.
 
 `VITE_SONGDB_BASE_URL` may be supplied at dev/build time to use the optional
 song database Worker. It is a public endpoint setting, not a secret. If it is

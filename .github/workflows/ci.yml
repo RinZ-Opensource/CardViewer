@@ -57,15 +57,17 @@ jobs:
           python -m pip install --requirement src-tauri/requirements-test.txt
           --only-binary=:all:
 
-      - name: Set up stable Rust
+      - name: Set up pinned Rust
         shell: pwsh
         run: |
-          rustup toolchain install stable --profile minimal --no-self-update
-          rustup default stable
-          rustup component add rustfmt
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup default 1.95.0
 
       - name: Check Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+      - name: Run Rust lints
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
 
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
