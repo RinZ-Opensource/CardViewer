@@ -84,8 +84,15 @@ test("CHUNITHM applies prefab cast scale uniformly", () => {
   }
 });
 
-test("bitmap-only CHUNITHM offsets do not move the authored cast boxes", () => {
-  for (const selector of [".cmb-title", ".cmb-artist", ".cmb-notes-name"]) {
+test("CHUNITHM text boxes retain the calibrated optical baseline", () => {
+  const positions = new Map([
+    [".cmb-title", 421],
+    [".cmb-artist", 469],
+    [".cmb-notes-name", 564],
+  ]);
+
+  for (const [selector, top] of positions) {
+    assert.match(cssRule(chuniCss, selector), new RegExp(`top:\\s*${top}px`));
     assert.doesNotMatch(cssRule(chuniCss, selector), /transform\s*:/);
     assert.match(cssRule(chuniCss, `${selector} > .scorecard-bitmap-fallback`), /translateY/);
   }

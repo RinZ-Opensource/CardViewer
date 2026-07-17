@@ -40,7 +40,7 @@
 .cmb-title {
   position: absolute;
   left: 27px;
-  top: 419px;
+  top: 421px;
   width: 400px;
   height: 48px;
   display: flex;
@@ -59,7 +59,7 @@
 .cmb-artist {
   position: absolute;
   left: 27px;
-  top: 467px;
+  top: 469px;
   width: 400px;
   height: 16px;
   display: flex;
@@ -179,7 +179,7 @@
 .cmb-notes-name {
   position: absolute;
   left: 152px;
-  top: 562px;
+  top: 564px;
   width: 200px;
   height: 20px;
   display: flex;
