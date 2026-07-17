@@ -15,9 +15,6 @@ import { OngekiScoreState, OngekiSong } from "./ongekiTypes";
  * PlayMusic reference dump; runtime behaviour
  * mirrors ANM_PLY_PlayMusic_00 / MusicDataObject / MU3UICounter / MU3Text.
  */
-export const ONGEKI_SCORECARD_WIDTH = 310;
-export const ONGEKI_SCORECARD_HEIGHT = 162;
-
 /*
  * NUM_MusicLevel (MU3UICounter): rect 32x22 centred at (149.8,71.7); digit
  * quads 28x30 (size_) at 14px advance (28 + charSpacing_ -14); align=Center

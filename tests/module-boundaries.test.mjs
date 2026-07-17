@@ -10,10 +10,6 @@ const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 
 const boundaries = [
   {
-    file: "src/hooks.ts",
-    forbidden: ["./cardRender/PreviewStage", "./cardRender/OfficialCardCanvas"],
-  },
-  {
     file: "src/cardEdits.ts",
     allowed: ["./types"],
     typeOnly: true,
@@ -44,6 +40,11 @@ const boundaries = [
       "./OngekiScoreCard",
       "./OngekiMusicBtCard",
     ],
+  },
+  {
+    file: "src/scorecard/scorecardLayout.ts",
+    allowed: ["./chuniTypes", "./ongekiTypes"],
+    typeOnly: true,
   },
   {
     file: "src/scorecard/scorecardDefaults.ts",
@@ -207,6 +208,28 @@ const boundaries = [
       "./ongekiTypes",
       "./scorecardSurfaceConfig",
       "./types",
+    ],
+  },
+  {
+    file: "src/scorecard/ScoreCardSurface.tsx",
+    allowed: [
+      "react",
+      "./ChuniScoreCardEditor",
+      "./MaiScoreCardEditor",
+      "./OngekiScoreCardEditor",
+      "./ScoreCardPreview",
+      "./chuniSamples",
+      "./chuniTypes",
+      "./ongekiSamples",
+      "./ongekiTypes",
+      "./scorecardDefaults",
+      "./scorecardLayout",
+      "./scorecardSurfaceConfig",
+      "./sampleSongs",
+      "./scorecardSelection",
+      "./types",
+      "./useScoreCardSongDb",
+      "./useScoreCardState",
     ],
   },
   {

@@ -18,6 +18,10 @@ asset-production workspaces are deliberately outside this boundary.
   browser URLs and does not fetch or construct producer paths.
 - `src/cardData.ts` and `src/cardData/`: stable card-rule facade plus isolated
   field access, formatting, holo, QR, MAI, and MU3 rules.
+- `src/hooks.ts` and `src/hooks/`: stable shared-hook facade plus isolated font,
+  manifest, list viewport, selected-asset, and thumbnail loading lifecycles.
+- `src/scorecard/scorecardLayout.ts`: renderer-independent design dimensions
+  used by the responsive preview fitter; CSS parity is enforced by tests.
 - `src/cardAssets.ts`, `src/layers.tsx`, `src/textRendering.ts`, and the holo and
   font loaders: browser renderer source that reads allowlisted R2 objects; these
   modules do not embed renderer assets.
