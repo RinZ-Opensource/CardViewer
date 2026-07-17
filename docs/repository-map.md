@@ -27,9 +27,11 @@ asset-production workspaces are deliberately outside this boundary.
 - `src/textRendering.ts` and `src/textRendering/`: stable text-rendering facade
   plus isolated Canvas, TextMesh Pro, React-child, Unity bitmap-font, and shared
   coordinate pipelines. Renderer consumers use only the facade.
-- `src/cardAssets.ts`, `src/layers.tsx`, and the holo and font loaders: browser
-  renderer source that reads allowlisted R2 objects; these modules do not embed
-  renderer assets.
+- `src/layers.tsx` and `src/layers/`: stable visual-layer facade plus isolated
+  image/text primitives, Canvas/Unity/TMP text components, sprite counters, and
+  QR rendering.
+- `src/cardAssets.ts` and the holo and font loaders: browser renderer source
+  that reads allowlisted R2 objects; these modules do not embed renderer assets.
 - `public/`: only `404.html`, `_headers`, and `theme-init.js`, copied verbatim
   into `dist`.
 - `functions/official/public-object-policy.js`: runtime-independent URL-to-R2

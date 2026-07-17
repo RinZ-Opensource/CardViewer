@@ -145,7 +145,9 @@ test("the stable facade preserves all value and type exports explicitly", async 
 
 test("renderer consumers continue to use only the stable facade", async () => {
   const consumers = new Map([
-    ["src/layers.tsx", "./textRendering"],
+    ["src/layers/canvasText.tsx", "../textRendering"],
+    ["src/layers/unityText.tsx", "../textRendering"],
+    ["src/layers/tmpText.tsx", "../textRendering"],
     ["src/holo.tsx", "./textRendering"],
     ["src/holoMaskTypes.ts", "./textRendering"],
     ["src/scorecard/MaiTmpText.tsx", "../textRendering"],
