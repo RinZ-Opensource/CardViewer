@@ -20,6 +20,13 @@ jackets ~30 d immutable. A daily cron refreshes `music-ex.json` (uploads are
 skipped when the stored sha-256 matches). Regular and HD jackets are publication
 inputs uploaded separately; no GET request populates them.
 
+Before a sync can replace metadata, the Worker checks the upstream MIME type,
+enforces an 8 MiB `Content-Length` and streamed-byte limit, decodes and parses
+JSON, and validates a non-empty array of flat string records with the minimum
+game-specific fields required by the browser.
+Any failed check is reported as an `error:` result without inspecting or writing
+the existing R2 object.
+
 ## Bucket binding
 
 The worker binds the existing CardViewer bucket (the one already hosting the

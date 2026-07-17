@@ -4,6 +4,7 @@ import test from "node:test";
 import worker from "../src/index.ts";
 
 const ORIGIN_ROOT = "https://raw.githubusercontent.com/zvuc/otoge-db/master";
+const MAX_DATA_BYTES = 8 * 1024 * 1024;
 const encoder = new TextEncoder();
 
 function bytes(value) {
@@ -12,6 +13,26 @@ function bytes(value) {
 
 function bodyText(value) {
   return new TextDecoder().decode(value);
+}
+
+function validSongData(game, marker = "current") {
+  if (game === "maimai") {
+    return JSON.stringify([{ sort: "1", title: marker, image_url: "maimai.png" }]);
+  }
+  if (game === "chunithm") {
+    return JSON.stringify([{ id: "1", title: marker, image: "chunithm.png" }]);
+  }
+  return JSON.stringify([{ id: "1", title: marker, image_url: "ongeki.png" }]);
+}
+
+function originContentType(game) {
+  return game === "chunithm" ? "application/octet-stream" : "text/plain; charset=utf-8";
+}
+
+function validOriginResponse(game, marker) {
+  return new Response(validSongData(game, marker), {
+    headers: { "content-type": originContentType(game) },
+  });
 }
 
 function makeObject(value, etag = '"etag"', customMetadata = undefined) {
@@ -23,6 +44,7 @@ function makeR2(initial = {}) {
   const calls = { get: [], head: [], put: [] };
   return {
     calls,
+    objects,
     bucket: {
       async get(key) {
         calls.get.push(key);
@@ -65,6 +87,31 @@ function env(bucket, token = "secret") {
 
 async function request(url, options, environment, context = makeContext().context) {
   return worker.fetch(new Request(url, options), environment, context);
+}
+
+async function syncRequest(environment) {
+  return request(
+    "https://worker.example/sync",
+    { method: "POST", headers: { authorization: "Bearer secret" } },
+    environment,
+  );
+}
+
+async function assertRejectedMaimaiSync(t, responseFactory, expectedResult) {
+  const key = "songdb/data/maimai/music-ex.json";
+  const oldBody = validSongData("maimai", "known-good");
+  const r2 = makeR2({ [key]: makeObject(oldBody, '"known-good"') });
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url === `${ORIGIN_ROOT}/maimai/data/music-ex.json`) return responseFactory();
+    return new Response(null, { status: 503 });
+  });
+
+  const response = await syncRequest(env(r2.bucket));
+  const results = await response.json();
+  assert.equal(results[0].result, expectedResult);
+  assert.equal(r2.calls.head.length, 0, "invalid data must be rejected before R2 inspection");
+  assert.equal(r2.calls.put.length, 0, "invalid data must never replace an R2 object");
+  assert.equal(bodyText(r2.objects.get(key).body), oldBody);
 }
 
 function assertCors(response) {
@@ -178,7 +225,9 @@ test("returns 404 for every R2 read miss without consulting the upstream origin"
 });
 
 test("manual sync reports updated, unchanged, and failed games", async (t) => {
-  const chuniBytes = bytes("chuni-current");
+  const maiBody = validSongData("maimai", "maimai-new");
+  const chuniBody = validSongData("chunithm", "chuni-current");
+  const chuniBytes = bytes(chuniBody);
   const chuniHash = await crypto.subtle.digest("SHA-256", chuniBytes);
   const chuniSha = [...new Uint8Array(chuniHash)]
     .map((value) => value.toString(16).padStart(2, "0"))
@@ -187,8 +236,17 @@ test("manual sync reports updated, unchanged, and failed games", async (t) => {
     "songdb/data/chunithm/music-ex.json": makeObject("old body", '"old"', { sha256: chuniSha }),
   });
   const fetchMock = t.mock.method(globalThis, "fetch", async (url) => {
-    if (url === `${ORIGIN_ROOT}/maimai/data/music-ex.json`) return new Response("maimai-new");
-    if (url === `${ORIGIN_ROOT}/chunithm/data/music-ex.json`) return new Response(chuniBytes);
+    if (url === `${ORIGIN_ROOT}/maimai/data/music-ex.json`) {
+      return new Response(maiBody, { headers: { "content-type": originContentType("maimai") } });
+    }
+    if (url === `${ORIGIN_ROOT}/chunithm/data/music-ex.json`) {
+      return new Response(chuniBytes, {
+        headers: {
+          "content-length": String(chuniBytes.byteLength),
+          "content-type": originContentType("chunithm"),
+        },
+      });
+    }
     if (url === `${ORIGIN_ROOT}/ongeki/data/music-ex.json`) return new Response(null, { status: 503 });
     throw new Error(`unexpected URL ${url}`);
   });
@@ -210,13 +268,89 @@ test("manual sync reports updated, unchanged, and failed games", async (t) => {
   ]);
   assert.equal(r2.calls.put.length, 1);
   assert.equal(r2.calls.put[0].key, "songdb/data/maimai/music-ex.json");
-  assert.equal(bodyText(r2.calls.put[0].value), "maimai-new");
+  assert.equal(bodyText(r2.calls.put[0].value), maiBody);
+});
+
+test("rejects HTML and malformed JSON 200 responses without replacing R2", async (t) => {
+  await t.test("HTML response", async (subtest) => {
+    await assertRejectedMaimaiSync(
+      subtest,
+      () => new Response("<html>upstream error</html>", { headers: { "content-type": "text/html" } }),
+      "error: unexpected origin content-type text/html",
+    );
+  });
+  await t.test("malformed JSON", async (subtest) => {
+    await assertRejectedMaimaiSync(
+      subtest,
+      () => new Response("[{", { headers: { "content-type": "application/json" } }),
+      "error: origin body is not valid JSON",
+    );
+  });
+});
+
+test("rejects wrong JSON shape, empty arrays, and invalid records without replacing R2", async (t) => {
+  const cases = [
+    ["object", JSON.stringify({ sort: "1", title: "not an array", image_url: "cover.png" }),
+      "error: origin JSON must be a non-empty top-level array"],
+    ["empty array", "[]", "error: origin JSON must be a non-empty top-level array"],
+    ["invalid record", JSON.stringify([{ sort: "1", title: "missing image" }]),
+      "error: origin JSON has an invalid maimai record at index 0"],
+    ["non-string field", JSON.stringify([{ sort: "1", title: "song", image_url: "cover.png", bpm: 120 }]),
+      "error: origin JSON has an invalid maimai record at index 0"],
+  ];
+  for (const [name, body, expectedResult] of cases) {
+    await t.test(name, async (subtest) => {
+      await assertRejectedMaimaiSync(
+        subtest,
+        () => new Response(body, { headers: { "content-type": "application/json" } }),
+        expectedResult,
+      );
+    });
+  }
+});
+
+test("rejects declared and streamed bodies over the byte limit without replacing R2", async (t) => {
+  await t.test("declared Content-Length", async (subtest) => {
+    await assertRejectedMaimaiSync(
+      subtest,
+      () => new Response(validSongData("maimai"), {
+        headers: {
+          "content-length": String(MAX_DATA_BYTES + 1),
+          "content-type": "application/json",
+        },
+      }),
+      `error: origin body exceeds ${MAX_DATA_BYTES} bytes`,
+    );
+  });
+  await t.test("actual streamed bytes", async (subtest) => {
+    await assertRejectedMaimaiSync(
+      subtest,
+      () => new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array(MAX_DATA_BYTES));
+            controller.enqueue(new Uint8Array([0]));
+            controller.close();
+          },
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+      `error: origin body exceeds ${MAX_DATA_BYTES} bytes`,
+    );
+  });
 });
 
 test("scheduled sync registers and completes the same refresh job", async (t) => {
   const r2 = makeR2();
   const { context, promises } = makeContext();
-  t.mock.method(globalThis, "fetch", async (url) => new Response(`scheduled:${url}`));
+  t.mock.method(globalThis, "fetch", async (url) => {
+    const game = url.includes("/maimai/")
+      ? "maimai"
+      : url.includes("/chunithm/")
+        ? "chunithm"
+        : "ongeki";
+    return validOriginResponse(game, `scheduled:${url}`);
+  });
   const logMock = t.mock.method(console, "log", () => {});
   await worker.scheduled({}, env(r2.bucket), context);
   assert.equal(promises.length, 1);
