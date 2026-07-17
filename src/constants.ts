@@ -23,8 +23,8 @@ export const MU3_LIMIT_BREAK_STAR_Y = -290.1;
 export const MU3_AWAKEN_MARK_RECT = { x: -273.7, y: 289, w: 174, h: 152 };
 export const MU3_LEVEL_LIMITS = [1, 50, 55, 60, 65, 70, 80, 90, 100, 100000];
 
-// Shared MU3 card layer rects, used by both the visual card (cards.tsx) and the
-// holo mask (holo.tsx) so each coordinate is authored in exactly one place.
+// Shared MU3 card layer rects, used by both the visual card renderer and the
+// holo mask renderer so each coordinate is authored in exactly one place.
 export const MU3_ATTRIBUTE_RECT = { x: -297, y: 439, w: 130, h: 130 } as const;
 export const MU3_RARE_SPRITE_RECT = { x: -161.4, y: 442.3, w: 208, h: 118 } as const;
 export const MU3_DIGITAL_MARK_RECT = { x: 239.2, y: 477.4, w: 294, h: 102 } as const;

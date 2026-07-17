@@ -30,9 +30,6 @@ import { jacketImgProps } from "./songdb";
  * sits at (8,13). All coordinates are frame-relative CSS px from the external
  * CHUNITHM MusicBox reference dump.
  */
-export const CHUNI_MUSICBOX_WIDTH = 454;
-export const CHUNI_MUSICBOX_HEIGHT = 610;
-
 /*
  * C_score_num (CNUM): digit cell 16x20 with kerning -2 -> 14px advance; comma
  * cell 8x20 -> 6px advance; thousands grouping, max 7 digits. "1,010,000"

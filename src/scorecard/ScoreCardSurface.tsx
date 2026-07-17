@@ -1,38 +1,18 @@
 import React from "react";
-import {
-  CHUNI_MUSICBOX_HEIGHT,
-  CHUNI_MUSICBOX_WIDTH,
-} from "./ChuniMusicBoxCard";
-import {
-  CHUNI_SCORECARD_HEIGHT,
-  CHUNI_SCORECARD_WIDTH,
-} from "./ChuniScoreCard";
 import { ChuniScoreCardEditor } from "./ChuniScoreCardEditor";
-import {
-  MAI_SCORECARD_HEIGHT,
-  MAI_SCORECARD_WIDTH,
-} from "./MaiScoreCard";
 import { MaiScoreCardEditor } from "./MaiScoreCardEditor";
-import {
-  ONGEKI_MUSICBT_HEIGHT,
-  ONGEKI_MUSICBT_WIDTH,
-} from "./OngekiMusicBtCard";
-import {
-  ONGEKI_SCORECARD_HEIGHT,
-  ONGEKI_SCORECARD_WIDTH,
-} from "./OngekiScoreCard";
 import { OngekiScoreCardEditor } from "./OngekiScoreCardEditor";
 import { ScoreCardPreview } from "./ScoreCardPreview";
 import { CHUNI_SAMPLE_SONGS } from "./chuniSamples";
-import { ChuniCardType, ChuniDifficulty, ChuniSong } from "./chuniTypes";
+import { ChuniDifficulty, ChuniSong } from "./chuniTypes";
 import { ONGEKI_SAMPLE_SONGS } from "./ongekiSamples";
-import { OngekiCardType, OngekiDifficulty, OngekiSong } from "./ongekiTypes";
+import { OngekiDifficulty, OngekiSong } from "./ongekiTypes";
 import { defaultChuniState, defaultOngekiState, defaultState } from "./scorecardDefaults";
+import { scorecardDesignSize } from "./scorecardLayout";
 import {
   GAMES,
   SCORECARD_ASSET_SENTINEL,
   SHOW_SCORECARD_RESET,
-  type ScoreCardGame,
 } from "./scorecardSurfaceConfig";
 import { MAI_SAMPLE_SONGS } from "./sampleSongs";
 import {
@@ -49,23 +29,6 @@ import {
 import { MaiDifficulty, MaiScoreState, MaiSong } from "./types";
 import { useScoreCardSongDb } from "./useScoreCardSongDb";
 import { usePersistScoreCardState, useScoreCardState } from "./useScoreCardState";
-
-/** Active card design-space size; the stage auto-fit zoom uses this. */
-function designSize(
-  game: ScoreCardGame,
-  chuniCard: ChuniCardType,
-  ongekiCard: OngekiCardType,
-): { width: number; height: number } {
-  if (game === "mai") return { width: MAI_SCORECARD_WIDTH, height: MAI_SCORECARD_HEIGHT };
-  if (game === "chuni") {
-    return chuniCard === "musicbox"
-      ? { width: CHUNI_MUSICBOX_WIDTH, height: CHUNI_MUSICBOX_HEIGHT }
-      : { width: CHUNI_SCORECARD_WIDTH, height: CHUNI_SCORECARD_HEIGHT };
-  }
-  return ongekiCard === "musicbt"
-    ? { width: ONGEKI_MUSICBT_WIDTH, height: ONGEKI_MUSICBT_HEIGHT }
-    : { width: ONGEKI_SCORECARD_WIDTH, height: ONGEKI_SCORECARD_HEIGHT };
-}
 
 export function ScoreCardSurface() {
   const {
@@ -117,7 +80,12 @@ export function ScoreCardSurface() {
     }
   }
 
-  const design = designSize(game, chuniState.cardType, ongekiState.cardType);
+  const design =
+    game === "mai"
+      ? scorecardDesignSize({ game })
+      : game === "chuni"
+        ? scorecardDesignSize({ game, cardType: chuniState.cardType })
+        : scorecardDesignSize({ game, cardType: ongekiState.cardType });
 
   React.useEffect(() => {
     const stage = stageRef.current;

@@ -13,17 +13,41 @@ Function.
 | `GET /data/{game}/music-ex.json` | Serve from R2; return 404 on a miss. |
 | `GET /jackets/{game}/{file}` | Serve from R2; return 404 on a miss. |
 | `GET /hd-jackets/{game}/{file}` | R2 only — high-res override tier uploaded out-of-band. |
-| `POST /sync` | `Authorization: Bearer $SYNC_TOKEN`; fetch upstream metadata and write it to R2, matching the daily cron. |
+| `POST /sync` | `Authorization: Bearer $SYNC_TOKEN`; fetch upstream metadata and write it to R2, matching the daily cron. Returns 200, 207, or 502 for complete success, partial failure, or total failure. |
 
 `{game}` is one of `maimai`, `chunithm`, `ongeki`. Metadata is cached ~1 h,
 jackets ~30 d immutable. A daily cron refreshes `music-ex.json` (uploads are
 skipped when the stored sha-256 matches). Regular and HD jackets are publication
 inputs uploaded separately; no GET request populates them.
 
+Before a sync can replace metadata, the Worker applies a 20-second per-game
+origin deadline, checks the upstream MIME type, enforces an 8 MiB
+`Content-Length` and streamed-byte limit, decodes and parses JSON, and validates
+a non-empty array of flat string records with the minimum game-specific fields
+required by the browser. Conservative per-game row floors reject obviously
+truncated catalogs; after a successful upload records the row count, a later
+drop of more than 25% is also rejected for review.
+Any failed check is reported as an `error:` result without inspecting or writing
+the existing R2 object. Scheduled runs reject their execution task when any
+game fails so Cloudflare monitoring does not record a false success.
+
+## Source layout
+
+- `src/config.ts`: generated binding boundary, games, key builders, and cache/CORS policy.
+- `src/auth.ts`: constant-time manual-sync token verification.
+- `src/http.ts`: request routing plus streaming R2 responses.
+- `src/metadata.ts`: bounded upstream-body and JSON-record validation.
+- `src/sync.ts`: hashing, no-op detection, and R2 writes.
+- `src/index.ts`: minimal fetch and scheduled-handler entrypoint.
+
+`worker-configuration.d.ts` is generated from `wrangler.jsonc`; secret bindings
+remain declared separately because their values and names are not stored in the
+tracked configuration.
+
 ## Bucket binding
 
 The worker binds the existing CardViewer bucket (the one already hosting the
-online-preview assets); no new bucket is created. The tracked `wrangler.toml`
+online-preview assets); no new bucket is created. The tracked `wrangler.jsonc`
 currently names `cardviewer-assets`. Confirm that non-secret resource name is
 correct for the target Cloudflare account before deploying a fork.
 
@@ -49,9 +73,11 @@ npm exec --offline -- wrangler secret put SYNC_TOKEN
 npm run deploy
 ```
 
-`npm run check` performs both the Worker type-check and its in-memory behavior
-suite. The suite fakes R2 and upstream fetches; it does not contact Cloudflare
-or prove a live bucket binding.
+`npm run check` verifies that the generated binding declaration matches
+`wrangler.jsonc`, performs the Worker type-check, then runs its in-memory
+behavior suite. The suite fakes R2 and upstream fetches; it does not contact
+Cloudflare or prove a live bucket binding. Regenerate the binding declaration
+after configuration changes with `npm run types:generate`.
 
 Manual metadata sync (optional — the cron covers normal operation):
 
@@ -66,8 +92,9 @@ no build-time origin override. It prefers
 `/official/songdb/hd-jackets/...`, falls back to
 `/official/songdb/jackets/...`, then to the same-origin R2 placeholder at
 `/official/cardviewer/v1/runtime/jacket-placeholder.png` per image (see
-`src/scorecard/songdb.ts`). No jacket or placeholder binary is bundled in the
-repository.
+`src/scorecard/songdb/assets.ts`, re-exported through the stable
+`src/scorecard/songdb.ts` facade). No jacket or placeholder binary is bundled
+in the repository.
 
 Upstream access is confined to the authenticated `POST /sync` and scheduled
 metadata jobs. The Worker's GET routes only inspect existing R2 objects and

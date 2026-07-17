@@ -1,25 +1,9 @@
-// Cloudflare Pages Function: serve the reviewed public subset of /official/*
-// from the ASSETS_BUCKET R2 binding. Prefixes alone are not a sufficient
-// boundary because the source bucket also contains scripts and diagnostic
-// files, so every request must pass both a path allowlist and an extension
-// allowlist before R2 is consulted.
+import { publicObjectKey } from "./public-object-policy.js";
 
-const MEDIA_EXTENSIONS = new Set([".json", ".png", ".jpg", ".jpeg", ".webp"]);
-const PUBLIC_FONT_FILES = new Set([
-  "ZenKakuGothicNew-Black.ttf",
-  "ZenKakuGothicNew-Bold.ttf",
-  "ZenKakuGothicNew-Regular.ttf",
-  "ZenMaruGothic-Black.ttf",
-  "ZenMaruGothic-Bold.ttf",
-  "ZenMaruGothic-Medium.ttf",
-  "ZenMaruGothic-Regular.ttf",
-]);
-const PUBLIC_FONT_LICENSE_FILES = new Set([
-  "OFL-ZenKakuGothicNew.txt",
-  "OFL-ZenMaruGothic.txt",
-]);
-const SONGDB_GAMES = new Set(["maimai", "chunithm", "ongeki"]);
-const SONGDB_IMAGE_FILE = /^[A-Za-z0-9_.-]+\.(?:png|jpg|jpeg|webp)$/i;
+// Cloudflare Pages Function transport for the reviewed /official/* contract.
+// Path validation and R2 key selection live in public-object-policy.js; this
+// entrypoint owns bindings, edge caching, response metadata, and HTTP methods.
+
 const CONTENT_TYPES = new Map([
   [".json", "application/json; charset=utf-8"],
   [".png", "image/png"],
@@ -29,97 +13,6 @@ const CONTENT_TYPES = new Map([
   [".ttf", "font/ttf"],
   [".txt", "text/plain; charset=utf-8"],
 ]);
-const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
-
-function rawPathname(rawUrl) {
-  const match = /^[a-z][a-z\d+.-]*:\/\/[^/?#]*(\/[^?#]*)?(?:[?#].*)?$/i.exec(rawUrl);
-  return match ? match[1] || "/" : null;
-}
-
-function publicObjectKey(rawUrl) {
-  const pathname = rawPathname(rawUrl);
-  if (!pathname) return null;
-
-  const rawSegments = pathname.split("/");
-  if (rawSegments[0] !== "" || rawSegments[1] !== "official") return null;
-
-  const relativeSegments = [];
-  for (const rawSegment of rawSegments.slice(2)) {
-    if (!rawSegment) return null;
-
-    let segment;
-    try {
-      segment = decodeURIComponent(rawSegment);
-    } catch {
-      return null;
-    }
-
-    if (
-      !segment ||
-      segment.startsWith(".") ||
-      segment.includes("/") ||
-      segment.includes("\\") ||
-      segment.includes("%") ||
-      segment.includes("?") ||
-      segment.includes("#") ||
-      CONTROL_CHARACTERS.test(segment)
-    ) {
-      return null;
-    }
-
-    relativeSegments.push(segment);
-  }
-
-  if (relativeSegments.length === 0) return null;
-
-  const leaf = relativeSegments.at(-1);
-  const extensionAt = leaf.lastIndexOf(".");
-  if (extensionAt <= 0) return null;
-
-  const extension = leaf.slice(extensionAt).toLowerCase();
-  const [root, version, assetClass] = relativeSegments;
-  if (root === "songdb") {
-    const [, songdbClass, game, file] = relativeSegments;
-    if (relativeSegments.length !== 4 || !SONGDB_GAMES.has(game)) return null;
-    if (songdbClass === "data" && file === "music-ex.json") {
-      return `songdb/data/${game}/${file}`;
-    }
-    if (
-      (songdbClass === "jackets" || songdbClass === "hd-jackets") &&
-      SONGDB_IMAGE_FILE.test(file)
-    ) {
-      return `songdb/${songdbClass}/${game}/${file}`;
-    }
-    return null;
-  }
-
-  const isLegacyMedia =
-    relativeSegments.length >= 2 && (root === "generated" || root === "scorecard");
-  const isVersionedRuntime =
-    relativeSegments.length >= 4 &&
-    root === "cardviewer" &&
-    version === "v1" &&
-    assetClass === "runtime";
-  if ((isLegacyMedia || isVersionedRuntime) && MEDIA_EXTENSIONS.has(extension)) {
-    return ["official", ...relativeSegments].join("/");
-  }
-  if (
-    relativeSegments.length === 5 &&
-    root === "cardviewer" &&
-    version === "v1" &&
-    assetClass === "fonts"
-  ) {
-    const [, , , fontClass, file] = relativeSegments;
-    if (
-      (fontClass === "zen" && PUBLIC_FONT_FILES.has(file)) ||
-      (fontClass === "licenses" && PUBLIC_FONT_LICENSE_FILES.has(file))
-    ) {
-      return ["official", ...relativeSegments].join("/");
-    }
-  }
-  return null;
-}
-
 function notFoundResponse() {
   return new Response("Not found", {
     status: 404,

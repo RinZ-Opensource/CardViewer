@@ -7,9 +7,11 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "check": "npm run typecheck && npm test",
+    "check": "npm run types:check && npm run typecheck && npm test",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
+    "types:generate": "wrangler types worker-configuration.d.ts --env-interface CloudflareBindings --include-runtime false",
+    "types:check": "wrangler types worker-configuration.d.ts --env-interface CloudflareBindings --include-runtime false --check",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
   },

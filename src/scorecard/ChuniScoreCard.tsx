@@ -21,9 +21,6 @@ import { ChuniScoreState, ChuniSong } from "./chuniTypes";
  * the on-screen rest pose (only the Lumina-VERSE root slide/fade and the WE
  * star reveal animate).
  */
-export const CHUNI_SCORECARD_WIDTH = 586;
-export const CHUNI_SCORECARD_HEIGHT = 182;
-
 /*
  * CNUM digit-run layout, read from the cast dumps: anchor4b tracks the pivot
  * corner on every cast in the scene (0=top-left at pivot (0,0), 3=mid-left at

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { onRequest } from "../functions/official/[[path]].js";
+import { publicObjectKey } from "../functions/official/public-object-policy.js";
 import { onRequest as onPrivateFontRequest } from "../functions/fonts/private/[[path]].js";
 
 function installCache(t) {
@@ -55,6 +56,23 @@ function makeBucket(body = "asset-body", contentType) {
   };
 }
 
+test("public object policy maps URLs without Cloudflare runtime state", () => {
+  assert.equal(
+    publicObjectKey(
+      "https://assets.example/official/generated/assets/chu/CHU_card_00001002.webp?revision=1",
+    ),
+    "official/generated/assets/chu/CHU_card_00001002.webp",
+  );
+  assert.equal(
+    publicObjectKey("https://assets.example/official/songdb/data/ongeki/music-ex.json"),
+    "songdb/data/ongeki/music-ex.json",
+  );
+  assert.equal(
+    publicObjectKey("https://assets.example/official/generated/private/credentials.json"),
+    null,
+  );
+});
+
 test("private font paths always fail closed without consulting request context", async () => {
   const context = new Proxy(
     {},
@@ -85,15 +103,51 @@ async function invoke({ bucket, env, method = "GET", url }) {
   return response;
 }
 
-test("serves legacy media, versioned runtime assets, and only approved fonts", async (t) => {
+test("serves every reviewed publication shape and only approved fonts", async (t) => {
   installCache(t);
   const { bucket, getCalls } = makeBucket();
   const allowed = [
     ["/official/generated/cards.json", "official/generated/cards.json"],
-    ["/official/generated/cards/front.png", "official/generated/cards/front.png"],
+    ["/official/generated/cards.index.json", "official/generated/cards.index.json"],
+    ["/official/generated/cards.chu.json", "official/generated/cards.chu.json"],
+    ["/official/generated/cards.mai.json", "official/generated/cards.mai.json"],
+    ["/official/generated/cards.mu3.json", "official/generated/cards.mu3.json"],
+    [
+      "/official/generated/shards/cards-0002.json",
+      "official/generated/shards/cards-0002.json",
+    ],
+    [
+      "/official/generated/assets/chu/CHU_card_00001002.webp",
+      "official/generated/assets/chu/CHU_card_00001002.webp",
+    ],
+    [
+      "/official/generated/assets/thumbs/mai/card_card00010013.webp",
+      "official/generated/assets/thumbs/mai/card_card00010013.webp",
+    ],
+    ["/official/scorecard/mai/UI_MSS_Rank_S.png", "official/scorecard/mai/UI_MSS_Rank_S.png"],
     ["/official/scorecard/mai/jackets/000001.webp", "official/scorecard/mai/jackets/000001.webp"],
     ["/official/scorecard/chuni/jackets/cover.jpg", "official/scorecard/chuni/jackets/cover.jpg"],
     ["/official/scorecard/ongeki/jackets/cover.jpeg", "official/scorecard/ongeki/jackets/cover.jpeg"],
+    [
+      "/official/scorecard/chuni/manifest_musicbox.json",
+      "official/scorecard/chuni/manifest_musicbox.json",
+    ],
+    [
+      "/official/scorecard/mai/jackets/jacket-map.json",
+      "official/scorecard/mai/jackets/jacket-map.json",
+    ],
+    [
+      "/official/scorecard/chuni/jackets/v2/music_0001.png",
+      "official/scorecard/chuni/jackets/v2/music_0001.png",
+    ],
+    [
+      "/official/scorecard/ongeki/boss/boss-map.json",
+      "official/scorecard/ongeki/boss/boss-map.json",
+    ],
+    [
+      "/official/scorecard/ongeki/boss/v1/UI_Card_Icon_000001.png",
+      "official/scorecard/ongeki/boss/v1/UI_Card_Icon_000001.png",
+    ],
     [
       "/official/cardviewer/v1/runtime/C310Busb_CardBack.png",
       "official/cardviewer/v1/runtime/C310Busb_CardBack.png",
@@ -292,6 +346,48 @@ test("denies unreviewed prefixes, root assets, hidden files, and non-public exte
   assert.deepEqual(getCalls, []);
 });
 
+test("rejects media files that do not match a reviewed publication shape", async (t) => {
+  installCache(t);
+  const { bucket, getCalls } = makeBucket();
+  const denied = [
+    // Regression cases from the public-data audit: all have an otherwise
+    // allowed extension but live outside a reviewed object shape.
+    "/official/generated/private/credentials.json",
+    "/official/scorecard/private/secret.json",
+    "/official/cardviewer/v1/runtime/diagnostics/private.json",
+    // Generated objects are direct manifests, named shards, or known game
+    // asset trees; the old arbitrary nesting behavior must remain closed.
+    "/official/generated/cards/front.png",
+    "/official/generated/shards/index.json",
+    "/official/generated/shards/cards-secret.json",
+    "/official/generated/assets/private/card.webp",
+    "/official/generated/assets/chu/private-preview.webp",
+    "/official/generated/assets/chu/nested/card.webp",
+    "/official/generated/assets/thumbs/private/card.webp",
+    // Score-card nesting is limited to the jacket and ONGEKI boss contracts.
+    "/official/scorecard/mai/private/card.png",
+    "/official/scorecard/mai/jackets/v0/card.png",
+    "/official/scorecard/chuni/boss/v1/card.png",
+    "/official/scorecard/ongeki/boss/private/card.png",
+    // The only reviewed runtime child directory is the FONT_* catalog/atlas
+    // group. Other runtime assets are direct children.
+    "/official/cardviewer/v1/runtime/fonts/regular.json",
+    "/official/cardviewer/v1/runtime/fonts/private.json",
+    "/official/cardviewer/v1/runtime/fonts/FONT_private.json",
+    "/official/cardviewer/v1/runtime/fonts/nested/FONT_Test.json",
+    "/official/cardviewer/v1/runtime/diagnostics.json",
+    "/official/cardviewer/v1/runtime/private-preview.png",
+  ];
+
+  for (const pathname of denied) {
+    const response = await invoke({ bucket, url: `https://assets.example${pathname}` });
+    assert.equal(response.status, 404, pathname);
+    assert.equal(response.headers.get("cache-control"), "no-store", pathname);
+  }
+
+  assert.deepEqual(getCalls, []);
+});
+
 test("rejects malformed and ambiguous path segments before reading R2", async (t) => {
   installCache(t);
   const { bucket, getCalls } = makeBucket();
@@ -346,25 +442,34 @@ test("normalizes query parameters out of the shared immutable-media cache key", 
 
   const first = await invoke({
     bucket,
-    url: "https://assets.example/official/generated/cards/front.png?version=one",
+    url: "https://assets.example/official/generated/assets/chu/front.png?version=one",
   });
   const second = await invoke({
     bucket,
-    url: "https://assets.example/official/generated/cards/front.png?version=two",
+    url: "https://assets.example/official/generated/assets/chu/front.png?version=two",
   });
 
   assert.equal(await first.text(), "image-bytes");
   assert.equal(await second.text(), "image-bytes");
-  assert.deepEqual(getCalls, ["official/generated/cards/front.png"]);
+  assert.deepEqual(getCalls, ["official/generated/assets/chu/front.png"]);
   assert.deepEqual(
     cache.matchCalls,
     [
-      { method: "GET", url: "https://assets.example/official/generated/cards/front.png" },
-      { method: "GET", url: "https://assets.example/official/generated/cards/front.png" },
+      {
+        method: "GET",
+        url: "https://assets.example/official/generated/assets/chu/front.png",
+      },
+      {
+        method: "GET",
+        url: "https://assets.example/official/generated/assets/chu/front.png",
+      },
     ],
   );
   assert.deepEqual(cache.putCalls, [
-    { method: "GET", url: "https://assets.example/official/generated/cards/front.png" },
+    {
+      method: "GET",
+      url: "https://assets.example/official/generated/assets/chu/front.png",
+    },
   ]);
 });
 
@@ -450,12 +555,12 @@ test("returns an uncacheable 404 when an allowed R2 object is missing", async (t
 
   const response = await invoke({
     bucket,
-    url: "https://assets.example/official/generated/missing.png",
+    url: "https://assets.example/official/generated/assets/chu/missing.webp",
   });
 
   assert.equal(response.status, 404);
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.deepEqual(getCalls, ["official/generated/missing.png"]);
+  assert.deepEqual(getCalls, ["official/generated/assets/chu/missing.webp"]);
   assert.deepEqual(cache.putCalls, []);
 });
 

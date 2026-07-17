@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { importTypeScriptModule } from "./helpers/import-typescript.mjs";
 
-const { isStaticAssetPath, resolveWebImageUrl } = await importTypeScriptModule(
+const { isStaticAssetPath, preloadWebImageUrl, resolveWebImageUrl } = await importTypeScriptModule(
   "src/imageLoader.ts",
 );
 const {
@@ -48,6 +48,40 @@ test("accepts only the same-origin R2-backed browser routes", async () => {
   } finally {
     if (originalWindow === undefined) delete globalThis.window;
     else globalThis.window = originalWindow;
+  }
+});
+
+test("preload rejects a missing R2 object and aborts an obsolete image decode", async () => {
+  const originalImage = globalThis.Image;
+  const instances = [];
+  class FakeImage {
+    constructor() {
+      instances.push(this);
+    }
+    removeAttribute(name) {
+      if (name === "src") this.src = "";
+    }
+  }
+  globalThis.Image = FakeImage;
+
+  try {
+    const missing = preloadWebImageUrl("/official/generated/assets/chu/missing.webp");
+    await Promise.resolve();
+    instances[0].onerror();
+    await assert.rejects(missing, /R2 image object unavailable/);
+
+    const controller = new AbortController();
+    const obsolete = preloadWebImageUrl(
+      "/official/generated/assets/chu/obsolete.webp",
+      controller.signal,
+    );
+    await Promise.resolve();
+    controller.abort(new DOMException("selection changed", "AbortError"));
+    await assert.rejects(obsolete, { name: "AbortError" });
+    assert.equal(instances[1].src, "");
+  } finally {
+    if (originalImage === undefined) delete globalThis.Image;
+    else globalThis.Image = originalImage;
   }
 });
 

@@ -4,7 +4,7 @@ import test from "node:test";
 import ts from "typescript";
 
 const selectionPath = new URL("../src/scorecard/scorecardSelection.ts", import.meta.url);
-const songDbPath = new URL("../src/scorecard/songdb.ts", import.meta.url);
+const songDbPath = new URL("../src/scorecard/songdb/chartHelpers.ts", import.meta.url);
 const selectionSource = await readFile(selectionPath, "utf8");
 const songDbSource = await readFile(songDbPath, "utf8");
 const selectionFile = ts.createSourceFile(
@@ -15,7 +15,7 @@ const selectionFile = ts.createSourceFile(
   ts.ScriptKind.TS,
 );
 const songDbFile = ts.createSourceFile(
-  "songdb.ts",
+  "songdb/chartHelpers.ts",
   songDbSource,
   ts.ScriptTarget.Latest,
   true,

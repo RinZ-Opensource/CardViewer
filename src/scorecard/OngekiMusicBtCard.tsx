@@ -31,13 +31,8 @@ import { jacketImgProps } from "./songdb";
  * MusicBt reference dump. The render root is
  * padded (16 left/right/bottom for the Lunatic plate's 310x490 glow, 22 top
  * for the boss VS block that overhangs the plate), so the plate sits at
- * (PAD_X, PAD_TOP) inside a 310x496 root.
+ * (16, 22) inside a 310x496 root.
  */
-const PAD_X = 16;
-const PAD_TOP = 22;
-export const ONGEKI_MUSICBT_WIDTH = 278 + 2 * PAD_X;
-export const ONGEKI_MUSICBT_HEIGHT = 458 + PAD_TOP + 16;
-
 /*
  * MU3UICounter glyph layout (CustomUI/MU3UICounter.cs OnPopulateMesh): a
  * digit quad is size_ wide and advances size_.x + charSpacing_; a comma is

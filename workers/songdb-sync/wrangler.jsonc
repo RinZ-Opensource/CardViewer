@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cardviewer-songdb",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+
+  // Daily metadata refresh at 04:17 JST. GET routes remain R2-only.
+  "triggers": {
+    "crons": ["17 19 * * *"]
+  },
+
+  // Shared with the Pages project. This Worker is confined to songdb/** keys.
+  "r2_buckets": [
+    {
+      "binding": "SONGDB",
+      "bucket_name": "cardviewer-assets"
+    }
+  ],
+
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

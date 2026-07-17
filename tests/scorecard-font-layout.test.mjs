@@ -42,8 +42,8 @@ const chuniCss = await readFile(
   new URL("../src/styles/scorecard-chuni-box.css", import.meta.url),
   "utf8",
 );
-const scorecardCss = await readFile(
-  new URL("../src/styles/scorecard.css", import.meta.url),
+const scorecardMaiCss = await readFile(
+  new URL("../src/styles/scorecard-mai.css", import.meta.url),
   "utf8",
 );
 
@@ -84,8 +84,15 @@ test("CHUNITHM applies prefab cast scale uniformly", () => {
   }
 });
 
-test("bitmap-only CHUNITHM offsets do not move the authored cast boxes", () => {
-  for (const selector of [".cmb-title", ".cmb-artist", ".cmb-notes-name"]) {
+test("CHUNITHM text boxes retain the calibrated optical baseline", () => {
+  const positions = new Map([
+    [".cmb-title", 421],
+    [".cmb-artist", 469],
+    [".cmb-notes-name", 564],
+  ]);
+
+  for (const [selector, top] of positions) {
+    assert.match(cssRule(chuniCss, selector), new RegExp(`top:\\s*${top}px`));
     assert.doesNotMatch(cssRule(chuniCss, selector), /transform\s*:/);
     assert.match(cssRule(chuniCss, `${selector} > .scorecard-bitmap-fallback`), /translateY/);
   }
@@ -101,12 +108,12 @@ test("score-card bitmap text uses one scaled canvas and retains the game face", 
 });
 
 test("maimai TMP boxes retain authored alignment geometry", () => {
-  assert.match(cssRule(scorecardCss, ".msc-ach"), /top:\s*518\.5px/);
-  assert.match(cssRule(scorecardCss, ".msc-dx-value"), /top:\s*551\.5px/);
+  assert.match(cssRule(scorecardMaiCss, ".msc-ach"), /top:\s*518\.5px/);
+  assert.match(cssRule(scorecardMaiCss, ".msc-dx-value"), /top:\s*551\.5px/);
   assert.ok(
-    cssRules(scorecardCss, ".msc-dx-max").some((rule) => /top:\s*551\.5px/.test(rule)),
+    cssRules(scorecardMaiCss, ".msc-dx-max").some((rule) => /top:\s*551\.5px/.test(rule)),
   );
-  assert.match(cssRule(scorecardCss, ".msc-designer-name"), /height:\s*16\.27px/);
+  assert.match(cssRule(scorecardMaiCss, ".msc-designer-name"), /height:\s*16\.27px/);
 });
 
 test("ONGEKI notes use the authored 16px Maru atlas", () => {

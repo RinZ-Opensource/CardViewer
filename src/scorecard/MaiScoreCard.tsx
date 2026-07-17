@@ -21,9 +21,6 @@ import { MaiChart, MaiScoreState, MaiSong } from "./types";
  * Runtime behavior (text formats, star layout, visibility gates) mirrors
  * TimelineRoot.Initialise / TrackStartMonitor.SetTrackStart / SpriteCounter.
  */
-export const MAI_SCORECARD_WIDTH = 420;
-export const MAI_SCORECARD_HEIGHT = 690;
-
 const TMP_WHITE = [255, 255, 255] as const;
 const TMP_GOLD = [242, 198, 0] as const;
 const TMP_GREEN = [52, 219, 57] as const;

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { importTypeScriptModule } from "./helpers/import-typescript.mjs";
+
+const { canvasFontLoadDescriptors } = await importTypeScriptModule("src/fontLoading.ts");
 
 const css = await readFile(new URL("../src/styles/base.css", import.meta.url), "utf8");
 
@@ -60,5 +63,12 @@ test("ordinary Maru remains a true Regular-capable family", () => {
   assert.match(
     css,
     /font-family:\s*"CardViewer Zen Maru";[\s\S]*?ZenMaruGothic-Bold\.ttf[\s\S]*?font-weight:\s*700;/,
+  );
+});
+
+test("canvas font loading uses the same size and weight as the eventual draw", () => {
+  assert.deepEqual(
+    canvasFontLoadDescriptors('"CardViewer Zen Maru", sans-serif', 19.2, 550),
+    ['550 19.2px "CardViewer Zen Maru"', "550 19.2px sans-serif"],
   );
 });
