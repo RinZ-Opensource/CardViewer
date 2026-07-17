@@ -15,7 +15,7 @@
     "check": "npm run check:secrets && npm run test:secrets && npm run test:deployment-boundary && npm run test:boundaries && npm run test:public-dist && npm run test:functions && npm run test:persistence && npm run test:scorecard-input && npm run test:scorecard-defaults && npm run test:scorecard-selection && npm run test:font-fallbacks && npm run test:scorecard-font-layout && npm run test:image-loader && npm run test:manifest-url && npm run test:runtime-json && npm run test:holo-mask && npm run test:cache && npm run build && npm run check:functions && npm run check:worker",
     "check:all": "npm run check",
     "check:secrets": "node scripts/security/check-tracked-secrets.mjs",
-    "check:functions": "node --check \"functions/official/[[path]].js\" && node --check \"functions/fonts/private/[[path]].js\"",
+    "check:functions": "node --check \"functions/official/[[path]].js\" && node --check functions/official/public-object-policy.js && node --check \"functions/fonts/private/[[path]].js\"",
     "check:public-dist": "node check-public-dist.mjs",
     "check:worker": "npm --prefix workers/songdb-sync run check",
     "preview": "vite preview --host 127.0.0.1 --port 1421",

@@ -1,5 +1,6 @@
 import React from "react";
 import { OFFICIAL_ASSET_ROOT } from "../constants";
+import { parseTmpFontMetrics } from "../runtimeJson";
 import { loadTmpAtlas, measureTmpLine } from "../textRendering";
 import type { TmpFontMetrics, TmpGlyph } from "../types";
 import { FitText } from "./FitText";
@@ -23,11 +24,12 @@ const PADDING = 8;
 export function loadMaiTmpFont(key: MaiTmpFontKey) {
   const cached = fontPromises.get(key);
   if (cached) return cached;
-  const promise = fetch(`${OFFICIAL_ASSET_ROOT}${FONT_CATALOGS[key]}`, {
+  const file = FONT_CATALOGS[key];
+  const promise = fetch(`${OFFICIAL_ASSET_ROOT}${file}`, {
     credentials: "same-origin",
   }).then(async (response) => {
     if (!response.ok) throw new Error(`R2 maimai TMP catalog unavailable: ${response.status}`);
-    return (await response.json()) as TmpFontMetrics;
+    return parseTmpFontMetrics(await response.json(), file);
   });
   fontPromises.set(key, promise);
   void promise.catch(() => {

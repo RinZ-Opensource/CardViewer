@@ -195,6 +195,11 @@ R2; every miss is a 404 and never starts an upstream fetch. Regular and HD
 jackets are uploaded as reviewed publication objects outside the browser read
 path.
 
+Each upstream metadata fetch has a bounded per-game deadline. Manual sync uses
+HTTP 200 for complete success, 207 for a mixed result, and 502 when every game
+fails. A scheduled run rejects its tracked task when any game fails, while its
+single structured log retains every per-game result for diagnosis.
+
 Worker secrets such as the manual-sync token belong in Cloudflare secret
 storage. They are never browser configuration or `VITE_` variables.
 

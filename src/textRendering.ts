@@ -1,5 +1,6 @@
 import React from "react";
 import { OFFICIAL_ASSET_ROOT } from "./constants";
+import { canvasFontLoadDescriptors } from "./fontLoading";
 import { LruMap } from "./lru";
 import { Bounds, TmpFontMetrics, TmpGlyph, UnityFontMetrics } from "./types";
 
@@ -106,19 +107,15 @@ export function drawCanvasLine(context: CanvasRenderingContext2D, line: string, 
   }
 }
 
-export function waitForCanvasFont(fontFamily: string, fontSize: number) {
+export function waitForCanvasFont(fontFamily: string, fontSize: number, fontWeight: number) {
   if (typeof document === "undefined" || !("fonts" in document)) {
     return Promise.resolve();
   }
 
-  const families = fontFamily
-    .split(",")
-    .map((family) => family.trim())
-    .filter(Boolean)
-    .slice(0, 3);
-
   return Promise.allSettled([
-    ...families.map((family) => document.fonts.load(`700 ${fontSize}px ${family}`)),
+    ...canvasFontLoadDescriptors(fontFamily, fontSize, fontWeight).map((description) =>
+      document.fonts.load(description),
+    ),
     document.fonts.ready,
   ]).then(() => undefined);
 }

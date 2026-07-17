@@ -4,7 +4,7 @@ import { visibleAssetLayers } from "./cardAssets";
 import { isSupportedCardRecord } from "./cardSupport";
 import { USE_OFFICIAL_ASSETS } from "./constants";
 import { loadOfficialFonts, loadOfficialTmpFont } from "./fonts";
-import { isStaticAssetPath, preloadWebImageUrl, resolveWebImageUrl } from "./imageLoader";
+import { isStaticAssetPath, preloadWebImageUrl } from "./imageLoader";
 import { loadStaticScanResult } from "./manifest";
 import { mockScanResult } from "./mockData";
 import {
@@ -171,18 +171,20 @@ export function useSelectedImageDataUrl(selected: CardRecord | null, selectedIma
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
     setLoadedImageDataUrl((prev) => (prev?.path === selectedImagePath ? prev : null));
-    resolveWebImageUrl(selectedImagePath)
+    preloadWebImageUrl(selectedImagePath, controller.signal)
       .then((dataUrl) => {
-        if (!cancelled) setLoadedImageDataUrl({ path: selectedImagePath, dataUrl });
+        if (!controller.signal.aborted) {
+          setLoadedImageDataUrl({ path: selectedImagePath, dataUrl });
+        }
       })
       .catch(() => {
-        if (!cancelled) setLoadedImageDataUrl(null);
+        if (!controller.signal.aborted) setLoadedImageDataUrl(null);
       });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
     // `selected` intentionally omitted: the effect only reads selectedImagePath
     // (derived from it by the caller), so depending on it adds redundant re-runs.
@@ -327,7 +329,7 @@ export function useThumbnailLoader(thumbnailCards: CardRecord[]) {
         }
         if (!isStaticAssetPath(thumbPath)) return null;
         thumbPendingRef.current.set(card.dataName, thumbPath);
-        return resolveWebImageUrl(thumbPath)
+        return preloadWebImageUrl(thumbPath)
           .then((dataUrl) => ({ dataName: card.dataName, path: thumbPath, dataUrl }))
           .catch(() => null)
           .finally(() => {

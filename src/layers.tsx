@@ -117,7 +117,7 @@ export function LayerCanvasText({
     if (canvasRef.current) clearCanvas(canvasRef.current);
     const draw = async () => {
       try {
-        await waitForCanvasFont(fontFamily, fontSize);
+        await waitForCanvasFont(fontFamily, fontSize, fontWeight);
         if (cancelled) return;
         const canvas = canvasRef.current;
         if (!canvas) return;

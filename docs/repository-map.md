@@ -9,17 +9,23 @@ asset-production workspaces are deliberately outside this boundary.
 
 - `src/`: React/Vite application, CHU/MAI/MU3 card renderers, and CHUNITHM,
   maimai, and O.N.G.E.K.I. score-card renderers.
-- `src/scorecard/`: controlled editors, persisted state, song database access,
-  asset URL lookup, selection transitions, and preview renderers.
+- `src/scorecard/`: controlled editors, persisted state, selection transitions,
+  and preview renderers. `songdb.ts` is the stable public facade; `songdb/`
+  separates fetch/cache orchestration, R2 URL and fallback policy, per-game
+  normalization, chart helpers, field parsing, and internal models.
 - `src/cardAssets.ts`, `src/layers.tsx`, `src/textRendering.ts`, and the holo and
   font loaders: browser renderer source that reads allowlisted R2 objects; these
   modules do not embed renderer assets.
 - `public/`: only `404.html`, `_headers`, and `theme-init.js`, copied verbatim
   into `dist`.
-- `functions/official/[[path]].js`: Pages Function that exposes the reviewed
-  `/official/*` surface through the `ASSETS_BUCKET` R2 binding.
+- `functions/official/public-object-policy.js`: runtime-independent URL-to-R2
+  allowlist and key mapping for the reviewed `/official/*` surface.
+- `functions/official/[[path]].js`: Pages transport for the `ASSETS_BUCKET` R2
+  binding, edge cache, response metadata, and GET/HEAD behavior.
 - `workers/songdb-sync/`: scheduled/manual upstream metadata production plus
-  R2-only GET diagnostics; browser reads never use its origin.
+  R2-only GET diagnostics. Its source separates generated binding/config,
+  authentication, HTTP/R2 transport, upstream validation, and synchronization;
+  browser reads never use its origin.
 - `scripts/cloudflare/`: helper for deterministic, extension-specific R2 bulk
   upload manifests.
 - `tests/`: web behavior, module boundaries, Pages routing, persisted state,

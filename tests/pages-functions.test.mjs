@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { onRequest } from "../functions/official/[[path]].js";
+import { publicObjectKey } from "../functions/official/public-object-policy.js";
 import { onRequest as onPrivateFontRequest } from "../functions/fonts/private/[[path]].js";
 
 function installCache(t) {
@@ -54,6 +55,23 @@ function makeBucket(body = "asset-body", contentType) {
     },
   };
 }
+
+test("public object policy maps URLs without Cloudflare runtime state", () => {
+  assert.equal(
+    publicObjectKey(
+      "https://assets.example/official/generated/assets/chu/CHU_card_00001002.webp?revision=1",
+    ),
+    "official/generated/assets/chu/CHU_card_00001002.webp",
+  );
+  assert.equal(
+    publicObjectKey("https://assets.example/official/songdb/data/ongeki/music-ex.json"),
+    "songdb/data/ongeki/music-ex.json",
+  );
+  assert.equal(
+    publicObjectKey("https://assets.example/official/generated/private/credentials.json"),
+    null,
+  );
+});
 
 test("private font paths always fail closed without consulting request context", async () => {
   const context = new Proxy(

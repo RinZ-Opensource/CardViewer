@@ -49,6 +49,74 @@ const boundaries = [
     ],
   },
   {
+    file: "src/scorecard/songdb.ts",
+    allowed: [
+      "./songdb/assets",
+      "./songdb/chartHelpers",
+      "./songdb/loader",
+      "./songdb/models",
+    ],
+  },
+  {
+    file: "src/scorecard/songdb/models.ts",
+    allowed: ["../../runtimeJson"],
+    typeOnly: true,
+  },
+  {
+    file: "src/scorecard/songdb/assets.ts",
+    allowed: ["react", "./models"],
+    typeOnly: true,
+  },
+  {
+    file: "src/scorecard/songdb/parseFields.ts",
+    allowed: [],
+  },
+  {
+    file: "src/scorecard/songdb/normalizeMai.ts",
+    allowed: ["../../runtimeJson", "../types", "./assets", "./models", "./parseFields"],
+  },
+  {
+    file: "src/scorecard/songdb/normalizeChuni.ts",
+    allowed: [
+      "../../runtimeJson",
+      "../chuniAssets",
+      "../chuniTypes",
+      "./assets",
+      "./models",
+      "./parseFields",
+    ],
+  },
+  {
+    file: "src/scorecard/songdb/normalizeOngeki.ts",
+    allowed: [
+      "../../runtimeJson",
+      "../ongekiAssets",
+      "../ongekiTypes",
+      "./assets",
+      "./models",
+      "./parseFields",
+    ],
+  },
+  {
+    file: "src/scorecard/songdb/loader.ts",
+    allowed: [
+      "../../runtimeJson",
+      "../chuniTypes",
+      "../ongekiTypes",
+      "../types",
+      "./assets",
+      "./models",
+      "./normalizeChuni",
+      "./normalizeMai",
+      "./normalizeOngeki",
+    ],
+  },
+  {
+    file: "src/scorecard/songdb/chartHelpers.ts",
+    allowed: ["../chuniTypes", "../ongekiTypes", "../types"],
+    typeOnly: true,
+  },
+  {
     file: "src/scorecard/scorecardSelection.ts",
     allowed: [
       "./chuniSamples",
@@ -255,6 +323,47 @@ for (const boundary of boundaries) {
   });
 }
 
+test("scorecard songdb facade preserves its public API", async () => {
+  const file = "src/scorecard/songdb.ts";
+  const source = await readFile(path.join(projectRoot, file), "utf8");
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const exported = [];
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isExportDeclaration(statement) || !statement.exportClause) continue;
+    if (!ts.isNamedExports(statement.exportClause)) continue;
+    for (const element of statement.exportClause.elements) {
+      exported.push(element.name.text);
+    }
+  }
+
+  assert.deepEqual(exported.sort(), [
+    "SongDbGame",
+    "SongDbStatus",
+    "chuniChartFields",
+    "chuniHasChart",
+    "chuniPreferredDifficulty",
+    "invalidateSongDbCache",
+    "jacketImgProps",
+    "loadChuniSongs",
+    "loadMaiSongs",
+    "loadOngekiSongs",
+    "maiPreferredDifficulty",
+    "ongekiChartFields",
+    "ongekiHasChart",
+    "ongekiPreferredDifficulty",
+    "songdbDataUrl",
+    "songdbHdJacketUrl",
+    "songdbJacketUrl",
+  ].sort());
+});
+
 test("frontend source does not embed machine-specific absolute paths", async () => {
   const sourceRoot = path.join(projectRoot, "src");
   const violations = [];
@@ -277,6 +386,55 @@ test("frontend source does not embed machine-specific absolute paths", async () 
       ) {
         const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
         violations.push(`${relative}:${position.line + 1} (${node.text})`);
+      }
+      ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+  }
+
+  assert.deepEqual(violations, []);
+});
+
+test("frontend source does not trust fetched JSON through a type assertion", async () => {
+  const sourceRoot = path.join(projectRoot, "src");
+  const violations = [];
+
+  function containsJsonCall(node) {
+    let found = false;
+    function visit(current) {
+      if (
+        ts.isCallExpression(current) &&
+        ts.isPropertyAccessExpression(current.expression) &&
+        current.expression.name.text === "json"
+      ) {
+        found = true;
+        return;
+      }
+      ts.forEachChild(current, visit);
+    }
+    visit(node);
+    return found;
+  }
+
+  for (const absolute of await collectTypeScriptFiles(sourceRoot)) {
+    const source = await readFile(absolute, "utf8");
+    const relative = path.relative(projectRoot, absolute);
+    const sourceFile = ts.createSourceFile(
+      relative,
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      absolute.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    );
+
+    function visit(node) {
+      if (
+        (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) &&
+        containsJsonCall(node.expression)
+      ) {
+        const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+        violations.push(`${relative}:${position.line + 1}`);
       }
       ts.forEachChild(node, visit);
     }
@@ -315,6 +473,22 @@ test("private font guard remains a dependency-free Pages Function leaf", async (
   const source = await readFile(path.join(projectRoot, file), "utf8");
 
   assert.deepEqual(importedModules(file, source), []);
+});
+
+test("official object policy remains independent of Cloudflare transport", async () => {
+  const file = "functions/official/public-object-policy.js";
+  const source = await readFile(path.join(projectRoot, file), "utf8");
+
+  assert.deepEqual(importedModules(file, source), []);
+});
+
+test("official Pages transport depends only on the public object policy", async () => {
+  const file = "functions/official/[[path]].js";
+  const source = await readFile(path.join(projectRoot, file), "utf8");
+
+  assert.deepEqual(importedModules(file, source), [
+    { specifier: "./public-object-policy.js", typeOnly: false },
+  ]);
 });
 
 function jsxTagNames(sourceFile) {
