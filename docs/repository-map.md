@@ -30,6 +30,9 @@ asset-production workspaces are deliberately outside this boundary.
 - `src/layers.tsx` and `src/layers/`: stable visual-layer facade plus isolated
   image/text primitives, Canvas/Unity/TMP text components, sprite counters, and
   QR rendering.
+- `src/runtimeJson.ts` and `src/runtimeJson/`: stable external-JSON facade plus
+  narrow shared primitives and isolated font-metric, manifest, and SongDB
+  validators. Application consumers import only the facade.
 - `src/cardAssets.ts` and the holo and font loaders: browser renderer source
   that reads allowlisted R2 objects; these modules do not embed renderer assets.
 - `public/`: only `404.html`, `_headers`, and `theme-init.js`, copied verbatim

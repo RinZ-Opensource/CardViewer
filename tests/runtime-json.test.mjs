@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { importTypeScriptModule } from "./helpers/import-typescript.mjs";
+import { importTypeScriptModuleGraph } from "./helpers/import-typescript.mjs";
 
 const {
   parseOnlineManifestIndex,
@@ -9,7 +9,7 @@ const {
   parseSongDbEntries,
   parseTmpFontMetrics,
   parseUnityFontMetrics,
-} = await importTypeScriptModule("src/runtimeJson.ts");
+} = await importTypeScriptModuleGraph("src/runtimeJson.ts");
 
 const stats = {
   chuCards: 1,
@@ -174,15 +174,85 @@ test("rejects malformed manifest envelopes before callers trust them", () => {
       }),
     /Invalid legacy manifest at \$\.stats\.pngAssets/,
   );
+
+  assert.throws(
+    () =>
+      parseOnlineManifestShard(
+        {
+          key: "chu",
+          game: "CHU",
+          cards: [
+            {
+              ...card,
+              printFields: [
+                {
+                  key: "frame",
+                  label: "Frame",
+                  fieldType: "select",
+                  value: "gold",
+                  options: [{ value: "gold", label: 42 }],
+                },
+              ],
+            },
+          ],
+        },
+        "deep shard",
+      ),
+    /Invalid deep shard at \$\.cards\[0\]\.printFields\[0\]\.options\[0\]\.label: expected a string/,
+  );
+});
+
+test("rejects invalid parser roots with source-specific errors", () => {
+  const objectParsers = [
+    [parseUnityFontMetrics, null, "root Unity"],
+    [parseTmpFontMetrics, [], "root TMP"],
+    [parseOnlineManifestIndex, "index", "root index"],
+    [parseOnlineManifestShard, 1, "root shard"],
+    [parseScanResult, false, "root legacy"],
+  ];
+
+  for (const [parse, value, source] of objectParsers) {
+    assert.throws(() => parse(value, source), {
+      message: `Invalid ${source} at $: expected an object`,
+    });
+  }
+
+  assert.throws(() => parseSongDbEntries({}, "maimai", "root songdb"), {
+    message: "Invalid root songdb at $: expected an array",
+  });
+});
+
+test("preserves each parser's default source label", () => {
+  const cases = [
+    [() => parseUnityFontMetrics(null), "Invalid Unity font metrics at $: expected an object"],
+    [() => parseTmpFontMetrics(null), "Invalid TMP font metrics at $: expected an object"],
+    [() => parseOnlineManifestIndex(null), "Invalid manifest index at $: expected an object"],
+    [() => parseOnlineManifestShard(null), "Invalid manifest shard at $: expected an object"],
+    [() => parseScanResult(null), "Invalid legacy manifest at $: expected an object"],
+    [
+      () => parseSongDbEntries({}, "ongeki"),
+      "Invalid songdb ongeki at $: expected an array",
+    ],
+  ];
+
+  for (const [parse, message] of cases) {
+    assert.throws(parse, { message });
+  }
 });
 
 test("SongDB accepts only a top-level array of flat string rows", () => {
-  const rows = [{ id: "1", title: "Song", bpm: "120" }, { title: "Another" }];
-  const chuniRows = rows.map((row, index) => ({ ...row, image: `jacket-${index}.png` }));
-  assert.equal(parseSongDbEntries(chuniRows, "chunithm", "songdb test"), chuniRows);
+  const validGames = [
+    ["maimai", { title: "Song", image_url: "maimai.png", sort: "1" }],
+    ["chunithm", { title: "Song", image: "chunithm.png", id: "1" }],
+    ["ongeki", { title: "Song", image_url: "ongeki.png", id: "1" }],
+  ];
+  for (const [game, row] of validGames) {
+    const rows = [row, { title: "Partial row" }];
+    assert.equal(parseSongDbEntries(rows, game, `songdb ${game} test`), rows);
+  }
 
   assert.throws(
-    () => parseSongDbEntries({ rows }, "chunithm", "songdb test"),
+    () => parseSongDbEntries({ rows: [] }, "chunithm", "songdb test"),
     /Invalid songdb test at \$: expected an array/,
   );
   assert.throws(
@@ -197,8 +267,15 @@ test("SongDB accepts only a top-level array of flat string rows", () => {
     () => parseSongDbEntries([], "maimai", "songdb test"),
     /Invalid songdb test at \$: expected a non-empty song array/,
   );
-  assert.throws(
-    () => parseSongDbEntries([{ title: "UTAGE" }], "maimai", "songdb test"),
-    /at least one row with non-empty title, image_url, sort/,
-  );
+  const requiredFields = [
+    ["maimai", "title, image_url, sort"],
+    ["chunithm", "title, image, id"],
+    ["ongeki", "title, image_url, id"],
+  ];
+  for (const [game, fields] of requiredFields) {
+    assert.throws(
+      () => parseSongDbEntries([{ title: "Incomplete" }], game, `bad ${game}`),
+      { message: `Invalid bad ${game} at $: expected at least one row with non-empty ${fields}` },
+    );
+  }
 });

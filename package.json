@@ -22,7 +22,7 @@
     "preview:cloudflare": "npm exec --prefix workers/songdb-sync --offline -- wrangler pages dev dist --r2=ASSETS_BUCKET",
     "preview:public": "npm run preview",
     "test:functions": "node --test tests/pages-functions.test.mjs",
-    "test:boundaries": "node --test tests/module-boundaries.test.mjs tests/card-module-boundaries.test.mjs tests/hooks-module-boundaries.test.mjs tests/layers-module-boundaries.test.mjs tests/text-rendering-module-boundaries.test.mjs",
+    "test:boundaries": "node --test tests/module-boundaries.test.mjs tests/card-module-boundaries.test.mjs tests/hooks-module-boundaries.test.mjs tests/layers-module-boundaries.test.mjs tests/runtime-json-module-boundaries.test.mjs tests/text-rendering-module-boundaries.test.mjs",
     "test:import-graph": "node --test tests/import-graph.test.mjs",
     "test:deployment-boundary": "node --test tests/deployment-boundary.test.mjs",
     "test:holo-mask": "node --test tests/holo-mask-math.test.mjs",
