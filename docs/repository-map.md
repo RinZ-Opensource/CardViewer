@@ -14,7 +14,8 @@ asset-production workspaces are deliberately outside this boundary.
 - `src/cardAssets.ts`, `src/layers.tsx`, `src/textRendering.ts`, and the holo and
   font loaders: browser renderer source that reads allowlisted R2 objects; these
   modules do not embed renderer assets.
-- `public/`: only `_headers` and `theme-init.js`, copied verbatim into `dist`.
+- `public/`: only `404.html`, `_headers`, and `theme-init.js`, copied verbatim
+  into `dist`.
 - `functions/official/[[path]].js`: Pages Function that exposes the reviewed
   `/official/*` surface through the `ASSETS_BUCKET` R2 binding.
 - `workers/songdb-sync/`: scheduled/manual upstream metadata production plus
@@ -75,10 +76,10 @@ changed working-tree variants.
 
 The Vite guard compares the entire `public/` tree with
 `public-asset-policy.json` before serving or building. That policy allows only
-`_headers` and `theme-init.js`; `check-public-dist.mjs` then allows those files
-plus the expected Vite entry bundles. These safeguards are independent of the
-Pages Function allowlist: one protects static build contents, while the other
-limits which R2 objects can be read at runtime.
+`404.html`, `_headers`, and `theme-init.js`; `check-public-dist.mjs` then allows
+those files plus the expected Vite entry bundles. These safeguards are
+independent of the Pages Function allowlist: one protects static build contents,
+while the other limits which R2 objects can be read at runtime.
 
 ## Deployment boundary
 

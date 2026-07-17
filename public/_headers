@@ -8,5 +8,9 @@
 # duplicate request.
 /
   Link: </official/generated/cards.index.json>; rel=preload; as=fetch
+  Cache-Control: no-cache, no-store, must-revalidate
 /index.html
   Link: </official/generated/cards.index.json>; rel=preload; as=fetch
+  Cache-Control: no-cache, no-store, must-revalidate
+/404.html
+  Cache-Control: no-store

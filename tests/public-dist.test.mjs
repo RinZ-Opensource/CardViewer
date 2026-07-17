@@ -69,6 +69,17 @@ test("rejects output missing a reviewed static file", async (t) => {
   assert.match(result.stderr, /missing: theme-init\.js/);
 });
 
+test("requires the Pages 404 boundary that prevents stale bundle fallback", async (t) => {
+  const distRoot = await temporaryDist(t);
+  await populateReviewedDist(distRoot);
+  await rm(path.join(distRoot, "404.html"));
+
+  const result = runChecker(distRoot);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /missing: 404\.html/);
+});
+
 test("rejects output missing the generated JavaScript entry", async (t) => {
   const distRoot = await temporaryDist(t);
   await populateReviewedDist(distRoot);

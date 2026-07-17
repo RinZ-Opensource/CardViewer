@@ -69,8 +69,8 @@ same-origin R2 route.
 ## Repository layout
 
 - `src/`: React application and renderers.
-- `public/`: two reviewed app-shell control files copied verbatim by Vite;
-  runtime media and fonts do not live here.
+- `public/`: reviewed app-shell control files and the fail-closed Pages 404,
+  copied verbatim by Vite; runtime media and fonts do not live here.
 - `public-asset-policy.json`: exact allowlist for copied and generated files.
 - `functions/`: allowlisted Pages Function for R2-backed official assets.
 - `workers/songdb-sync/`: upstream-to-R2 metadata synchronization Worker with
@@ -82,7 +82,7 @@ same-origin R2 route.
 
 Do not place media or font binaries anywhere in the repository. The
 deployment-boundary test rejects tracked image, font, and media extensions,
-while `public-asset-policy.json` limits `public/` to `_headers` and
+while `public-asset-policy.json` limits `public/` to `404.html`, `_headers`, and
 `theme-init.js`. Vite copies that directory into `dist` even when Git ignores a
 file, so the completed artifact is checked independently.
 

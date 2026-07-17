@@ -1,5 +1,6 @@
 {
   "allowedPublicFiles": [
+    "404.html",
     "_headers",
     "theme-init.js"
   ],
