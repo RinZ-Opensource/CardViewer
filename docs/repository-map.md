@@ -22,6 +22,8 @@ asset-production workspaces are deliberately outside this boundary.
   manifest, list viewport, selected-asset, and thumbnail loading lifecycles.
 - `src/scorecard/scorecardLayout.ts`: renderer-independent design dimensions
   used by the responsive preview fitter; CSS parity is enforced by tests.
+- `src/styles/scorecard-ui.css` and `src/styles/scorecard-{mai,chuni,ongeki}*.css`:
+  shared workbench layout is separate from each game's design-space renderer.
 - `src/cardAssets.ts`, `src/layers.tsx`, `src/textRendering.ts`, and the holo and
   font loaders: browser renderer source that reads allowlisted R2 objects; these
   modules do not embed renderer assets.

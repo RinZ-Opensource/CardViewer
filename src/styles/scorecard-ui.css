@@ -1,0 +1,283 @@
+/* ---------------------------------------------------------------------------
+ * Score-card surface layout
+ * ------------------------------------------------------------------------- */
+
+.scorecard-shell {
+  display: grid;
+  grid-template-columns: 390px minmax(0, 1fr);
+  height: 100%;
+  background: var(--ui-shell-bg);
+}
+
+.scorecard-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-right: 1px solid var(--ui-border);
+  background: var(--ui-sidebar-bg);
+  overflow-y: auto;
+}
+
+.scorecard-form h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.scorecard-form .control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ui-text-muted);
+}
+
+.scorecard-form .control input,
+.scorecard-form .control select {
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-panel-bg);
+  color: var(--ui-text);
+}
+
+.scorecard-form .segment {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+/* Checkbox rows (chuni/ongeki option toggles): undo the text-input chrome the
+   shared .control input rule would give the checkbox. */
+.scorecard-form .control.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.scorecard-form .control.inline input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--ui-accent, #3b82f6);
+}
+
+/* Difficulties the selected DB song has no chart for. */
+.scorecard-form .segment button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.scorecard-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.scorecard-form-actions .ghost-button {
+  min-height: 34px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Song picker (searchable DB dropdown shared by the three game forms)
+ * ------------------------------------------------------------------------- */
+
+.scorecard-form .songpicker {
+  position: relative;
+}
+
+.songpicker-status {
+  font-size: 11px;
+  color: var(--ui-text-muted);
+}
+
+.songpicker-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.songpicker-retry {
+  padding: 2px 7px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-size: 11px;
+}
+
+.songpicker-retry:hover {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent-strong);
+}
+
+/* Anchored under the whole .control label (input + status line). */
+.songpicker-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 30;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-panel-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.songpicker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.songpicker-row.active {
+  background: var(--ui-accent-solid);
+}
+
+.songpicker-thumb {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--ui-ghost-bg);
+}
+
+.songpicker-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.songpicker-title {
+  font-size: 12px;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.songpicker-artist {
+  font-size: 11px;
+  color: var(--ui-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.songpicker-row.active .songpicker-title,
+.songpicker-row.active .songpicker-artist {
+  color: var(--ui-on-accent);
+}
+
+.songpicker-empty {
+  padding: 10px;
+  font-size: 12px;
+  color: var(--ui-text-muted);
+}
+
+.scorecard-preview {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--ui-stage-bg);
+}
+
+.scorecard-asset-error {
+  margin: 10px 18px 0;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 45%, var(--ui-border));
+  border-radius: var(--radius-control);
+  background: var(--ui-surface);
+  color: var(--ui-danger);
+  font-size: 12px;
+}
+
+.scorecard-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Scales the design-space card for on-screen preview. Raster-backed text
+ * allocates its backing store from the same fit factor before this zoom. */
+.scorecard-zoom {
+  flex: 0 0 auto;
+}
+
+/* On narrow online layouts, show the preview first and move the long editor
+   underneath it. The stage remains scrollable as a last-resort fallback for
+   very short landscape viewports. */
+@media (max-width: 700px) {
+  .scorecard-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    height: auto;
+    min-height: 100%;
+  }
+
+  .scorecard-preview {
+    grid-row: 1;
+    height: clamp(430px, 64dvh, 560px);
+    min-height: 430px;
+  }
+
+  .scorecard-form {
+    grid-row: 2;
+    overflow: visible;
+    padding: 16px 14px calc(20px + env(safe-area-inset-bottom, 0px));
+    border-right: 0;
+    border-top: 1px solid var(--ui-border);
+  }
+
+  .scorecard-stage {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    justify-content: safe center;
+    padding: 12px 4px 20px;
+    overscroll-behavior: contain;
+  }
+
+  .scorecard-form .control input,
+  .scorecard-form .control select,
+  .scorecard-form .segment button,
+  .scorecard-form-actions .ghost-button,
+  .songpicker-retry {
+    min-height: 44px;
+  }
+
+  .scorecard-form .control input,
+  .scorecard-form .control select {
+    height: 44px;
+  }
+
+  .scorecard-form .control.inline {
+    min-height: 44px;
+  }
+
+  .songpicker-row {
+    min-height: 48px;
+  }
+
+}
+
+.scorecard-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--ui-text-muted);
+}
