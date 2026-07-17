@@ -12,7 +12,7 @@
     "dev:public": "npm run dev",
     "build": "tsc && vite build && npm run check:public-dist",
     "build:public": "npm run build",
-    "check": "npm run check:secrets && npm run test:secrets && npm run test:deployment-boundary && npm run test:boundaries && npm run test:public-dist && npm run test:functions && npm run test:persistence && npm run test:scorecard-input && npm run test:scorecard-defaults && npm run test:scorecard-selection && npm run test:font-fallbacks && npm run test:image-loader && npm run test:manifest-url && npm run test:holo-mask && npm run test:cache && npm run build && npm run check:functions && npm run check:worker",
+    "check": "npm run check:secrets && npm run test:secrets && npm run test:deployment-boundary && npm run test:boundaries && npm run test:public-dist && npm run test:functions && npm run test:persistence && npm run test:scorecard-input && npm run test:scorecard-defaults && npm run test:scorecard-selection && npm run test:font-fallbacks && npm run test:scorecard-font-layout && npm run test:image-loader && npm run test:manifest-url && npm run test:holo-mask && npm run test:cache && npm run build && npm run check:functions && npm run check:worker",
     "check:all": "npm run check",
     "check:secrets": "node scripts/security/check-tracked-secrets.mjs",
     "check:functions": "node --check \"functions/official/[[path]].js\" && node --check \"functions/fonts/private/[[path]].js\"",
@@ -33,6 +33,7 @@
     "test:scorecard-selection": "node --test tests/scorecard-selection.test.mjs",
     "test:scorecard-input": "node --test tests/scorecard-input.test.mjs",
     "test:font-fallbacks": "node --test tests/font-fallbacks.test.mjs",
+    "test:scorecard-font-layout": "node --test tests/scorecard-font-layout.test.mjs",
     "test:public-dist": "node --test tests/public-dist.test.mjs",
     "test:secrets": "node --test tests/tracked-secrets.test.mjs"
   },

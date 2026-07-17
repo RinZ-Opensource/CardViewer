@@ -4,6 +4,7 @@ import { ChuniScoreCard } from "./ChuniScoreCard";
 import { MaiScoreCard } from "./MaiScoreCard";
 import { OngekiMusicBtCard } from "./OngekiMusicBtCard";
 import { OngekiScoreCard } from "./OngekiScoreCard";
+import { ScorecardRenderScaleProvider } from "./ScorecardRenderContext";
 import type { ChuniScoreState, ChuniSong } from "./chuniTypes";
 import type { OngekiScoreState, OngekiSong } from "./ongekiTypes";
 import type { ScoreCardGame } from "./scorecardSurfaceConfig";
@@ -48,33 +49,35 @@ export function ScoreCardPreview({
         </div>
       ) : null}
       <div className="scorecard-stage" ref={stageRef}>
-        {/* CSS zoom (not transform:scale): text re-rasterizes at the zoomed
-            size, so glyph spacing stays even at fractional fit factors. */}
-        <div className="scorecard-zoom" style={{ zoom: stageScale }}>
-          {game === "mai" ? (
-            <MaiScoreCard
-              song={song}
-              chart={chart}
-              state={state}
-              maxDxScore={maxDxScore}
-            />
-          ) : game === "chuni" ? (
-            chuniState.cardType === "musicbox" ? (
-              <ChuniMusicBoxCard song={chuniSong} state={chuniState} />
+        <ScorecardRenderScaleProvider scale={stageScale}>
+          {/* Raster-backed text renderers receive this exact fit factor and
+              allocate their backing stores for the final on-screen size. */}
+          <div className="scorecard-zoom" style={{ zoom: stageScale }}>
+            {game === "mai" ? (
+              <MaiScoreCard
+                song={song}
+                chart={chart}
+                state={state}
+                maxDxScore={maxDxScore}
+              />
+            ) : game === "chuni" ? (
+              chuniState.cardType === "musicbox" ? (
+                <ChuniMusicBoxCard song={chuniSong} state={chuniState} />
+              ) : (
+                <ChuniScoreCard song={chuniSong} state={chuniState} />
+              )
+            ) : ongekiState.cardType === "musicbt" ? (
+              <OngekiMusicBtCard
+                song={ongekiSong}
+                state={ongekiState}
+                bossIconUrl={ongekiSong.bossIconUrl}
+                bossIconFallbacks={ongekiSong.bossIconFallbacks}
+              />
             ) : (
-              <ChuniScoreCard song={chuniSong} state={chuniState} />
-            )
-          ) : ongekiState.cardType === "musicbt" ? (
-            <OngekiMusicBtCard
-              song={ongekiSong}
-              state={ongekiState}
-              bossIconUrl={ongekiSong.bossIconUrl}
-              bossIconFallbacks={ongekiSong.bossIconFallbacks}
-            />
-          ) : (
-            <OngekiScoreCard song={ongekiSong} state={ongekiState} />
-          )}
-        </div>
+              <OngekiScoreCard song={ongekiSong} state={ongekiState} />
+            )}
+          </div>
+        </ScorecardRenderScaleProvider>
       </div>
     </section>
   );

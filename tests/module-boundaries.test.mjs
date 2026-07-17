@@ -116,6 +116,7 @@ const boundaries = [
       "./MaiScoreCard",
       "./OngekiMusicBtCard",
       "./OngekiScoreCard",
+      "./ScorecardRenderContext",
       "./chuniTypes",
       "./ongekiTypes",
       "./scorecardSurfaceConfig",

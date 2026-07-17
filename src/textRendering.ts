@@ -507,7 +507,31 @@ export function reactText(children: React.ReactNode) {
     .join("");
 }
 
-export function layoutUnityText(
+export type UnityTextGlyphLayout = {
+  key: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  sourceX: number;
+  sourceY: number;
+  sourceW: number;
+  sourceH: number;
+  color: string;
+};
+
+/**
+ * Lay out a legacy Unity bitmap-font run in logical pixels.
+ *
+ * CharacterInfo.vert uses Unity's y-up convention: the shipped atlases have
+ * a negative `vert.y` (top bearing) and a negative `vert.height`. Converting
+ * that rectangle to the canvas' y-down convention therefore uses `-vertY`
+ * for the top and `abs(vertH)` for the height. Keeping this conversion here,
+ * before any backing-store rounding, gives every glyph in a line one shared
+ * baseline and avoids the per-element percentage rounding used by the DOM
+ * renderer.
+ */
+export function layoutUnityTextPixels(
   font: UnityFontMetrics,
   text: string,
   fontSize: number,
@@ -521,7 +545,7 @@ export function layoutUnityText(
   horizontalScale: number,
   glyphOffsetY: number,
   fixedGlyphTop: boolean,
-) {
+): UnityTextGlyphLayout[] {
   const scale = fontSize / font.lineSpacing;
   const scaleX = clampNumber(horizontalScale, 0.1, 2);
   const lines = text.split(/\r?\n/);
@@ -540,15 +564,7 @@ export function layoutUnityText(
   const totalHeight = lineHeight * Math.max(1, lines.length);
   const { horizontal, vertical } = decodeUnityAnchor(alignment);
   const topBase = alignOffset(vertical, rectHeight, totalHeight);
-  const output: Array<{
-    key: string;
-    style: React.CSSProperties;
-    sourceX: number;
-    sourceY: number;
-    sourceW: number;
-    sourceH: number;
-    color: string;
-  }> = [];
+  const output: UnityTextGlyphLayout[] = [];
 
   laidOutLines.forEach((line, lineIndex) => {
     const lineWidth = line.width * fitScaleX;
@@ -577,12 +593,10 @@ export function layoutUnityText(
             glyphOffsetY;
           output.push({
             key: `${lineIndex}-${charIndex}-${char.codePointAt(0) ?? 0}`,
-            style: {
-              left: `${(glyphLeft / rectWidth) * 100}%`,
-              top: `${(glyphTop / rectHeight) * 100}%`,
-              width: `${(displayW / rectWidth) * 100}%`,
-              height: `${(displayH / rectHeight) * 100}%`,
-            },
+            x: glyphLeft,
+            y: glyphTop,
+            width: displayW,
+            height: displayH,
             sourceX,
             sourceY,
             sourceW,
@@ -596,6 +610,52 @@ export function layoutUnityText(
   });
 
   return output;
+}
+
+/** Compatibility adapter for the Card Viewer layer renderer. */
+export function layoutUnityText(
+  font: UnityFontMetrics,
+  text: string,
+  fontSize: number,
+  rectWidth: number,
+  rectHeight: number,
+  alignment: number,
+  lineSpacing: number,
+  color: string,
+  fitHorizontal: boolean,
+  extraCharacterSpacing: number,
+  horizontalScale: number,
+  glyphOffsetY: number,
+  fixedGlyphTop: boolean,
+) {
+  return layoutUnityTextPixels(
+    font,
+    text,
+    fontSize,
+    rectWidth,
+    rectHeight,
+    alignment,
+    lineSpacing,
+    color,
+    fitHorizontal,
+    extraCharacterSpacing,
+    horizontalScale,
+    glyphOffsetY,
+    fixedGlyphTop,
+  ).map((glyph) => ({
+    key: glyph.key,
+    style: {
+      left: `${(glyph.x / rectWidth) * 100}%`,
+      top: `${(glyph.y / rectHeight) * 100}%`,
+      width: `${(glyph.width / rectWidth) * 100}%`,
+      height: `${(glyph.height / rectHeight) * 100}%`,
+    } satisfies React.CSSProperties,
+    sourceX: glyph.sourceX,
+    sourceY: glyph.sourceY,
+    sourceW: glyph.sourceW,
+    sourceH: glyph.sourceH,
+    color: glyph.color,
+  }));
 }
 
 export function unityGlyph(font: UnityFontMetrics, char: string) {

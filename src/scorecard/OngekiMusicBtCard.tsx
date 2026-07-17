@@ -476,7 +476,7 @@ export function OngekiMusicBtCard({
         <ScorecardBitmapText
           className="omb-notes"
           text={state.notesDesigner}
-          fontKey="maru32"
+          fontKey="maru16"
           fontSize={10}
           width={126}
           height={10}

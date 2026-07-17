@@ -104,7 +104,7 @@ export type Bounds = {
   w: number;
   h: number;
 };
-export type OfficialFontKey = "kaku40" | "maru32" | "kaku16";
+export type OfficialFontKey = "kaku40" | "maru32" | "kaku16" | "maru16";
 
 export type UnityGlyph = {
   index: number;

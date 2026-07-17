@@ -35,8 +35,8 @@
   height: 300px;
 }
 
-/* T_music_box_title: R2 Unity SegaKakuGothic 40px atlas rendered at 32pt,
-   x0.9, centre pivot, ink #323228, no shadow. */
+/* T_music_box_title: R2 Unity SegaKakuGothic 40px atlas rendered at 32pt
+   with the prefab's uniform 0.9 cast scale, centre pivot, no shadow. */
 .cmb-title {
   position: absolute;
   left: 27px;
@@ -46,9 +46,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* The game's RFO bitmap glyphs sit lower in the cast box than CSS centering
-     of the vector face; nudge down to match (same fix as the maimai digits). */
-  transform: translateY(5px);
   line-height: 1;
   font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
   font-size: 28.8px;
@@ -57,8 +54,8 @@
   white-space: nowrap;
 }
 
-/* T_music_box_artist: R2 Unity SegaKakuGothic 16px atlas at 18pt x0.8,
-   top-centre, #5A5A50. */
+/* T_music_box_artist: R2 Unity SegaKakuGothic 16px atlas at 18pt with the
+   prefab's uniform 0.8 cast scale, top-centre, #5A5A50. */
 .cmb-artist {
   position: absolute;
   left: 27px;
@@ -68,8 +65,6 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  /* Bitmap-font baseline nudge, see .cmb-title. */
-  transform: translateY(4px);
   line-height: 1;
   font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
   font-size: 14.4px;
@@ -189,8 +184,6 @@
   height: 20px;
   display: flex;
   align-items: center;
-  /* Bitmap-font baseline nudge, see .cmb-title. */
-  transform: translateY(3px);
   line-height: 1;
   font-family: var(--font-mai-kaku, "Yu Gothic", sans-serif);
   font-size: 14px;
@@ -198,6 +191,12 @@
   color: #313c4e;
   white-space: nowrap;
 }
+
+/* Loading fallbacks use browser fonts rather than Unity glyph metrics. Keep
+   their optical nudges isolated so the real bitmap baseline is not shifted. */
+.cmb-title > .scorecard-bitmap-fallback { transform: translateY(5px); }
+.cmb-artist > .scorecard-bitmap-fallback { transform: translateY(4px); }
+.cmb-notes-name > .scorecard-bitmap-fallback { transform: translateY(3px); }
 
 /* Confirm state (A_start_in rest pose): pre-baked decide frame + banner.
    The idle alpha pulse (A_start_eff) is skipped for a stable preview. */

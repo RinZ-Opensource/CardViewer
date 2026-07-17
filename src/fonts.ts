@@ -16,6 +16,7 @@ const OFFICIAL_FONT_CATALOGS: Record<OfficialFontKey, string> = {
   kaku40: "FONT_SegaKakuGothic_40px.json",
   maru32: "FONT_SegaMaruGothic_32px.json",
   kaku16: "FONT_SegaKakuGothic_16px.json",
+  maru16: "FONT_SegaMaruGothic_16px.json",
 };
 
 const officialFontPromises = new Map<OfficialFontKey, Promise<UnityFontMetrics>>();
@@ -35,7 +36,7 @@ export function loadOfficialFont(key: OfficialFontKey) {
 }
 
 /**
- * Load the three Unity bitmap-font catalogs used by the CHU and MAI card
+ * Load the Unity bitmap-font catalogs used by the CHU, MAI, and MU3 card
  * renderers. Both the catalogs and their referenced atlases live in the
  * versioned R2 runtime bundle; the repository intentionally stores neither.
  */

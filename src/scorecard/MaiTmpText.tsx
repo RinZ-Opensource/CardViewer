@@ -3,9 +3,12 @@ import { OFFICIAL_ASSET_ROOT } from "../constants";
 import { loadTmpAtlas, measureTmpLine } from "../textRendering";
 import type { TmpFontMetrics, TmpGlyph } from "../types";
 import { FitText } from "./FitText";
+import { useScorecardRenderScale } from "./ScorecardRenderContext";
+import { scorecardTextBackingScale } from "./scorecardRenderScale";
 
 export type MaiTmpFontKey = "rodin" | "maru";
 export type MaiTmpHorizontalAlign = "left" | "center" | "right";
+export type MaiTmpVerticalAlign = "top" | "middle" | "bottom";
 
 const FONT_CATALOGS: Record<MaiTmpFontKey, string> = {
   rodin: "FONT_TMP_MAI_NEW_RODIN_EB_SDF_SUBSET_V1.json",
@@ -84,15 +87,28 @@ function renderMaiTmpText(
     fontSize: number;
     color: readonly [number, number, number];
     align: MaiTmpHorizontalAlign;
+    verticalAlign: MaiTmpVerticalAlign;
     fitHorizontal: boolean;
+    marginTop: number;
+    marginBottom: number;
+    renderScale: number;
   },
 ) {
-  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-  canvas.width = Math.ceil((options.width + PADDING * 2) * dpr);
-  canvas.height = Math.ceil((options.height + PADDING * 2) * dpr);
+  // CSS `zoom` does not re-rasterize a canvas. Allocate for its final display
+  // size and retain an extra 2x sample so small SDF strokes survive the final
+  // browser resample. The cap prevents a large HiDPI window from producing
+  // disproportionately expensive per-field backing stores.
+  const backingRatio = scorecardTextBackingScale(
+    options.renderScale,
+    window.devicePixelRatio || 1,
+  );
+  canvas.width = Math.ceil((options.width + PADDING * 2) * backingRatio);
+  canvas.height = Math.ceil((options.height + PADDING * 2) * backingRatio);
   const context = canvas.getContext("2d");
   if (!context) return false;
   context.clearRect(0, 0, canvas.width, canvas.height);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
 
   // The exported game atlases omit a small number of song-database symbols.
   // Keep the complete DOM fallback for those strings instead of substituting
@@ -101,40 +117,50 @@ function renderMaiTmpText(
     return false;
   }
 
-  const fontScale = options.fontSize / font.fontInfo.PointSize;
-  const naturalWidth = measureTmpLine(font, text, options.fontSize, 0);
-  const scaleX = options.fitHorizontal && naturalWidth > options.width
-    ? options.width / naturalWidth
-    : 1;
-  const fittedWidth = naturalWidth * scaleX;
+  const maximumWidth = Math.max(0, options.width);
+  const maximumSizeWidth = measureTmpLine(font, text, options.fontSize, 0);
+  // TMP auto-size preserves glyph proportions. Scaling only X made fitted
+  // titles visibly narrower and changed their stroke weight.
+  const effectiveFontSize = options.fitHorizontal && maximumSizeWidth > maximumWidth
+    ? options.fontSize * (maximumWidth / maximumSizeWidth)
+    : options.fontSize;
+  const fontScale = effectiveFontSize / font.fontInfo.PointSize;
+  const fittedWidth = measureTmpLine(font, text, effectiveFontSize, 0);
   const offsetX = options.align === "center"
     ? (options.width - fittedWidth) / 2
     : options.align === "right"
       ? options.width - fittedWidth
       : 0;
   const lineHeight = font.fontInfo.LineHeight * fontScale;
-  const baseline = PADDING + (options.height - lineHeight) / 2 + font.fontInfo.Ascender * fontScale;
+  const marginTop = Math.max(0, options.marginTop);
+  const marginBottom = Math.max(0, options.marginBottom);
+  const contentHeight = Math.max(0, options.height - marginTop - marginBottom);
+  const lineTop = options.verticalAlign === "top"
+    ? marginTop
+    : options.verticalAlign === "bottom"
+      ? options.height - marginBottom - lineHeight
+      : marginTop + (contentHeight - lineHeight) / 2;
+  const baseline = PADDING + lineTop + font.fontInfo.Ascender * fontScale;
 
-  context.save();
-  context.translate((PADDING + offsetX) * dpr, 0);
-  context.scale(scaleX, 1);
   let cursor = 0;
   let drawn = 0;
   for (const character of Array.from(text)) {
     const glyph = glyphFor(font, character);
     const advance = (glyph?.xAdvance ?? font.fontInfo.PointSize * 0.5) * fontScale;
     if (glyph && glyph.width > 0 && glyph.height > 0) {
-      const width = Math.max(1, Math.ceil(glyph.width * fontScale * dpr));
-      const height = Math.max(1, Math.ceil(glyph.height * fontScale * dpr));
+      const width = Math.max(1, Math.ceil(glyph.width * fontScale * backingRatio));
+      const height = Math.max(1, Math.ceil(glyph.height * fontScale * backingRatio));
       const glyphCanvas = rasterizeGlyph(atlas, glyph, width, height, options.color);
-      const x = (cursor + glyph.xOffset * fontScale) * dpr;
-      const y = (baseline - glyph.yOffset * fontScale) * dpr;
-      context.drawImage(glyphCanvas, Math.round(x), Math.round(y));
+      const x = (PADDING + offsetX + cursor + glyph.xOffset * fontScale) * backingRatio;
+      const y = (baseline - glyph.yOffset * fontScale) * backingRatio;
+      // Keep the shared TMP baseline at sub-pixel precision. Independent
+      // integer rounding here was enough to move adjacent glyphs by a full
+      // displayed pixel after the parent card zoom.
+      context.drawImage(glyphCanvas, x, y);
       drawn += 1;
     }
     cursor += advance;
   }
-  context.restore();
   return drawn > 0;
 }
 
@@ -147,7 +173,10 @@ interface MaiTmpTextProps {
   height: number;
   color: readonly [number, number, number];
   align?: MaiTmpHorizontalAlign;
+  verticalAlign?: MaiTmpVerticalAlign;
   fitHorizontal?: boolean;
+  marginTop?: number;
+  marginBottom?: number;
 }
 
 /** Renders the original maimai TMP SDF atlas while retaining a DOM fallback. */
@@ -160,10 +189,14 @@ export function MaiTmpText({
   height,
   color,
   align = "left",
+  verticalAlign = "middle",
   fitHorizontal = false,
+  marginTop = 0,
+  marginBottom = 0,
 }: MaiTmpTextProps) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [rendered, setRendered] = React.useState(false);
+  const renderScale = useScorecardRenderScale();
 
   React.useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -183,7 +216,11 @@ export function MaiTmpText({
           fontSize,
           color,
           align,
+          verticalAlign,
           fitHorizontal,
+          marginTop,
+          marginBottom,
+          renderScale,
         }));
       })
       .catch(() => {
@@ -192,7 +229,26 @@ export function MaiTmpText({
     return () => {
       cancelled = true;
     };
-  }, [align, color, fitHorizontal, font, fontSize, height, text, width]);
+  }, [
+    align,
+    color,
+    fitHorizontal,
+    font,
+    fontSize,
+    height,
+    marginBottom,
+    marginTop,
+    renderScale,
+    text,
+    verticalAlign,
+    width,
+  ]);
+
+  const fallbackAlignItems = verticalAlign === "top"
+    ? "flex-start"
+    : verticalAlign === "bottom"
+      ? "flex-end"
+      : "center";
 
   return (
     <div className={`${className} mai-tmp-text`}>
@@ -200,7 +256,13 @@ export function MaiTmpText({
       <span
         aria-hidden="true"
         className={`mai-tmp-fallback align-${align}`}
-        style={{ opacity: rendered ? 0 : 1 }}
+        style={{
+          alignItems: fallbackAlignItems,
+          boxSizing: "border-box",
+          opacity: rendered ? 0 : 1,
+          paddingBottom: marginBottom,
+          paddingTop: marginTop,
+        }}
       >
         {fitHorizontal ? (
           <FitText maxWidth={width} origin={align}>

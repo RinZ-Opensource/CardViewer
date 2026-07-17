@@ -96,6 +96,7 @@ test("retains successful Unity font catalogs when one sibling fails", async () =
       ["kaku40", "kaku40.json"],
       ["maru32", "maru32.json"],
       ["kaku16", "kaku16.json"],
+      ["maru16", "maru16.json"],
     ],
     async (file) => {
       if (file === "maru32.json") throw new Error("catalog unavailable");
@@ -106,6 +107,7 @@ test("retains successful Unity font catalogs when one sibling fails", async () =
   assert.deepEqual(fonts, {
     kaku40: { file: "kaku40.json" },
     kaku16: { file: "kaku16.json" },
+    maru16: { file: "maru16.json" },
   });
   assert.deepEqual(failures, [["maru32", "maru32.json"]]);
 });

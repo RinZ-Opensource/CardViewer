@@ -175,10 +175,10 @@ export function MaiScoreCard({ song, chart, state, maxDxScore }: MaiScoreCardPro
                 }}
               />
             ) : null}
-            <MaiTmpText className="msc-dxscore-label" text="DXSCORE" font="rodin" fontSize={18} width={121} height={25} color={TMP_GREEN} />
-            <MaiTmpText className="msc-dx-value" text={String(dxScore)} font="maru" fontSize={18} width={61} height={21} color={TMP_WHITE} align="right" fitHorizontal />
+            <MaiTmpText className="msc-dxscore-label" text="DXSCORE" font="rodin" fontSize={18} width={121} height={25} color={TMP_GREEN} marginTop={3.68} marginBottom={0.07} />
+            <MaiTmpText className="msc-dx-value" text={String(dxScore)} font="maru" fontSize={18} width={61} height={21} color={TMP_WHITE} align="right" verticalAlign="bottom" fitHorizontal />
             <MaiTmpText className="msc-dx-slash" text="/" font="maru" fontSize={15} width={11} height={17} color={TMP_WHITE} align="center" />
-            <MaiTmpText className="msc-dx-max" text={safeMaxDxScore > 0 ? String(safeMaxDxScore) : "----"} font="maru" fontSize={16} width={48} height={21} color={TMP_WHITE} align="right" fitHorizontal />
+            <MaiTmpText className="msc-dx-max" text={safeMaxDxScore > 0 ? String(safeMaxDxScore) : "----"} font="maru" fontSize={16} width={48} height={21} color={TMP_WHITE} align="right" verticalAlign="bottom" fitHorizontal />
             {stars > 0 ? (
               <span className="msc-stars">
                 {Array.from({ length: stars }, (_, index) => (
@@ -190,8 +190,8 @@ export function MaiScoreCard({ song, chart, state, maxDxScore }: MaiScoreCardPro
         ) : null}
 
         {/* Notes designer + BPM (labels are TMP text on this card, not sprites) */}
-        <MaiTmpText className="msc-designer-label" text="NOTES DESIGNER" font="rodin" fontSize={12} width={121} height={25} color={TMP_NAVY} />
-        <MaiTmpText className="msc-designer-name" text={designer} font="maru" fontSize={16} width={243.12} height={16.27} color={TMP_NAVY} fitHorizontal />
+        <MaiTmpText className="msc-designer-label" text="NOTES DESIGNER" font="rodin" fontSize={12} width={121} height={25} color={TMP_NAVY} marginTop={3.68} marginBottom={0.07} />
+        <MaiTmpText className="msc-designer-name" text={designer} font="maru" fontSize={16} width={243.12} height={16.27} color={TMP_NAVY} verticalAlign="top" fitHorizontal />
         <MaiTmpText className="msc-bpm" text={`BPM ${bpmText}`} font="maru" fontSize={18} width={93} height={17} color={TMP_DARK} align="center" fitHorizontal />
 
         {/* Combo / sync medals: real when a badge is set, gray placeholder circle

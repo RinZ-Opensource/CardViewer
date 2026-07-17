@@ -211,9 +211,8 @@
   min-height: 0;
 }
 
-/* Scales the design-space card for on-screen preview. CSS zoom re-rasterizes
- * text at the target size, so glyph spacing stays even at fractional fit
- * factors unlike transform: scale(). */
+/* Scales the design-space card for on-screen preview. Raster-backed text
+ * allocates its backing store from the same fit factor before this zoom. */
 .scorecard-zoom {
   flex: 0 0 auto;
 }
@@ -463,9 +462,7 @@
 
 .msc-ach {
   position: absolute;
-  /* TMP rect top is 518.5; -0.8px centers the digits' optical box on the navy
-     box center (CSS half-leading sits the glyphs slightly lower than TMP). */
-  top: 517.7px;
+  top: 518.5px;
   height: 27px;
   line-height: 27px;
   font-family: var(--font-mai-rodin-eb, "Arial Black", sans-serif);
@@ -513,10 +510,9 @@
 
 .msc-dx-value { right: 214.5px; top: 551.5px; width: 61px; height: 21px; font-size: 18px; line-height: 21px; }
 .msc-dx-slash { left: 204.5px; top: 555.5px; width: 11px; height: 17px; font-size: 15px; line-height: 17px; text-align: center; }
-/* TMP autosizes the max up to 16pt (the prefab's 13.4 is just the editor value
-   for the "99,999" placeholder); real 4-digit maxima fit the 48px rect at 16.
-   top 555 puts its baseline on the value's (551.5 + 1.5 + 16 = 555 + 14). */
-.msc-dx-max { right: 156.5px; top: 555px; width: 48px; height: 21px; font-size: 16px; line-height: 16px; }
+/* TMP autosizes the max up to 16pt (the prefab's 13.4 is the editor value for
+   the placeholder); it shares the value field's 21px BottomRight cast box. */
+.msc-dx-max { right: 156.5px; top: 551.5px; width: 48px; height: 21px; font-size: 16px; line-height: 16px; }
 
 /* --- DX stars: earned only, tier-coloured sprite. HorizontalLayoutGroup
        spacing -5, MiddleRight: 24px pips at 19px pitch, right edge fixed at
@@ -552,7 +548,7 @@
   left: 25.4px;
   top: 599px;
   width: 243.12px;
-  height: 16px;
+  height: 16.27px;
   line-height: 16px;
   font-family: var(--font-mai-maru, "Yu Gothic", sans-serif);
   font-size: 16px;

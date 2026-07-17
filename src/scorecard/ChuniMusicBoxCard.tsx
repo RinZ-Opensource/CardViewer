@@ -143,23 +143,21 @@ export function ChuniMusicBoxCard({ song, state, jacketUrl }: ChuniMusicBoxCardP
         className="cmb-title"
         text={song.title}
         fontKey="kaku40"
-        fontSize={32}
+        fontSize={28.8}
         width={400}
         height={48}
         alignment={4}
         color="#323228"
-        horizontalScale={0.9}
       />
       <ScorecardBitmapText
         className="cmb-artist"
         text={song.artist}
         fontKey="kaku16"
-        fontSize={18}
+        fontSize={14.4}
         width={400}
         height={16}
         alignment={1}
         color="#5a5a50"
-        horizontalScale={0.8}
       />
 
       {/* C_level_default and C_level_WE both exist in data; code shows one. */}
@@ -180,12 +178,11 @@ export function ChuniMusicBoxCard({ song, state, jacketUrl }: ChuniMusicBoxCardP
             className="cmb-we-kanji"
             text={state.weKanji.slice(0, 1)}
             fontKey="kaku40"
-            fontSize={60}
+            fontSize={48}
             width={54.4}
             height={54.4}
             alignment={4}
             color="#ffffff"
-            horizontalScale={0.8}
           />
         </>
       ) : (
@@ -262,6 +259,7 @@ export function ChuniMusicBoxCard({ song, state, jacketUrl }: ChuniMusicBoxCardP
         height={20}
         alignment={3}
         color="#313c4e"
+        lineSpacing={16 / 14}
       />
 
       {/* Confirm state (A_start_in): decide frame + start banner fade in over
