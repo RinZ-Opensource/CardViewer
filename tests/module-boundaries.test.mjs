@@ -10,6 +10,17 @@ const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 const boundaries = [
   { file: "src/hooks.ts", forbidden: ["./cards"] },
   { file: "src/cardData.ts", forbidden: ["./layers"] },
+  { file: "src/cardEdits.ts", allowed: ["./types"], typeOnly: true },
+  {
+    file: "src/useCardEdits.ts",
+    allowed: ["react", "./cardEdits", "./persistence", "./types"],
+    forbidden: ["./hooks", "./cards", "./exportPng", "@tauri-apps/api/core"],
+  },
+  {
+    file: "src/EditorPanel.tsx",
+    allowed: ["./cardEdits", "./types"],
+    forbidden: ["./hooks", "./cards", "./exportPng", "@tauri-apps/api/core"],
+  },
   {
     file: "src/scorecard/scorecardInput.ts",
     forbidden: ["react", "./ScoreCardSurface", "../persistence"],

@@ -1,8 +1,10 @@
 import React from "react";
 import { selectedAssetSignature, usesPrimaryImageDataUrl } from "./cardAssets";
+import { applyEdits, effectiveCardEdits } from "./cardEdits";
 import { buildFilterConfig, cardMatchesFilters, uniqueOptions } from "./cardFilters";
 import { isSupportedCardRecord } from "./cardSupport";
 import { PreviewStage } from "./cards";
+import { EditorPanel } from "./EditorPanel";
 import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT } from "./constants";
 import {
   useCardListViewport,
@@ -13,6 +15,7 @@ import {
 } from "./hooks";
 import { THUMBNAIL_BUFFER_ROWS } from "./imageLoader";
 import { CardRecord, ViewMode } from "./types";
+import { useCardEdits } from "./useCardEdits";
 
 export function App() {
   const [selectedId, setSelectedId] = React.useState<string>("");
@@ -20,18 +23,25 @@ export function App() {
   const [cardFilters, setCardFilters] = React.useState<Record<string, string>>({});
   const [viewMode, setViewMode] = React.useState<ViewMode>("3d");
   const { cardListRef, cardListViewport, updateCardListScroll } = useCardListViewport();
+  const { edits, updateCardField, updatePlayerField } = useCardEdits();
   const { scanResult, status, source, loading, retry } = useScanResult(setSelectedId);
 
   const cards = scanResult?.cards ?? [];
-  const displayCards = React.useMemo(
+  const baseCards = React.useMemo(
     () => cards.filter(isSupportedCardRecord),
     [cards],
+  );
+  const displayCards = React.useMemo(
+    () => baseCards.map((card) => applyEdits(card, effectiveCardEdits(edits, card))),
+    [baseCards, edits],
   );
   const games = React.useMemo(
     () => uniqueOptions(displayCards.map((card) => card.game)),
     [displayCards],
   );
+  const selectedBase = baseCards.find((card) => card.dataName === selectedId) ?? null;
   const selected = displayCards.find((card) => card.dataName === selectedId) ?? null;
+  const selectedEdits = selectedBase ? effectiveCardEdits(edits, selectedBase) : undefined;
   const selectedImagePath =
     selected && usesPrimaryImageDataUrl(selected)
       ? selected.imagePath ?? selected.thumbnailPath ?? ""
@@ -48,7 +58,7 @@ export function App() {
   );
 
   // One lowercased haystack per card, so typing only re-runs cheap substring
-  // checks; rebuilt only when the manifest cards change.
+  // checks; rebuilt when the manifest cards or their browser edits change.
   const searchIndex = React.useMemo(() => {
     const index = new Map<string, string>();
     for (const card of displayCards) {
@@ -366,35 +376,36 @@ export function App() {
                 className="card-list-window"
                 style={{ transform: `translateY(${virtualStart * CARD_ROW_HEIGHT}px)` }}
               >
-              {virtualCards.map((card, windowIndex) => {
-                const cardIndex = virtualStart + windowIndex;
-                const active = selected?.dataName === card.dataName;
-                const thumb = thumbCache[card.dataName];
-                return (
-                  <button
-                    key={`${card.game}-${card.dataName}`}
-                    id={`card-option-${cardIndex}`}
-                    type="button"
-                    role="option"
-                    tabIndex={-1}
-                    aria-selected={active}
-                    aria-posinset={cardIndex + 1}
-                    aria-setsize={filteredCards.length}
-                    className={`card-row ${active ? "active" : ""}`}
-                    onClick={() => setSelectedId(card.dataName)}
-                  >
-                    <span className="thumb-slot">
-                      {thumb ? <img src={thumb} alt="" decoding="async" /> : <span>{card.game}</span>}
-                    </span>
-                    <span className="row-main">
-                      <strong>{card.displayName}</strong>
-                      <small>
-                        {card.dataName} / {card.recordType}
-                      </small>
-                    </span>
-                  </button>
-                );
-              })}
+                {virtualCards.map((card, windowIndex) => {
+                  const cardIndex = virtualStart + windowIndex;
+                  const active = selected?.dataName === card.dataName;
+                  const thumb = thumbCache[card.dataName];
+                  return (
+                    <button
+                      key={`${card.game}-${card.dataName}`}
+                      id={`card-option-${cardIndex}`}
+                      type="button"
+                      role="option"
+                      tabIndex={-1}
+                      aria-selected={active}
+                      aria-posinset={cardIndex + 1}
+                      aria-setsize={filteredCards.length}
+                      className={`card-row ${active ? "active" : ""}`}
+                      onClick={() => setSelectedId(card.dataName)}
+                    >
+                      <span className="thumb-slot">
+                        {thumb ? <img src={thumb} alt="" decoding="async" /> : <span>{card.game}</span>}
+                      </span>
+                      <span className="row-main">
+                        <strong>{card.displayName}</strong>
+                        <small>
+                          {card.dataName} / {card.recordType}
+                        </small>
+                      </span>
+                      {edits[card.dataName] ? <span className="chip-edited">edited</span> : null}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -440,12 +451,22 @@ export function App() {
           </div>
         </div>
 
-        <PreviewStage
-          card={selected}
-          imageDataUrl={imageDataUrl}
-          assetDataUrls={assetDataUrls}
-          mode={viewMode}
-        />
+        <div className="preview-and-editor">
+          <PreviewStage
+            card={selected}
+            imageDataUrl={imageDataUrl}
+            assetDataUrls={assetDataUrls}
+            mode={viewMode}
+          />
+          <EditorPanel
+            card={selectedBase}
+            edits={selectedEdits}
+            onChange={(fieldKey, value) => {
+              if (selectedBase) updateCardField(selectedBase, fieldKey, value);
+            }}
+            onPlayerChange={updatePlayerField}
+          />
+        </div>
       </section>
     </main>
   );

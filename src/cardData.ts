@@ -1,7 +1,6 @@
 import { HOLO_ENABLED, MAI_FRAME_ASSETS, MAI_PASS_CROPS, MAI_PASS_RECT, MU3_LEVEL_LIMITS } from "./constants";
 import { spriteCropDisplayRect } from "./geometry";
-import { CardRecord } from "./types";
-import type { QrSource } from "./types";
+import type { CardRecord, QrSource } from "./types";
 
 export type MaiCharaChoice = {
   id: number;

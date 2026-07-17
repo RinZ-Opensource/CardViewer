@@ -87,6 +87,9 @@ export type OnlineManifestShard = {
   cards: CardRecord[];
 };
 
+export type PrintFieldValue = string | boolean;
+export type CardEdits = Record<string, PrintFieldValue>;
+
 export type LoadedImageDataUrl = {
   path: string;
   dataUrl: string;
