@@ -35,9 +35,8 @@
   height: 300px;
 }
 
-/* T_music_box_title: 32pt SEGA KakuGothic DB x0.9 = 28.8px, centre pivot,
-   ink #323228, no shadow (FontParam shadow 0/0). Marquee statically
-   compressed via FitText. */
+/* T_music_box_title: R2 Unity SegaKakuGothic 40px atlas rendered at 32pt,
+   x0.9, centre pivot, ink #323228, no shadow. */
 .cmb-title {
   position: absolute;
   left: 27px;
@@ -58,7 +57,8 @@
   white-space: nowrap;
 }
 
-/* T_music_box_artist: 18pt x0.8 = 14.4px, top-centre, #5A5A50. */
+/* T_music_box_artist: R2 Unity SegaKakuGothic 16px atlas at 18pt x0.8,
+   top-centre, #5A5A50. */
 .cmb-artist {
   position: absolute;
   left: 27px;
@@ -179,7 +179,8 @@
   height: 24px;
 }
 
-/* T_notesdesigner_name: 14pt, mid-left, #313C4E. */
+/* T_notesdesigner_name: R2 Unity SegaKakuGothic 16px atlas at 14pt,
+   mid-left, #313C4E. */
 .cmb-notes-name {
   position: absolute;
   left: 152px;

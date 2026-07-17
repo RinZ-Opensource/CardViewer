@@ -22,14 +22,14 @@ type LoadedImageDataUrl = {
 };
 
 /** Load the R2-hosted bitmap-font metadata required by the full renderer. */
-export function useOfficialFonts() {
+export function useOfficialFonts(enabled = true) {
   const [officialFonts, setOfficialFonts] = React.useState<
     Partial<Record<OfficialFontKey, UnityFontMetrics>>
   >({});
   const [tmpFont, setTmpFont] = React.useState<TmpFontMetrics | null>(null);
 
   React.useEffect(() => {
-    if (!USE_OFFICIAL_ASSETS) return;
+    if (!USE_OFFICIAL_ASSETS || !enabled) return;
     let cancelled = false;
     void loadOfficialFonts()
       .then((fonts) => {
@@ -44,7 +44,7 @@ export function useOfficialFonts() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   return { officialFonts, tmpFont };
 }

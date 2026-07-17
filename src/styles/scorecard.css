@@ -360,6 +360,34 @@
 
 /* --- title / artist (NewRodin EB / MaruGothic DB, white, centred) --- */
 
+.mai-tmp-text {
+  overflow: visible;
+  pointer-events: none;
+}
+
+.mai-tmp-canvas,
+.mai-tmp-fallback {
+  position: absolute;
+  pointer-events: none;
+}
+
+.mai-tmp-canvas {
+  display: block;
+  max-width: none;
+}
+
+.mai-tmp-fallback {
+  inset: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.mai-tmp-fallback.align-left { justify-content: flex-start; text-align: left; }
+.mai-tmp-fallback.align-center { justify-content: center; text-align: center; }
+.mai-tmp-fallback.align-right { justify-content: flex-end; text-align: right; }
+
 .msc-title {
   position: absolute;
   left: 17px;
@@ -447,7 +475,7 @@
 }
 
 .msc-ach-int { left: 26px; width: 56px; text-align: right; }
-.msc-ach-dec { left: 81.5px; }
+.msc-ach-dec { left: 81.5px; width: 75.5px; }
 .msc-ach-pct { left: 157px; width: 22px; text-align: center; }
 
 .msc-rank {
@@ -464,6 +492,7 @@
   position: absolute;
   left: 33.5px;
   top: 548.5px;
+  width: 121px;
   height: 25px;
   line-height: 25px;
   font-family: var(--font-mai-rodin-eb, "Arial Black", sans-serif);
@@ -482,12 +511,12 @@
   white-space: nowrap;
 }
 
-.msc-dx-value { right: 214.5px; top: 551.5px; font-size: 18px; line-height: 21px; }
-.msc-dx-slash { left: 204.5px; top: 555.5px; width: 11px; font-size: 15px; line-height: 17px; text-align: center; }
+.msc-dx-value { right: 214.5px; top: 551.5px; width: 61px; height: 21px; font-size: 18px; line-height: 21px; }
+.msc-dx-slash { left: 204.5px; top: 555.5px; width: 11px; height: 17px; font-size: 15px; line-height: 17px; text-align: center; }
 /* TMP autosizes the max up to 16pt (the prefab's 13.4 is just the editor value
    for the "99,999" placeholder); real 4-digit maxima fit the 48px rect at 16.
    top 555 puts its baseline on the value's (551.5 + 1.5 + 16 = 555 + 14). */
-.msc-dx-max { right: 156.5px; top: 555px; font-size: 16px; line-height: 16px; }
+.msc-dx-max { right: 156.5px; top: 555px; width: 48px; height: 21px; font-size: 16px; line-height: 16px; }
 
 /* --- DX stars: earned only, tier-coloured sprite. HorizontalLayoutGroup
        spacing -5, MiddleRight: 24px pips at 19px pitch, right edge fixed at
@@ -509,6 +538,7 @@
   position: absolute;
   left: 28.5px;
   top: 572.5px;
+  width: 121px;
   height: 25px;
   line-height: 25px;
   font-family: var(--font-mai-rodin-eb, "Arial Black", sans-serif);
@@ -521,6 +551,7 @@
   position: absolute;
   left: 25.4px;
   top: 599px;
+  width: 243.12px;
   height: 16px;
   line-height: 16px;
   font-family: var(--font-mai-maru, "Yu Gothic", sans-serif);

@@ -3,15 +3,9 @@ import { selectedAssetSignature, usesPrimaryImageDataUrl } from "./cardAssets";
 import { buildFilterConfig, cardMatchesFilters, uniqueOptions } from "./cardFilters";
 import { isSupportedCardRecord } from "./cardSupport";
 import { PreviewStage } from "./cards";
-import {
-  CARD_LIST_OVERSCAN,
-  CARD_ROW_HEIGHT,
-  OfficialFontContext,
-  TmpFontContext,
-} from "./constants";
+import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT } from "./constants";
 import {
   useCardListViewport,
-  useOfficialFonts,
   useScanResult,
   useSelectedAssetDataUrls,
   useSelectedImageDataUrl,
@@ -26,7 +20,6 @@ export function App() {
   const [cardFilters, setCardFilters] = React.useState<Record<string, string>>({});
   const [viewMode, setViewMode] = React.useState<ViewMode>("3d");
   const { cardListRef, cardListViewport, updateCardListScroll } = useCardListViewport();
-  const { officialFonts, tmpFont } = useOfficialFonts();
   const { scanResult, status, source, loading, retry } = useScanResult(setSelectedId);
 
   const cards = scanResult?.cards ?? [];
@@ -256,9 +249,7 @@ export function App() {
   }
 
   return (
-    <OfficialFontContext.Provider value={officialFonts}>
-      <TmpFontContext.Provider value={tmpFont}>
-        <main className="app-shell">
+    <main className="app-shell">
       <aside className="sidebar" aria-label="Card browser">
         <section className="filters">
           <div className="search-field">
@@ -456,8 +447,6 @@ export function App() {
           mode={viewMode}
         />
       </section>
-        </main>
-      </TmpFontContext.Provider>
-    </OfficialFontContext.Provider>
+    </main>
   );
 }

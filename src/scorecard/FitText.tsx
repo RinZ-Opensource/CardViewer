@@ -5,7 +5,7 @@ const FIT_GUTTER_PX = 2;
 interface FitTextProps {
   maxWidth: number;
   /** Where the game anchors this text: center (title/artist) or left (designer). */
-  origin?: "center" | "left";
+  origin?: "center" | "left" | "right";
   className?: string;
   children: React.ReactNode;
 }

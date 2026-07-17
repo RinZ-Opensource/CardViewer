@@ -1,4 +1,4 @@
-import { FitText } from "./FitText";
+import { ScorecardBitmapText } from "./ScorecardBitmapText";
 import {
   CHUNI_BOX_BPM_DIGIT_WIDTH,
   CHUNI_BOX_COMBO_CROP,
@@ -139,12 +139,28 @@ export function ChuniMusicBoxCard({ song, state, jacketUrl }: ChuniMusicBoxCardP
         decoding="async"
       />
 
-      <div className="cmb-title">
-        <FitText maxWidth={400}>{song.title}</FitText>
-      </div>
-      <div className="cmb-artist">
-        <FitText maxWidth={400}>{song.artist}</FitText>
-      </div>
+      <ScorecardBitmapText
+        className="cmb-title"
+        text={song.title}
+        fontKey="kaku40"
+        fontSize={32}
+        width={400}
+        height={48}
+        alignment={4}
+        color="#323228"
+        horizontalScale={0.9}
+      />
+      <ScorecardBitmapText
+        className="cmb-artist"
+        text={song.artist}
+        fontKey="kaku16"
+        fontSize={18}
+        width={400}
+        height={16}
+        alignment={1}
+        color="#5a5a50"
+        horizontalScale={0.8}
+      />
 
       {/* C_level_default and C_level_WE both exist in data; code shows one. */}
       {isWorldsEnd ? (
@@ -160,7 +176,17 @@ export function ChuniMusicBoxCard({ song, state, jacketUrl }: ChuniMusicBoxCardP
             src={chuniBoxCrop(star.crop)}
             alt=""
           />
-          <span className="cmb-we-kanji">{state.weKanji.slice(0, 1)}</span>
+          <ScorecardBitmapText
+            className="cmb-we-kanji"
+            text={state.weKanji.slice(0, 1)}
+            fontKey="kaku40"
+            fontSize={60}
+            width={54.4}
+            height={54.4}
+            alignment={4}
+            color="#ffffff"
+            horizontalScale={0.8}
+          />
         </>
       ) : (
         <>
@@ -227,11 +253,16 @@ export function ChuniMusicBoxCard({ song, state, jacketUrl }: ChuniMusicBoxCardP
       ))}
 
       <img className="cmb-notes-label" src={chuniBoxCrop(CHUNI_BOX_NOTES_LABEL_CROP)} alt="" />
-      <div className="cmb-notes-name">
-        <FitText maxWidth={200} origin="left">
-          {state.notesDesigner}
-        </FitText>
-      </div>
+      <ScorecardBitmapText
+        className="cmb-notes-name"
+        text={state.notesDesigner}
+        fontKey="kaku16"
+        fontSize={14}
+        width={200}
+        height={20}
+        alignment={3}
+        color="#313c4e"
+      />
 
       {/* Confirm state (A_start_in): decide frame + start banner fade in over
           the card; nothing else moves. */}

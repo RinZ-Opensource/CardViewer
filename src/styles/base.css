@@ -14,10 +14,17 @@
   --font-official-rounded: var(--font-sega-maru);
   --font-official-number:
     "CardViewer Zen Kaku", "Impact", "Arial Black", sans-serif;
-  --font-mai-kaku: "CardViewer Zen Kaku", "Yu Gothic", "Meiryo", sans-serif;
-  --font-mai-maru: "CardViewer Zen Maru", "Yu Gothic", "Meiryo", sans-serif;
-  --font-mai-rodin: "CardViewer Zen Kaku", "Arial Black", sans-serif;
-  --font-mai-rodin-eb: "CardViewer Zen Kaku", "Impact", "Arial Black", sans-serif;
+  /* Score-card styles mirror game font roles but use redistributable Zen
+     faces. Dedicated single-face aliases make `font-weight: normal` select the
+     intended physical DB/EB face instead of silently falling back to Regular. */
+  --font-mai-kaku:
+    "CardViewer Fallback Kaku DB", "Yu Gothic", "Meiryo", sans-serif;
+  --font-mai-maru:
+    "CardViewer Fallback Maru DB", "Yu Gothic", "Meiryo", sans-serif;
+  --font-mai-rodin:
+    "CardViewer Fallback NewRodin", "Arial Black", sans-serif;
+  --font-mai-rodin-eb:
+    "CardViewer Fallback NewRodin EB", "Impact", "Arial Black", sans-serif;
   /* Data/mono face for IDs, serials, and tabular figures. */
   --font-mono:
     ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
@@ -234,6 +241,42 @@ html.theme-anim *::after {
   font-family: "CardViewer Zen Maru";
   src: url("/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Black.ttf") format("truetype");
   font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Role-specific public fallbacks. These aliases intentionally advertise a
+   normal CSS weight: the source file itself contains the required DB/EB
+   outlines, so legacy score-card rules that request `normal` cannot select a
+   lighter member of a multi-weight family. */
+@font-face {
+  font-family: "CardViewer Fallback Kaku DB";
+  src: url("/official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Bold.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CardViewer Fallback Maru DB";
+  src: url("/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Bold.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CardViewer Fallback NewRodin";
+  src: url("/official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Bold.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CardViewer Fallback NewRodin EB";
+  src: url("/official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Black.ttf") format("truetype");
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }

@@ -1,5 +1,7 @@
 import React from "react";
 import { App as CardViewerSurface } from "./App";
+import { OfficialFontContext, TmpFontContext } from "./constants";
+import { useOfficialFonts } from "./hooks";
 import { readLocalStorage, writeLocalStorage } from "./persistence";
 import { ScoreCardSurface } from "./scorecard/ScoreCardSurface";
 import { ThemeToggle } from "./ThemeToggle";
@@ -33,6 +35,9 @@ export function AppShell() {
   const [mountedSurfaces, setMountedSurfaces] = React.useState<Set<SurfaceKey>>(
     () => new Set([surface]),
   );
+  // Score Cards self-load only the atlas used by the selected game. The full
+  // renderer catalog is needed only after Card Viewer has actually mounted.
+  const { officialFonts, tmpFont } = useOfficialFonts(mountedSurfaces.has("cards"));
   const mountSurface = React.useCallback((nextSurface: SurfaceKey) => {
     setMountedSurfaces((current) => {
       if (current.has(nextSurface)) return current;
@@ -75,56 +80,60 @@ export function AppShell() {
   }
 
   return (
-    <div className="shell-root">
-      <nav className="surface-nav" aria-label="App surfaces">
-        <h1 className="surface-brand">ConfigArc CardViewer</h1>
-        <div className="surface-actions">
-          <div className="segment compact" role="group" aria-label="App surface">
-            {SURFACES.map((entry) => (
-              <button
-                key={entry.key}
-                type="button"
-                className={surface === entry.key ? "active" : ""}
-                aria-current={surface === entry.key ? "page" : undefined}
-                onClick={() => selectSurface(entry.key)}
+    <OfficialFontContext.Provider value={officialFonts}>
+      <TmpFontContext.Provider value={tmpFont}>
+        <div className="shell-root">
+          <nav className="surface-nav" aria-label="App surfaces">
+            <h1 className="surface-brand">ConfigArc CardViewer</h1>
+            <div className="surface-actions">
+              <div className="segment compact" role="group" aria-label="App surface">
+                {SURFACES.map((entry) => (
+                  <button
+                    key={entry.key}
+                    type="button"
+                    className={surface === entry.key ? "active" : ""}
+                    aria-current={surface === entry.key ? "page" : undefined}
+                    onClick={() => selectSurface(entry.key)}
+                  >
+                    {entry.label}
+                  </button>
+                ))}
+              </div>
+              <ThemeToggle />
+            </div>
+          </nav>
+          <div className="surface-body">
+            {mountedSurfaces.has("cards") ? (
+              <div
+                className="surface-pane"
+                hidden={surface !== "cards"}
+                role="region"
+                aria-label="Card Viewer"
+                tabIndex={-1}
+                ref={(node) => {
+                  surfacePaneRefs.current.cards = node;
+                }}
               >
-                {entry.label}
-              </button>
-            ))}
+                <CardViewerSurface />
+              </div>
+            ) : null}
+            {mountedSurfaces.has("scorecard") ? (
+              <div
+                className="surface-pane"
+                hidden={surface !== "scorecard"}
+                role="region"
+                aria-label="Score Cards"
+                tabIndex={-1}
+                ref={(node) => {
+                  surfacePaneRefs.current.scorecard = node;
+                }}
+              >
+                <ScoreCardSurface />
+              </div>
+            ) : null}
           </div>
-          <ThemeToggle />
         </div>
-      </nav>
-      <div className="surface-body">
-        {mountedSurfaces.has("cards") ? (
-          <div
-            className="surface-pane"
-            hidden={surface !== "cards"}
-            role="region"
-            aria-label="Card Viewer"
-            tabIndex={-1}
-            ref={(node) => {
-              surfacePaneRefs.current.cards = node;
-            }}
-          >
-            <CardViewerSurface />
-          </div>
-        ) : null}
-        {mountedSurfaces.has("scorecard") ? (
-          <div
-            className="surface-pane"
-            hidden={surface !== "scorecard"}
-            role="region"
-            aria-label="Score Cards"
-            tabIndex={-1}
-            ref={(node) => {
-              surfacePaneRefs.current.scorecard = node;
-            }}
-          >
-            <ScoreCardSurface />
-          </div>
-        ) : null}
-      </div>
-    </div>
+      </TmpFontContext.Provider>
+    </OfficialFontContext.Provider>
   );
 }

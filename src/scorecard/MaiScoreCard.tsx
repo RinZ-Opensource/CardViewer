@@ -1,4 +1,3 @@
-import { FitText } from "./FitText";
 import {
   MAI_COMBO_SPRITE,
   MAI_DIFF_SUFFIX,
@@ -9,6 +8,7 @@ import {
   maiSprite,
 } from "./maiAssets";
 import { formatAchievement, maiDxStars, maiRankForAchievement } from "./maiScore";
+import { MaiTmpText } from "./MaiTmpText";
 import { jacketImgProps } from "./songdb";
 import { MaiChart, MaiScoreState, MaiSong } from "./types";
 
@@ -23,6 +23,12 @@ import { MaiChart, MaiScoreState, MaiSong } from "./types";
  */
 export const MAI_SCORECARD_WIDTH = 420;
 export const MAI_SCORECARD_HEIGHT = 690;
+
+const TMP_WHITE = [255, 255, 255] as const;
+const TMP_GOLD = [242, 198, 0] as const;
+const TMP_GREEN = [52, 219, 57] as const;
+const TMP_NAVY = [34, 81, 146] as const;
+const TMP_DARK = [67, 67, 67] as const;
 
 /** Top-left of each glyph's 48x60 cell in the UI_NUM_MLevel_xx atlas (192x240). */
 const LEVEL_CELLS: Record<string, [number, number]> = {
@@ -140,12 +146,8 @@ export function MaiScoreCard({ song, chart, state, maxDxScore }: MaiScoreCardPro
         <span className="msc-lv-mark" style={{ backgroundImage: `url("${levelSheet}")` }} />
         <LevelCounter level={chart.level} src={levelSheet} />
 
-        <div className="msc-title">
-          <FitText maxWidth={386}>{song.title}</FitText>
-        </div>
-        <div className="msc-artist">
-          <FitText maxWidth={386}>{song.artist}</FitText>
-        </div>
+        <MaiTmpText className="msc-title" text={song.title} font="rodin" fontSize={20} width={386} height={33} color={TMP_WHITE} align="center" fitHorizontal />
+        <MaiTmpText className="msc-artist" text={song.artist} font="maru" fontSize={16} width={386} height={20} color={TMP_WHITE} align="center" fitHorizontal />
 
         {/* Achievement + rank backing always show (navy Box_01 played, gray Box_03
             empty). The DXSCORE row only exists when there's a nonzero DX score. */}
@@ -154,9 +156,9 @@ export function MaiScoreCard({ song, chart, state, maxDxScore }: MaiScoreCardPro
 
         {played ? (
           <>
-            <span className="msc-ach msc-ach-int">{achievementInt}</span>
-            <span className="msc-ach msc-ach-dec">.{achievementFrac}</span>
-            <span className="msc-ach msc-ach-pct">%</span>
+            <MaiTmpText className="msc-ach msc-ach-int" text={achievementInt} font="rodin" fontSize={20} width={56} height={27} color={TMP_GOLD} align="right" />
+            <MaiTmpText className="msc-ach msc-ach-dec" text={`.${achievementFrac}`} font="rodin" fontSize={20} width={75.5} height={27} color={TMP_GOLD} />
+            <MaiTmpText className="msc-ach msc-ach-pct" text="%" font="rodin" fontSize={20} width={22} height={27} color={TMP_GOLD} align="center" />
             <img className="msc-rank" src={maiSprite(MAI_RANK_SPRITE[rank])} alt={rank} />
           </>
         ) : null}
@@ -173,12 +175,10 @@ export function MaiScoreCard({ song, chart, state, maxDxScore }: MaiScoreCardPro
                 }}
               />
             ) : null}
-            <span className="msc-dxscore-label">DXSCORE</span>
-            <span className="msc-dx-value">{dxScore}</span>
-            <span className="msc-dx-slash">/</span>
-            <span className="msc-dx-max">
-              {safeMaxDxScore > 0 ? safeMaxDxScore : "----"}
-            </span>
+            <MaiTmpText className="msc-dxscore-label" text="DXSCORE" font="rodin" fontSize={18} width={121} height={25} color={TMP_GREEN} />
+            <MaiTmpText className="msc-dx-value" text={String(dxScore)} font="maru" fontSize={18} width={61} height={21} color={TMP_WHITE} align="right" fitHorizontal />
+            <MaiTmpText className="msc-dx-slash" text="/" font="maru" fontSize={15} width={11} height={17} color={TMP_WHITE} align="center" />
+            <MaiTmpText className="msc-dx-max" text={safeMaxDxScore > 0 ? String(safeMaxDxScore) : "----"} font="maru" fontSize={16} width={48} height={21} color={TMP_WHITE} align="right" fitHorizontal />
             {stars > 0 ? (
               <span className="msc-stars">
                 {Array.from({ length: stars }, (_, index) => (
@@ -190,11 +190,9 @@ export function MaiScoreCard({ song, chart, state, maxDxScore }: MaiScoreCardPro
         ) : null}
 
         {/* Notes designer + BPM (labels are TMP text on this card, not sprites) */}
-        <span className="msc-designer-label">NOTES DESIGNER</span>
-        <FitText maxWidth={243} origin="left" className="msc-designer-name">
-          {designer}
-        </FitText>
-        <span className="msc-bpm">BPM {bpmText}</span>
+        <MaiTmpText className="msc-designer-label" text="NOTES DESIGNER" font="rodin" fontSize={12} width={121} height={25} color={TMP_NAVY} />
+        <MaiTmpText className="msc-designer-name" text={designer} font="maru" fontSize={16} width={243.12} height={16.27} color={TMP_NAVY} fitHorizontal />
+        <MaiTmpText className="msc-bpm" text={`BPM ${bpmText}`} font="maru" fontSize={18} width={93} height={17} color={TMP_DARK} align="center" fitHorizontal />
 
         {/* Combo / sync medals: real when a badge is set, gray placeholder circle
             otherwise (the game swaps in Icon_Blank, never hides the nodes). */}

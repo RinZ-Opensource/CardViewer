@@ -103,6 +103,22 @@ test("serves legacy media, versioned runtime assets, and only approved fonts", a
       "official/cardviewer/v1/runtime/fonts/FONT_SegaKakuGothic_40px.json",
     ],
     [
+      "/official/cardviewer/v1/runtime/FONT_TMP_MAI_NEW_RODIN_EB_SDF_SUBSET_V1.json",
+      "official/cardviewer/v1/runtime/FONT_TMP_MAI_NEW_RODIN_EB_SDF_SUBSET_V1.json",
+    ],
+    [
+      "/official/cardviewer/v1/runtime/FONT_TMP_MAI_NEW_RODIN_EB_SDF_SUBSET_V1.png",
+      "official/cardviewer/v1/runtime/FONT_TMP_MAI_NEW_RODIN_EB_SDF_SUBSET_V1.png",
+    ],
+    [
+      "/official/cardviewer/v1/runtime/FONT_TMP_MAI_MARU_GOTHIC_DB_SDF_SUBSET_V1.json",
+      "official/cardviewer/v1/runtime/FONT_TMP_MAI_MARU_GOTHIC_DB_SDF_SUBSET_V1.json",
+    ],
+    [
+      "/official/cardviewer/v1/runtime/FONT_TMP_MAI_MARU_GOTHIC_DB_SDF_SUBSET_V1.png",
+      "official/cardviewer/v1/runtime/FONT_TMP_MAI_MARU_GOTHIC_DB_SDF_SUBSET_V1.png",
+    ],
+    [
       "/official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Black.ttf",
       "official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Black.ttf",
     ],

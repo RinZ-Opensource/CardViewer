@@ -1,4 +1,4 @@
-import { FitText } from "./FitText";
+import { ScorecardBitmapText } from "./ScorecardBitmapText";
 import {
   ONGEKI_BT_ATTRIBUTE_SPRITE,
   ONGEKI_BT_BADGE_NATIVE,
@@ -378,13 +378,27 @@ export function OngekiMusicBtCard({
           decoding="async"
         />
 
-        {/* MU3Text marquees in-game; statically compressed via FitText. */}
-        <div className="omb-title">
-          <FitText maxWidth={260}>{song.title}</FitText>
-        </div>
-        <div className="omb-artist">
-          <FitText maxWidth={260}>{song.artist}</FitText>
-        </div>
+        {/* MU3Text marquees in-game; statically fit to the original cast box. */}
+        <ScorecardBitmapText
+          className="omb-title"
+          text={song.title}
+          fontKey="maru32"
+          fontSize={24}
+          width={260}
+          height={28}
+          alignment={1}
+          color="#ffffff"
+        />
+        <ScorecardBitmapText
+          className="omb-artist"
+          text={song.artist}
+          fontKey="kaku16"
+          fontSize={12}
+          width={260}
+          height={18}
+          alignment={1}
+          color="#8b8b8b"
+        />
 
         {glyphImgs(levelGlyphs, "omb-glyph omb-ink-level")}
         {isFumenConstPlus ? (
@@ -459,11 +473,16 @@ export function OngekiMusicBtCard({
         {/* BPM (white glyphs, node scale 0.64). */}
         {glyphImgs(intCounterGlyphs(bpm, BPM_OPTS), "omb-glyph")}
 
-        <div className="omb-notes">
-          <FitText maxWidth={126} origin="left">
-            {state.notesDesigner}
-          </FitText>
-        </div>
+        <ScorecardBitmapText
+          className="omb-notes"
+          text={state.notesDesigner}
+          fontKey="maru32"
+          fontSize={10}
+          width={126}
+          height={10}
+          alignment={0}
+          color="#ffffff"
+        />
 
         {showRights ? (
           <>
