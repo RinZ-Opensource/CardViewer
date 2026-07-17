@@ -1,15 +1,6 @@
 {
   "allowedPublicFiles": [
     "_headers",
-    "fonts/zen/OFL-ZenKakuGothicNew.txt",
-    "fonts/zen/OFL-ZenMaruGothic.txt",
-    "fonts/zen/ZenKakuGothicNew-Black.ttf",
-    "fonts/zen/ZenKakuGothicNew-Bold.ttf",
-    "fonts/zen/ZenKakuGothicNew-Regular.ttf",
-    "fonts/zen/ZenMaruGothic-Black.ttf",
-    "fonts/zen/ZenMaruGothic-Bold.ttf",
-    "fonts/zen/ZenMaruGothic-Medium.ttf",
-    "fonts/zen/ZenMaruGothic-Regular.ttf",
     "theme-init.js"
   ],
   "allowedGeneratedDistFiles": [

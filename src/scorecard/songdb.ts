@@ -13,17 +13,15 @@ import { MaiChart, MaiDifficulty, MaiSong } from "./types";
 /**
  * Online song database (otoge-db) loader + normalizers.
  *
- * URL layouts: with VITE_SONGDB_BASE_URL set, data/jackets come from our
- * songdb worker (workers/songdb-sync — R2 mirror with an HD override tier);
- * unset, they come straight from the public jsDelivr mirror of otoge-db.
- * Both sources are CORS-enabled for browser access. Loader failures leave the
- * app on the bundled sample songs.
+ * Data and jackets are always read from the CardViewer R2 mirror through the
+ * same-origin Pages Function at `/official/songdb/**`. Loader failures leave
+ * the app on the bundled sample songs.
  */
 
 export type SongDbGame = "maimai" | "chunithm" | "ongeki";
 export type SongDbStatus = "loading" | "ready" | "error";
 
-const OTOGEDB_JSDELIVR_ROOT = "https://cdn.jsdelivr.net/gh/zvuc/otoge-db@master";
+const SAME_ORIGIN_SONGDB_ROOT = "/official/songdb";
 const SONGDB_FETCH_TIMEOUT_MS = 20_000;
 const OFFICIAL_ASSET_FETCH_TIMEOUT_MS = 5_000;
 
@@ -33,39 +31,23 @@ const OFFICIAL_SCORECARD_DIR: Record<SongDbGame, string> = {
   ongeki: "ongeki",
 };
 
-function workerBase(): string | undefined {
-  const base = import.meta.env.VITE_SONGDB_BASE_URL;
-  return base ? base.replace(/\/+$/, "") : undefined;
-}
-
 export function songdbDataUrl(game: SongDbGame): string {
-  const base = workerBase();
-  return base
-    ? `${base}/data/${game}/music-ex.json`
-    : `${OTOGEDB_JSDELIVR_ROOT}/${game}/data/music-ex.json`;
+  return `${SAME_ORIGIN_SONGDB_ROOT}/data/${game}/music-ex.json`;
 }
 
 export function songdbJacketUrl(game: SongDbGame, file: string): string {
-  const base = workerBase();
-  return base ? `${base}/jackets/${game}/${file}` : `${OTOGEDB_JSDELIVR_ROOT}/${game}/jacket/${file}`;
+  return `${SAME_ORIGIN_SONGDB_ROOT}/jackets/${game}/${file}`;
 }
 
-/** High-res override tier; worker-only (no jsDelivr equivalent). */
-export function songdbHdJacketUrl(game: SongDbGame, file: string): string | undefined {
-  const base = workerBase();
-  return base ? `${base}/hd-jackets/${game}/${file}` : undefined;
+/** High-resolution override tier stored alongside mirrored jackets in R2. */
+export function songdbHdJacketUrl(game: SongDbGame, file: string): string {
+  return `${SAME_ORIGIN_SONGDB_ROOT}/hd-jackets/${game}/${file}`;
 }
 
-/** Terminal <img> fallback: flat slate square as a data URI so it remains
-    available without another network request (maimai has no dummy jacket). */
-const PLACEHOLDER_JACKET =
-  "data:image/svg+xml," +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320"><rect width="320" height="320" fill="#2b3242"/></svg>',
-  );
+/** Terminal fallback is a versioned R2 object, never an in-bundle data URI. */
+const PLACEHOLDER_JACKET = "/official/cardviewer/v1/runtime/jacket-placeholder.png";
 
-/** Preferred jacket + ordered fallbacks: HD (worker only) -> mirrored jacket
-    -> local dummy art -> inline placeholder. */
+/** Preferred jacket + ordered R2 fallbacks: HD -> mirror -> dummy -> placeholder. */
 function jacketChain(
   game: SongDbGame,
   file: string,

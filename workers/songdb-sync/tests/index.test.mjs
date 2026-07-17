@@ -148,96 +148,33 @@ test("serves metadata and both jacket tiers directly from R2", async (t) => {
   ]);
 });
 
-test("bootstraps missing metadata from the origin and stores its digest", async (t) => {
+test("returns 404 for every R2 read miss without consulting the upstream origin", async (t) => {
   const r2 = makeR2();
-  const fetchMock = t.mock.method(globalThis, "fetch", async (url) => {
-    assert.equal(url, `${ORIGIN_ROOT}/ongeki/data/music-ex.json`);
-    return new Response('{"version":2}');
-  });
-  const response = await request("https://worker.example/data/ongeki/music-ex.json", undefined, env(r2.bucket));
-  assert.equal(response.status, 200);
-  assert.equal(await response.text(), '{"version":2}');
-  assert.equal(response.headers.get("cache-control"), "public, max-age=3600");
-  assertCors(response);
-  assert.equal(fetchMock.mock.callCount(), 1);
-  assert.equal(r2.calls.put.length, 1);
-  assert.equal(r2.calls.put[0].key, "songdb/data/ongeki/music-ex.json");
-  assert.equal(bodyText(r2.calls.put[0].value), '{"version":2}');
-  assert.equal(r2.calls.put[0].options.httpMetadata.contentType, "application/json");
-  assert.match(r2.calls.put[0].options.customMetadata.sha256, /^[a-f0-9]{64}$/);
-  assert.ok(!Number.isNaN(Date.parse(r2.calls.put[0].options.customMetadata.syncedAt)));
-});
-
-test("maps metadata origin HTTP, fetch, and body failures to CORS JSON", async (t) => {
-  const cases = [
-    ["HTTP failure", async () => new Response("upstream", { status: 503 }), { error: "origin HTTP 503" }],
-    ["fetch rejection", async () => { throw new Error("private network detail"); }, { error: "origin unavailable" }],
-    [
-      "body rejection",
-      async () => ({ ok: true, status: 200, arrayBuffer: async () => { throw new Error("stream reset"); } }),
-      { error: "origin unavailable" },
-    ],
-  ];
-  for (const [name, origin, body] of cases) {
-    await t.test(name, async (subtest) => {
-      const r2 = makeR2();
-      subtest.mock.method(globalThis, "fetch", origin);
-      const response = await request("https://worker.example/data/maimai/music-ex.json", undefined, env(r2.bucket));
-      assert.equal(response.status, 502);
-      assert.deepEqual(await response.json(), body);
-      assert.equal(response.headers.get("content-type"), "application/json");
-      assertCors(response);
-      assert.equal(r2.calls.put.length, 0);
-    });
-  }
-});
-
-test("mirrors a missing regular jacket while HD misses stay R2-only", async (t) => {
-  const r2 = makeR2();
-  const { context, promises } = makeContext();
-  const fetchMock = t.mock.method(globalThis, "fetch", async (url) => {
-    assert.equal(url, `${ORIGIN_ROOT}/maimai/jacket/cover.jpeg`);
-    return new Response(bytes("jacket"));
+  const fetchMock = t.mock.method(globalThis, "fetch", async () => {
+    throw new Error("GET routes must never consult the upstream origin");
   });
   const environment = env(r2.bucket);
-  const regular = await request("https://worker.example/jackets/maimai/cover.jpeg", undefined, environment, context);
-  assert.equal(await regular.text(), "jacket");
-  assert.equal(regular.headers.get("content-type"), "image/jpeg");
-  assert.equal(promises.length, 1);
-  await Promise.all(promises);
-  assert.equal(r2.calls.put[0].key, "songdb/jackets/maimai/cover.jpeg");
-  assert.equal(r2.calls.put[0].options.httpMetadata.contentType, "image/jpeg");
-
-  const hd = await request("https://worker.example/hd-jackets/maimai/missing.jpeg", undefined, environment);
-  assert.equal(hd.status, 404);
-  assert.deepEqual(await hd.json(), { error: "not found" });
-  assert.equal(fetchMock.mock.callCount(), 1);
-});
-
-test("maps regular jacket misses and origin failures", async (t) => {
-  const cases = [
-    [async () => new Response(null, { status: 404 }), 404, { error: "not found" }],
-    [async () => new Response(null, { status: 500 }), 502, { error: "origin HTTP 500" }],
-    [async () => { throw new Error("socket failure"); }, 502, { error: "origin unavailable" }],
+  const urls = [
+    "https://worker.example/data/ongeki/music-ex.json",
+    "https://worker.example/jackets/maimai/cover.jpeg",
+    "https://worker.example/hd-jackets/chunithm/cover.png",
   ];
-  for (const [origin, status, body] of cases) {
-    await t.test(`maps to ${status}: ${body.error}`, async (subtest) => {
-      const r2 = makeR2();
-      const { context, promises } = makeContext();
-      subtest.mock.method(globalThis, "fetch", origin);
-      const response = await request(
-        "https://worker.example/jackets/chunithm/missing.jpg",
-        undefined,
-        env(r2.bucket),
-        context,
-      );
-      assert.equal(response.status, status);
-      assert.deepEqual(await response.json(), body);
-      assertCors(response);
-      assert.equal(promises.length, 0);
-      assert.equal(r2.calls.put.length, 0);
-    });
+
+  for (const url of urls) {
+    const response = await request(url, undefined, environment);
+    assert.equal(response.status, 404, url);
+    assert.deepEqual(await response.json(), { error: "not found" }, url);
+    assertCors(response);
   }
+
+  assert.equal(fetchMock.mock.callCount(), 0);
+  assert.deepEqual(r2.calls.get, [
+    "songdb/data/ongeki/music-ex.json",
+    "songdb/jackets/maimai/cover.jpeg",
+    "songdb/hd-jackets/chunithm/cover.png",
+  ]);
+  assert.deepEqual(r2.calls.head, []);
+  assert.deepEqual(r2.calls.put, []);
 });
 
 test("manual sync reports updated, unchanged, and failed games", async (t) => {

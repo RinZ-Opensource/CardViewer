@@ -1,10 +1,11 @@
-# cardviewer-songdb: otoge-db mirror for the score-card song picker.
+# cardviewer-songdb: upstream-to-R2 metadata synchronization producer.
 # See README.md for bucket binding, secret setup and deploy steps.
 name = "cardviewer-songdb"
 main = "src/index.ts"
 compatibility_date = "2026-06-01"
 
-# Daily metadata refresh (04:17 JST); jackets are mirrored lazily on request.
+# Daily metadata refresh (04:17 JST). Every GET route is R2-only and returns
+# 404 on a miss; regular and HD jackets are uploaded out-of-band.
 [triggers]
 crons = ["17 19 * * *"]
 

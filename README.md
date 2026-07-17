@@ -8,12 +8,15 @@ repository contains only the public Cloudflare deployment surface.
 
 Cloudflare Pages serves the Vite bundle from `dist/`. A Pages Function maps the
 reviewed `/official/*` request surface to an R2 binding named `ASSETS_BUCKET`.
-The optional song-database Worker supplies public metadata and jacket fallbacks.
+The song-database Worker is a producer: scheduled or authenticated manual sync
+fetches upstream metadata and writes it into R2. Browser reads never use the
+Worker origin; they stay on the same-origin Pages Function.
 
-Official source packages, licensed fonts, extraction utilities, desktop or
-device runtimes, and generated working directories are maintained outside this
-repository. They are not copied into the Vite build. External producers may
-publish only reviewed output objects to R2.
+Official source packages, all image and font binaries, extraction utilities,
+desktop or device runtimes, and generated working directories are maintained
+outside this repository. They are not copied into the Vite build. The browser
+renderer source remains here; every visual, atlas, bitmap-font, and web-font
+object it consumes is published to R2 by an external producer.
 
 The browser-facing asset contract is:
 
@@ -23,12 +26,17 @@ The browser-facing asset contract is:
 - Manifest asset URLs must stay under the allowlisted `/official/generated/**`
   route.
 - Score-card maps and images use `/official/scorecard/**`.
-- Published files must be `.json`, `.png`, `.jpg`, `.jpeg`, or `.webp`.
+- Shared card-renderer UI, atlases, hologram textures, and bitmap-font data use
+  `/official/cardviewer/v1/runtime/**`.
+- Redistributable web fonts and their license texts use
+  `/official/cardviewer/v1/fonts/**`.
+- Runtime and generated objects use reviewed JSON/image extensions; the font
+  route accepts only reviewed font binaries and license text.
 - Versioned image keys are uploaded before the JSON files that reference them.
 
-The Pages Function additionally exposes one reviewed root card-back resource. See
-[the Cloudflare runbook](docs/online-preview.md) for the complete allowlist,
-publication order, cache policy, and verification gates.
+See [the Cloudflare runbook](docs/online-preview.md) for the complete
+route-specific allowlist, publication order, cache policy, and verification
+gates.
 
 ## Commands
 
@@ -53,32 +61,34 @@ deployment-boundary tests, frontend and Function tests, the public build, and
 the Worker checks. It does not publish Pages, mutate R2, or perform a live edge
 verification.
 
-`VITE_CARD_MANIFEST_URL` may select another public, credential-free card
-manifest URL. `VITE_SONGDB_BASE_URL` may select the optional public Worker
-origin. Both values are embedded in browser code at build time and must never
-contain secrets.
+Song metadata and every jacket tier are fixed to the same-origin
+`/official/songdb/**` Pages route. There is no build-time origin override or
+external browser fallback. The card manifest is likewise fixed to its
+same-origin R2 route.
 
 ## Repository layout
 
 - `src/`: React application and renderers.
-- `public/`: reviewed redistributable static files copied verbatim by Vite.
+- `public/`: two reviewed app-shell control files copied verbatim by Vite;
+  runtime media and fonts do not live here.
 - `public-asset-policy.json`: exact allowlist for copied and generated files.
 - `functions/`: allowlisted Pages Function for R2-backed official assets.
-- `workers/songdb-sync/`: optional public song metadata Worker.
+- `workers/songdb-sync/`: upstream-to-R2 metadata synchronization Worker with
+  R2-only GET diagnostics.
 - `scripts/cloudflare/`: deterministic R2 publication-manifest helper.
 - `tests/`: frontend, Function, artifact, secret, and repository-boundary tests.
 - `docs/online-preview.md`: Cloudflare build, R2, cache, and release runbook.
 - `docs/repository-map.md`: maintained source and external-input boundaries.
 
-Do not place any unreviewed file under `public/`; in particular, official
-assets, licensed fonts, environment files, and credentials never belong there.
-Vite copies that directory into `dist` even when Git ignores a file. An
-intentional static-file change therefore requires an explicit policy update,
-and the completed artifact is checked independently.
+Do not place media or font binaries anywhere in the repository. The
+deployment-boundary test rejects tracked image, font, and media extensions,
+while `public-asset-policy.json` limits `public/` to `_headers` and
+`theme-init.js`. Vite copies that directory into `dist` even when Git ignores a
+file, so the completed artifact is checked independently.
 
 ## License
 
 Released under the [MIT License](LICENSE). The license covers source code in
 this repository only; it grants no rights to third-party assets or fonts.
-Redistributable bundled fonts and their notices are listed in
+Redistributable runtime-font attribution is listed in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

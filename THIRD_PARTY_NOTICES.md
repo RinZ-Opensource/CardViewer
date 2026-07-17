@@ -1,6 +1,11 @@
 # Third-Party Notices
 
-This file covers third-party font files stored directly in this repository.
+This repository stores source code and attribution only. It does not contain
+font binaries. Redistributable web fonts and their license texts are published
+as versioned runtime objects in R2 under
+`official/cardviewer/v1/fonts/`; the application requests them through the
+same-origin `/official/cardviewer/v1/fonts/**` route.
+
 The CardViewer source code remains subject to the repository's top-level
 `LICENSE` file.
 
@@ -11,13 +16,14 @@ The CardViewer source code remains subject to the repository's top-level
 - Upstream project: https://github.com/googlefonts/zen-kakugothic
 - Google Fonts catalog files: https://github.com/google/fonts/tree/main/ofl/zenkakugothicnew
 - Upstream license: https://github.com/google/fonts/blob/main/ofl/zenkakugothicnew/OFL.txt
-- Full license text: `public/fonts/zen/OFL-ZenKakuGothicNew.txt`
+- Runtime license object:
+  `official/cardviewer/v1/fonts/licenses/OFL-ZenKakuGothicNew.txt`
 
-The following bundled files belong to the **Zen Kaku Gothic New** family:
+The runtime font release provides these **Zen Kaku Gothic New** files:
 
-- `public/fonts/zen/ZenKakuGothicNew-Black.ttf` (Black, 900; font version 1.002)
-- `public/fonts/zen/ZenKakuGothicNew-Bold.ttf` (Bold, 700; font version 1.002)
-- `public/fonts/zen/ZenKakuGothicNew-Regular.ttf` (Regular, 400; font version 1.002)
+- `ZenKakuGothicNew-Black.ttf` (Black, 900; font version 1.002)
+- `ZenKakuGothicNew-Bold.ttf` (Bold, 700; font version 1.002)
+- `ZenKakuGothicNew-Regular.ttf` (Regular, 400; font version 1.002)
 
 Copyright 2022 The Zen Kaku Gothic Project Authors
 (https://github.com/googlefonts/zen-kakugothic).
@@ -29,14 +35,15 @@ Copyright 2022 The Zen Kaku Gothic Project Authors
 - Upstream project: https://github.com/googlefonts/zen-marugothic
 - Google Fonts catalog files: https://github.com/google/fonts/tree/main/ofl/zenmarugothic
 - Upstream license: https://github.com/google/fonts/blob/main/ofl/zenmarugothic/OFL.txt
-- Full license text: `public/fonts/zen/OFL-ZenMaruGothic.txt`
+- Runtime license object:
+  `official/cardviewer/v1/fonts/licenses/OFL-ZenMaruGothic.txt`
 
-The following bundled files belong to the **Zen Maru Gothic** family:
+The runtime font release provides these **Zen Maru Gothic** files:
 
-- `public/fonts/zen/ZenMaruGothic-Black.ttf` (Black, 900; font version 1.001)
-- `public/fonts/zen/ZenMaruGothic-Bold.ttf` (Bold, 700; font version 1.001)
-- `public/fonts/zen/ZenMaruGothic-Medium.ttf` (Medium, 500; font version 1.001)
-- `public/fonts/zen/ZenMaruGothic-Regular.ttf` (Regular, 400; font version 1.002)
+- `ZenMaruGothic-Black.ttf` (Black, 900; font version 1.001)
+- `ZenMaruGothic-Bold.ttf` (Bold, 700; font version 1.001)
+- `ZenMaruGothic-Medium.ttf` (Medium, 500; font version 1.001)
+- `ZenMaruGothic-Regular.ttf` (Regular, 400; font version 1.002)
 
 Copyright 2021 The Zen Maru Gothic Project Authors
 (https://github.com/googlefonts/zen-marugothic).
@@ -44,7 +51,6 @@ Copyright 2021 The Zen Maru Gothic Project Authors
 ## Private/local font boundary
 
 Privately licensed font files are external producer inputs. They are not
-repository contents, part of the public bundle, or served by the Cloudflare
-runtime. No license or redistribution right for those files is asserted by this
-notice. The seven OFL-licensed Zen font binaries listed above are the only font
-binaries intentionally distributed in the public bundle.
+repository contents, public runtime objects, or served by the Cloudflare
+application. No license or redistribution right for those files is asserted by
+this notice.

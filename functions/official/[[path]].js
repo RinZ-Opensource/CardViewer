@@ -4,17 +4,30 @@
 // files, so every request must pass both a path allowlist and an extension
 // allowlist before R2 is consulted.
 
-const ALLOWED_ROOT_KEYS = new Set([
-  "official/C310Busb_CardBack.png",
+const MEDIA_EXTENSIONS = new Set([".json", ".png", ".jpg", ".jpeg", ".webp"]);
+const PUBLIC_FONT_FILES = new Set([
+  "ZenKakuGothicNew-Black.ttf",
+  "ZenKakuGothicNew-Bold.ttf",
+  "ZenKakuGothicNew-Regular.ttf",
+  "ZenMaruGothic-Black.ttf",
+  "ZenMaruGothic-Bold.ttf",
+  "ZenMaruGothic-Medium.ttf",
+  "ZenMaruGothic-Regular.ttf",
 ]);
-
-const ALLOWED_EXTENSIONS = new Set([".json", ".png", ".jpg", ".jpeg", ".webp"]);
+const PUBLIC_FONT_LICENSE_FILES = new Set([
+  "OFL-ZenKakuGothicNew.txt",
+  "OFL-ZenMaruGothic.txt",
+]);
+const SONGDB_GAMES = new Set(["maimai", "chunithm", "ongeki"]);
+const SONGDB_IMAGE_FILE = /^[A-Za-z0-9_.-]+\.(?:png|jpg|jpeg|webp)$/i;
 const CONTENT_TYPES = new Map([
   [".json", "application/json; charset=utf-8"],
   [".png", "image/png"],
   [".jpg", "image/jpeg"],
   [".jpeg", "image/jpeg"],
   [".webp", "image/webp"],
+  [".ttf", "font/ttf"],
+  [".txt", "text/plain; charset=utf-8"],
 ]);
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
@@ -61,17 +74,50 @@ function publicObjectKey(rawUrl) {
 
   const leaf = relativeSegments.at(-1);
   const extensionAt = leaf.lastIndexOf(".");
-  if (extensionAt <= 0 || !ALLOWED_EXTENSIONS.has(leaf.slice(extensionAt).toLowerCase())) {
+  if (extensionAt <= 0) return null;
+
+  const extension = leaf.slice(extensionAt).toLowerCase();
+  const [root, version, assetClass] = relativeSegments;
+  if (root === "songdb") {
+    const [, songdbClass, game, file] = relativeSegments;
+    if (relativeSegments.length !== 4 || !SONGDB_GAMES.has(game)) return null;
+    if (songdbClass === "data" && file === "music-ex.json") {
+      return `songdb/data/${game}/${file}`;
+    }
+    if (
+      (songdbClass === "jackets" || songdbClass === "hd-jackets") &&
+      SONGDB_IMAGE_FILE.test(file)
+    ) {
+      return `songdb/${songdbClass}/${game}/${file}`;
+    }
     return null;
   }
 
-  const key = ["official", ...relativeSegments].join("/");
-  if (relativeSegments.length === 1) {
-    return ALLOWED_ROOT_KEYS.has(key) ? key : null;
+  const isLegacyMedia =
+    relativeSegments.length >= 2 && (root === "generated" || root === "scorecard");
+  const isVersionedRuntime =
+    relativeSegments.length >= 4 &&
+    root === "cardviewer" &&
+    version === "v1" &&
+    assetClass === "runtime";
+  if ((isLegacyMedia || isVersionedRuntime) && MEDIA_EXTENSIONS.has(extension)) {
+    return ["official", ...relativeSegments].join("/");
   }
-
-  const publicPrefix = relativeSegments[0];
-  return publicPrefix === "generated" || publicPrefix === "scorecard" ? key : null;
+  if (
+    relativeSegments.length === 5 &&
+    root === "cardviewer" &&
+    version === "v1" &&
+    assetClass === "fonts"
+  ) {
+    const [, , , fontClass, file] = relativeSegments;
+    if (
+      (fontClass === "zen" && PUBLIC_FONT_FILES.has(file)) ||
+      (fontClass === "licenses" && PUBLIC_FONT_LICENSE_FILES.has(file))
+    ) {
+      return ["official", ...relativeSegments].join("/");
+    }
+  }
+  return null;
 }
 
 function notFoundResponse() {
@@ -124,11 +170,14 @@ export async function onRequest({ request, env, waitUntil }) {
   url.hash = "";
 
   const cache = globalThis.caches.default;
+  const isMutableData = key.endsWith(".json");
   // Query parameters do not select a different R2 object. Normalize them out,
-  // and use GET so GET and HEAD share one edge-cache entry.
+  // and use GET so GET and HEAD share one edge-cache entry for immutable media.
+  // Mutable catalogs deliberately bypass the Cache API: an R2 overwrite must
+  // not be shadowed by a response inserted by an older Function deployment.
   const cacheKey = new Request(url.toString(), { method: "GET" });
 
-  let response = await cache.match(cacheKey);
+  let response = isMutableData ? undefined : await cache.match(cacheKey);
   if (!response) {
     const object = await env.ASSETS_BUCKET.get(key);
     if (!object || object.body == null) {
@@ -145,11 +194,13 @@ export async function onRequest({ request, env, waitUntil }) {
         : "public, max-age=31536000, immutable",
     );
     response = publicAssetResponse(new Response(object.body, { headers }), key);
-    const cacheWrite = cache.put(cacheKey, response.clone());
-    if (typeof waitUntil === "function") {
-      waitUntil(cacheWrite);
-    } else {
-      await cacheWrite;
+    if (!isMutableData) {
+      const cacheWrite = cache.put(cacheKey, response.clone());
+      if (typeof waitUntil === "function") {
+        waitUntil(cacheWrite);
+      } else {
+        await cacheWrite;
+      }
     }
   } else {
     // Normalize cached entries too so a response written by an older Function

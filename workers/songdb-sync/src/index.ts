@@ -1,14 +1,15 @@
 /**
- * cardviewer-songdb: mirrors otoge-db song metadata and jackets into R2 and
- * serves them with permissive CORS so the browser score-card picker can load
- * them regardless of where the app is hosted.
+ * cardviewer-songdb: synchronizes otoge-db song metadata into R2 and exposes
+ * read-only diagnostics for objects already present in the songdb namespace.
+ * Browser runtime reads use the same-origin Pages Function instead.
  *
  * Routes (every response carries Access-Control-Allow-Origin: *):
- *   GET  /data/{game}/music-ex.json  R2 copy; lazy-bootstraps from GitHub.
- *   GET  /jackets/{game}/{file}      R2 copy; lazy-mirrors from GitHub.
+ *   GET  /data/{game}/music-ex.json  R2 only; missing objects return 404.
+ *   GET  /jackets/{game}/{file}      R2 only; missing objects return 404.
  *   GET  /hd-jackets/{game}/{file}   R2 only — high-res override tier uploaded
  *                                    out-of-band (scripts/upload-hd-jackets.mjs).
- *   POST /sync                       Bearer SYNC_TOKEN; same job as the cron.
+ *   POST /sync                       Bearer SYNC_TOKEN; fetches upstream
+ *                                    metadata and writes it to R2.
  *
  * The binding points at the existing CardViewer bucket: every key this worker
  * reads or writes lives under KEY_PREFIX so it coexists with the bucket's
@@ -30,7 +31,7 @@ const OTOGEDB_ROOT = "https://raw.githubusercontent.com/zvuc/otoge-db/master";
 const KEY_PREFIX = "songdb/";
 
 /** otoge-db jacket names are hashed basenames; anchoring the shape (plus the
-    three-game allowlist) keeps /jackets from being an open GitHub proxy. */
+    three-game allowlist) confines reads to the intended R2 object namespace. */
 const JACKET_FILE = /^[A-Za-z0-9_.-]+\.(png|jpg|jpeg|webp)$/;
 
 /** Metadata can move daily; jackets are content-addressed so effectively immutable. */
@@ -66,32 +67,6 @@ function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...CORS, "content-type": "application/json" },
-  });
-}
-
-function originUnavailableResponse(): Response {
-  return jsonResponse(502, { error: "origin unavailable" });
-}
-
-async function fetchOrigin(url: string): Promise<Response | null> {
-  try {
-    return await fetch(url);
-  } catch {
-    return null;
-  }
-}
-
-async function readOriginBytes(origin: Response): Promise<ArrayBuffer | null> {
-  try {
-    return await origin.arrayBuffer();
-  } catch {
-    return null;
-  }
-}
-
-function bytesResponse(bytes: ArrayBuffer, contentType: string, cacheControl: string): Response {
-  return new Response(bytes, {
-    headers: { ...CORS, "content-type": contentType, "cache-control": cacheControl },
   });
 }
 
@@ -145,36 +120,19 @@ function syncAll(env: Env): Promise<SyncResult[]> {
 
 async function serveData(env: Env, game: Game): Promise<Response> {
   const object = await env.SONGDB.get(dataKey(game));
-  if (object) return r2Response(object, "application/json", DATA_CACHE);
-  // Lazy bootstrap: the first request mirrors from GitHub, so a fresh deploy
-  // needs no manual init before the app can load the database.
-  const origin = await fetchOrigin(dataOriginUrl(game));
-  if (!origin) return originUnavailableResponse();
-  if (!origin.ok) return jsonResponse(502, { error: `origin HTTP ${origin.status}` });
-  const bytes = await readOriginBytes(origin);
-  if (!bytes) return originUnavailableResponse();
-  await putData(env, game, bytes, await sha256Hex(bytes));
-  return bytesResponse(bytes, "application/json", DATA_CACHE);
+  if (!object) return jsonResponse(404, { error: "not found" });
+  return r2Response(object, "application/json", DATA_CACHE);
 }
 
 async function serveJacket(
   env: Env,
-  ctx: ExecutionContext,
   game: Game,
   file: string,
 ): Promise<Response> {
   const key = `${KEY_PREFIX}jackets/${game}/${file}`;
   const object = await env.SONGDB.get(key);
-  if (object) return r2Response(object, contentTypeFor(file), JACKET_CACHE);
-  // Lazy mirror: fetch the jacket from GitHub once, keep it in R2 afterwards.
-  const origin = await fetchOrigin(`${OTOGEDB_ROOT}/${game}/jacket/${file}`);
-  if (!origin) return originUnavailableResponse();
-  if (origin.status === 404) return jsonResponse(404, { error: "not found" });
-  if (!origin.ok) return jsonResponse(502, { error: `origin HTTP ${origin.status}` });
-  const bytes = await readOriginBytes(origin);
-  if (!bytes) return originUnavailableResponse();
-  ctx.waitUntil(env.SONGDB.put(key, bytes, { httpMetadata: { contentType: contentTypeFor(file) } }));
-  return bytesResponse(bytes, contentTypeFor(file), JACKET_CACHE);
+  if (!object) return jsonResponse(404, { error: "not found" });
+  return r2Response(object, contentTypeFor(file), JACKET_CACHE);
 }
 
 /** hd-jackets is R2-only: there is no upstream, so a miss is a plain 404 and
@@ -186,7 +144,7 @@ async function serveHdJacket(env: Env, game: Game, file: string): Promise<Respon
 }
 
 export default {
-  async fetch(request, env, ctx): Promise<Response> {
+  async fetch(request, env): Promise<Response> {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
     const url = new URL(request.url);
@@ -205,7 +163,7 @@ export default {
     if (!root || !game || !isGame(game)) return jsonResponse(404, { error: "not found" });
 
     if (root === "data" && file === "music-ex.json") return serveData(env, game);
-    if (root === "jackets" && JACKET_FILE.test(file)) return serveJacket(env, ctx, game, file);
+    if (root === "jackets" && JACKET_FILE.test(file)) return serveJacket(env, game, file);
     if (root === "hd-jackets" && JACKET_FILE.test(file)) return serveHdJacket(env, game, file);
     return jsonResponse(404, { error: "not found" });
   },

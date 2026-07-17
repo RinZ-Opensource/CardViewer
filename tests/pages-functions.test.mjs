@@ -85,7 +85,7 @@ async function invoke({ bucket, env, method = "GET", url }) {
   return response;
 }
 
-test("serves generated, scorecard, and the reviewed card-back asset", async (t) => {
+test("serves legacy media, versioned runtime assets, and only approved fonts", async (t) => {
   installCache(t);
   const { bucket, getCalls } = makeBucket();
   const allowed = [
@@ -94,7 +94,70 @@ test("serves generated, scorecard, and the reviewed card-back asset", async (t) 
     ["/official/scorecard/mai/jackets/000001.webp", "official/scorecard/mai/jackets/000001.webp"],
     ["/official/scorecard/chuni/jackets/cover.jpg", "official/scorecard/chuni/jackets/cover.jpg"],
     ["/official/scorecard/ongeki/jackets/cover.jpeg", "official/scorecard/ongeki/jackets/cover.jpeg"],
-    ["/official/C310Busb_CardBack.png", "official/C310Busb_CardBack.png"],
+    [
+      "/official/cardviewer/v1/runtime/C310Busb_CardBack.png",
+      "official/cardviewer/v1/runtime/C310Busb_CardBack.png",
+    ],
+    [
+      "/official/cardviewer/v1/runtime/fonts/FONT_SegaKakuGothic_40px.json",
+      "official/cardviewer/v1/runtime/fonts/FONT_SegaKakuGothic_40px.json",
+    ],
+    [
+      "/official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Black.ttf",
+      "official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Black.ttf",
+    ],
+    [
+      "/official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Bold.ttf",
+      "official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Bold.ttf",
+    ],
+    [
+      "/official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Regular.ttf",
+      "official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Regular.ttf",
+    ],
+    [
+      "/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Black.ttf",
+      "official/cardviewer/v1/fonts/zen/ZenMaruGothic-Black.ttf",
+    ],
+    [
+      "/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Bold.ttf",
+      "official/cardviewer/v1/fonts/zen/ZenMaruGothic-Bold.ttf",
+    ],
+    [
+      "/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Medium.ttf",
+      "official/cardviewer/v1/fonts/zen/ZenMaruGothic-Medium.ttf",
+    ],
+    [
+      "/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Regular.ttf",
+      "official/cardviewer/v1/fonts/zen/ZenMaruGothic-Regular.ttf",
+    ],
+    [
+      "/official/cardviewer/v1/fonts/licenses/OFL-ZenKakuGothicNew.txt",
+      "official/cardviewer/v1/fonts/licenses/OFL-ZenKakuGothicNew.txt",
+    ],
+    [
+      "/official/cardviewer/v1/fonts/licenses/OFL-ZenMaruGothic.txt",
+      "official/cardviewer/v1/fonts/licenses/OFL-ZenMaruGothic.txt",
+    ],
+    [
+      "/official/songdb/data/maimai/music-ex.json",
+      "songdb/data/maimai/music-ex.json",
+    ],
+    [
+      "/official/songdb/data/chunithm/music-ex.json",
+      "songdb/data/chunithm/music-ex.json",
+    ],
+    [
+      "/official/songdb/data/ongeki/music-ex.json",
+      "songdb/data/ongeki/music-ex.json",
+    ],
+    [
+      "/official/songdb/jackets/maimai/3c88f7e0a.png",
+      "songdb/jackets/maimai/3c88f7e0a.png",
+    ],
+    [
+      "/official/songdb/hd-jackets/chunithm/music_0001.webp",
+      "songdb/hd-jackets/chunithm/music_0001.webp",
+    ],
   ];
 
   for (const [pathname] of allowed) {
@@ -120,11 +183,23 @@ test("forces response MIME types and nosniff instead of trusting R2 metadata", a
     bucket,
     url: "https://assets.example/official/scorecard/mai/icon.png",
   });
+  const font = await invoke({
+    bucket,
+    url: "https://assets.example/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Regular.ttf",
+  });
+  const license = await invoke({
+    bucket,
+    url: "https://assets.example/official/cardviewer/v1/fonts/licenses/OFL-ZenMaruGothic.txt",
+  });
 
   assert.equal(json.headers.get("content-type"), "application/json; charset=utf-8");
   assert.equal(image.headers.get("content-type"), "image/png");
+  assert.equal(font.headers.get("content-type"), "font/ttf");
+  assert.equal(license.headers.get("content-type"), "text/plain; charset=utf-8");
   assert.equal(json.headers.get("x-content-type-options"), "nosniff");
   assert.equal(image.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(font.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(license.headers.get("x-content-type-options"), "nosniff");
 });
 
 test("normalizes unsafe metadata already present in the edge cache", async (t) => {
@@ -148,16 +223,48 @@ test("denies unreviewed prefixes, root assets, hidden files, and non-public exte
   const { bucket, getCalls } = makeBucket();
   const denied = [
     "/official/MAI_cardbase_default.png",
+    "/official/C310Busb_CardBack.png",
     "/official/UI_Card_Horo_Rainbow_Hard.png",
     "/official/UI_Card_Horo_Pattern_00.png",
     "/official/fonts/private/licensed.png",
     "/official/generated",
     "/official/scorecard/",
+    "/official/cardviewer/v1/runtime/",
+    "/official/cardviewer/v1/fonts/",
+    "/official/cardviewer/v1/runtime/font.ttf",
+    "/official/cardviewer/v1/runtime/README.txt",
+    "/official/cardviewer/v1/fonts/image.png",
+    "/official/cardviewer/v1/fonts/metrics.json",
+    "/official/cardviewer/v1/fonts/private/licensed.otf",
+    "/official/cardviewer/v1/fonts/web/CardViewer.woff2",
+    "/official/cardviewer/v1/fonts/zen/Regular.ttf",
+    "/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Regular.otf",
+    "/official/cardviewer/v1/fonts/zen/nested/ZenMaruGothic-Regular.ttf",
+    "/official/cardviewer/v1/fonts/licenses/OFL.txt",
+    "/official/cardviewer/v1/fonts/licenses/nested/OFL-ZenMaruGothic.txt",
+    "/official/cardviewer/v1/fonts/licenses/OFL-ZenMaruGothic.ttf",
+    "/official/cardviewer/v1/private/asset.png",
+    "/official/cardviewer/v2/runtime/asset.png",
     "/official/generated/.logs/x.log",
+    "/official/cardviewer/v1/runtime/.logs/x.png",
+    "/official/cardviewer/v1/fonts/.private/font.ttf",
     "/official/generated/tool.py",
+    "/official/generated/README.txt",
     "/official/generated/run.cmd",
     "/official/generated/process.pid",
     "/official/scorecard/catalog.sqlite",
+    "/official/cardviewer/v1/runtime/tool.py",
+    "/official/cardviewer/v1/fonts/tool.exe",
+    "/official/songdb/data/maimai/other.json",
+    "/official/songdb/data/invalid/music-ex.json",
+    "/official/songdb/data/maimai/nested/music-ex.json",
+    "/official/songdb/jackets/ongeki/folder/0001.png",
+    "/official/songdb/jackets/invalid/0001.png",
+    "/official/songdb/jackets/ongeki/.0001.png",
+    "/official/songdb/jackets/ongeki/0001.svg",
+    "/official/songdb/jackets/ongeki/tool.exe",
+    "/official/songdb/hd-jackets/maimai/README.txt",
+    "/official/songdb/private/maimai/0001.png",
   ];
 
   for (const pathname of denied) {
@@ -183,6 +290,11 @@ test("rejects malformed and ambiguous path segments before reading R2", async (t
     "/official/generated/%00.png",
     "/official/generated/%ZZ.png",
     "/official/generated/%252e%252e/card.png",
+    "/official/cardviewer/v1/runtime/../private.png",
+    "/official/cardviewer/v1/runtime/%2e%2e/private.png",
+    "/official/cardviewer/v1/runtime/a%2Fb.png",
+    "/official/cardviewer/v1/fonts/%2Ehidden/font.ttf",
+    "/official/cardviewer/v1/fonts/a%5Cb.ttf",
   ];
 
   for (const pathname of denied) {
@@ -194,32 +306,83 @@ test("rejects malformed and ambiguous path segments before reading R2", async (t
   assert.deepEqual(getCalls, []);
 });
 
-test("normalizes query parameters out of the shared edge-cache key", async (t) => {
+test("mutable JSON bypasses stale edge cache entries and reads the current R2 object", async (t) => {
   const cache = installCache(t);
-  const { bucket, getCalls } = makeBucket("catalog");
+  const url = "https://assets.example/official/generated/cards.json";
+  cache.entries.set(url, new Response("stale-catalog"));
+  const { bucket, getCalls } = makeBucket("current-catalog");
+
+  const response = await invoke({ bucket, url: `${url}?revision=current` });
+
+  assert.equal(await response.text(), "current-catalog");
+  assert.equal(
+    response.headers.get("cache-control"),
+    "public, max-age=60, stale-while-revalidate=86400",
+  );
+  assert.deepEqual(getCalls, ["official/generated/cards.json"]);
+  assert.deepEqual(cache.matchCalls, []);
+  assert.deepEqual(cache.putCalls, []);
+});
+
+test("normalizes query parameters out of the shared immutable-media cache key", async (t) => {
+  const cache = installCache(t);
+  const { bucket, getCalls } = makeBucket("image-bytes");
 
   const first = await invoke({
     bucket,
-    url: "https://assets.example/official/generated/cards.json?version=one",
+    url: "https://assets.example/official/generated/cards/front.png?version=one",
   });
   const second = await invoke({
     bucket,
-    url: "https://assets.example/official/generated/cards.json?version=two",
+    url: "https://assets.example/official/generated/cards/front.png?version=two",
   });
 
-  assert.equal(await first.text(), "catalog");
-  assert.equal(await second.text(), "catalog");
-  assert.deepEqual(getCalls, ["official/generated/cards.json"]);
+  assert.equal(await first.text(), "image-bytes");
+  assert.equal(await second.text(), "image-bytes");
+  assert.deepEqual(getCalls, ["official/generated/cards/front.png"]);
   assert.deepEqual(
     cache.matchCalls,
     [
-      { method: "GET", url: "https://assets.example/official/generated/cards.json" },
-      { method: "GET", url: "https://assets.example/official/generated/cards.json" },
+      { method: "GET", url: "https://assets.example/official/generated/cards/front.png" },
+      { method: "GET", url: "https://assets.example/official/generated/cards/front.png" },
     ],
   );
   assert.deepEqual(cache.putCalls, [
-    { method: "GET", url: "https://assets.example/official/generated/cards.json" },
+    { method: "GET", url: "https://assets.example/official/generated/cards/front.png" },
   ]);
+});
+
+test("maps same-origin songdb routes to R2 keys with data and image cache policies", async (t) => {
+  installCache(t);
+  const { bucket, getCalls } = makeBucket("songdb-object", "text/html");
+
+  const data = await invoke({
+    bucket,
+    url: "https://assets.example/official/songdb/data/ongeki/music-ex.json?revision=one",
+  });
+  const jacket = await invoke({
+    bucket,
+    url: "https://assets.example/official/songdb/jackets/ongeki/0001.jpg?revision=one",
+  });
+  const hdJacket = await invoke({
+    bucket,
+    url: "https://assets.example/official/songdb/hd-jackets/maimai/0002.webp",
+  });
+
+  assert.deepEqual(getCalls, [
+    "songdb/data/ongeki/music-ex.json",
+    "songdb/jackets/ongeki/0001.jpg",
+    "songdb/hd-jackets/maimai/0002.webp",
+  ]);
+  assert.equal(data.headers.get("content-type"), "application/json; charset=utf-8");
+  assert.equal(
+    data.headers.get("cache-control"),
+    "public, max-age=60, stale-while-revalidate=86400",
+  );
+  assert.equal(jacket.headers.get("content-type"), "image/jpeg");
+  assert.equal(jacket.headers.get("cache-control"), "public, max-age=31536000, immutable");
+  assert.equal(hdJacket.headers.get("content-type"), "image/webp");
+  assert.equal(hdJacket.headers.get("cache-control"), "public, max-age=31536000, immutable");
 });
 
 test("HEAD shares the GET cache entry and returns headers without a body", async (t) => {

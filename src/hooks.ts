@@ -1,14 +1,53 @@
 import React from "react";
+import { buildOrderedAssetLoadPlans, loadFirstAvailable } from "./assetLoading";
+import { visibleAssetLayers } from "./cardAssets";
 import { isSupportedCardRecord } from "./cardSupport";
-import { isStaticAssetPath, resolveWebImageUrl } from "./imageLoader";
+import { USE_OFFICIAL_ASSETS } from "./constants";
+import { loadOfficialFonts, loadOfficialTmpFont } from "./fonts";
+import { isStaticAssetPath, preloadWebImageUrl, resolveWebImageUrl } from "./imageLoader";
 import { loadStaticScanResult } from "./manifest";
 import { mockScanResult } from "./mockData";
-import { CardRecord, ScanResult } from "./types";
+import {
+  CardRecord,
+  LoadedAssetDataUrls,
+  OfficialFontKey,
+  ScanResult,
+  TmpFontMetrics,
+  UnityFontMetrics,
+} from "./types";
 
 type LoadedImageDataUrl = {
   path: string;
   dataUrl: string;
 };
+
+/** Load the R2-hosted bitmap-font metadata required by the full renderer. */
+export function useOfficialFonts() {
+  const [officialFonts, setOfficialFonts] = React.useState<
+    Partial<Record<OfficialFontKey, UnityFontMetrics>>
+  >({});
+  const [tmpFont, setTmpFont] = React.useState<TmpFontMetrics | null>(null);
+
+  React.useEffect(() => {
+    if (!USE_OFFICIAL_ASSETS) return;
+    let cancelled = false;
+    void loadOfficialFonts()
+      .then((fonts) => {
+        if (!cancelled) setOfficialFonts(fonts);
+      })
+      .catch((error) => console.warn("R2 Unity font catalogs unavailable", error));
+    void loadOfficialTmpFont()
+      .then((font) => {
+        if (!cancelled) setTmpFont(font);
+      })
+      .catch((error) => console.warn("R2 TMP font catalog unavailable", error));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { officialFonts, tmpFont };
+}
 
 // Loads the Cloudflare/R2 manifest and falls back to bundled browser samples
 // when deployment data is unavailable.
@@ -150,6 +189,75 @@ export function useSelectedImageDataUrl(selected: CardRecord | null, selectedIma
   }, [selectedImagePath]);
 
   return loadedImageDataUrl?.path === selectedImagePath ? loadedImageDataUrl.dataUrl : "";
+}
+
+/** Resolve the selected card's manifest-declared R2 layers by semantic key. */
+export function useSelectedAssetDataUrls(
+  selected: CardRecord | null,
+  selectedAssetsSignature: string,
+  streamingAssets: string | undefined,
+) {
+  const [loaded, setLoaded] = React.useState<LoadedAssetDataUrls>({
+    signature: "",
+    urls: {},
+  });
+
+  React.useEffect(() => {
+    if (!selected) {
+      setLoaded({ signature: "", urls: {} });
+      return;
+    }
+
+    const controller = new AbortController();
+    const layers = visibleAssetLayers(selected, streamingAssets).filter((layer) =>
+      isStaticAssetPath(layer.path),
+    );
+    const plans = buildOrderedAssetLoadPlans(layers);
+    setLoaded((current) =>
+      current.signature === selectedAssetsSignature
+        ? current
+        : { signature: selectedAssetsSignature, urls: {} },
+    );
+
+    for (const plan of plans) {
+      void loadFirstAvailable(
+        plan.candidates,
+        (candidate) => preloadWebImageUrl(candidate.path, controller.signal),
+        () => controller.signal.aborted,
+      )
+        .then(({ candidate, value: url }) => {
+          if (controller.signal.aborted) return;
+          setLoaded((current) => {
+            if (current.signature !== selectedAssetsSignature) return current;
+            if (current.urls[plan.key] === url && current.urls[candidate.key] === url) {
+              return current;
+            }
+            return {
+              signature: selectedAssetsSignature,
+              urls: {
+                ...current.urls,
+                [plan.key]: url,
+                [candidate.key]: url,
+              },
+            };
+          });
+        })
+        .catch((error) => {
+          if (!controller.signal.aborted) {
+            console.warn(
+              `R2 card layer unavailable: ${plan.candidates.map(({ path }) => path).join(", ")}`,
+              error,
+            );
+          }
+        });
+    }
+
+    return () => {
+      controller.abort();
+    };
+  }, [selected?.dataName, selectedAssetsSignature]);
+
+  return loaded.signature === selectedAssetsSignature ? loaded.urls : {};
 }
 
 // Max resolved thumbnails kept in component state (FIFO).

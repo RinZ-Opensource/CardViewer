@@ -1,9 +1,22 @@
 import React from "react";
+import { selectedAssetSignature, usesPrimaryImageDataUrl } from "./cardAssets";
 import { buildFilterConfig, cardMatchesFilters, uniqueOptions } from "./cardFilters";
 import { isSupportedCardRecord } from "./cardSupport";
 import { PreviewStage } from "./cards";
-import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT } from "./constants";
-import { useCardListViewport, useScanResult, useSelectedImageDataUrl, useThumbnailLoader } from "./hooks";
+import {
+  CARD_LIST_OVERSCAN,
+  CARD_ROW_HEIGHT,
+  OfficialFontContext,
+  TmpFontContext,
+} from "./constants";
+import {
+  useCardListViewport,
+  useOfficialFonts,
+  useScanResult,
+  useSelectedAssetDataUrls,
+  useSelectedImageDataUrl,
+  useThumbnailLoader,
+} from "./hooks";
 import { THUMBNAIL_BUFFER_ROWS } from "./imageLoader";
 import { CardRecord, ViewMode } from "./types";
 
@@ -13,6 +26,7 @@ export function App() {
   const [cardFilters, setCardFilters] = React.useState<Record<string, string>>({});
   const [viewMode, setViewMode] = React.useState<ViewMode>("3d");
   const { cardListRef, cardListViewport, updateCardListScroll } = useCardListViewport();
+  const { officialFonts, tmpFont } = useOfficialFonts();
   const { scanResult, status, source, loading, retry } = useScanResult(setSelectedId);
 
   const cards = scanResult?.cards ?? [];
@@ -25,8 +39,20 @@ export function App() {
     [displayCards],
   );
   const selected = displayCards.find((card) => card.dataName === selectedId) ?? null;
-  const selectedImagePath = selected?.imagePath ?? selected?.thumbnailPath ?? "";
+  const selectedImagePath =
+    selected && usesPrimaryImageDataUrl(selected)
+      ? selected.imagePath ?? selected.thumbnailPath ?? ""
+      : "";
+  const selectedAssetsSignature = React.useMemo(
+    () => selectedAssetSignature(selected, scanResult?.streamingAssets),
+    [scanResult?.streamingAssets, selected],
+  );
   const imageDataUrl = useSelectedImageDataUrl(selected, selectedImagePath);
+  const assetDataUrls = useSelectedAssetDataUrls(
+    selected,
+    selectedAssetsSignature,
+    scanResult?.streamingAssets,
+  );
 
   // One lowercased haystack per card, so typing only re-runs cheap substring
   // checks; rebuilt only when the manifest cards change.
@@ -230,7 +256,9 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
+    <OfficialFontContext.Provider value={officialFonts}>
+      <TmpFontContext.Provider value={tmpFont}>
+        <main className="app-shell">
       <aside className="sidebar" aria-label="Card browser">
         <section className="filters">
           <div className="search-field">
@@ -424,9 +452,12 @@ export function App() {
         <PreviewStage
           card={selected}
           imageDataUrl={imageDataUrl}
+          assetDataUrls={assetDataUrls}
           mode={viewMode}
         />
       </section>
-      </main>
+        </main>
+      </TmpFontContext.Provider>
+    </OfficialFontContext.Provider>
   );
 }

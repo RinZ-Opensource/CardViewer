@@ -3,22 +3,21 @@
    preview stage. See src/theme.ts for how the light/dark tokens are toggled. */
 :root {
   --font-sega-kaku:
-    "CardViewer Zen Kaku", "CardViewer NewRodin", "Yu Gothic", "Meiryo",
-    "Segoe UI", sans-serif;
+    "CardViewer Zen Kaku", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-sega-maru:
-    "CardViewer Zen Maru", "CardViewer Humming", "Yu Gothic", "Meiryo",
-    "Segoe UI", sans-serif;
+    "CardViewer Zen Maru", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-sega-maru-db:
-    "CardViewer Zen Maru", "CardViewer Humming", "Yu Gothic", "Meiryo",
-    "Segoe UI", sans-serif;
+    "CardViewer Zen Maru", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-tmp-humming:
-    "CardViewer Humming", "CardViewer Zen Maru", "Yu Gothic", "Meiryo",
-    "Segoe UI", sans-serif;
+    "CardViewer Zen Maru", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
   --font-official-gothic: var(--font-sega-kaku);
   --font-official-rounded: var(--font-sega-maru);
   --font-official-number:
-    "CardViewer Zen Kaku", "CardViewer NewRodin", "Impact", "Arial Black",
-    sans-serif;
+    "CardViewer Zen Kaku", "Impact", "Arial Black", sans-serif;
+  --font-mai-kaku: "CardViewer Zen Kaku", "Yu Gothic", "Meiryo", sans-serif;
+  --font-mai-maru: "CardViewer Zen Maru", "Yu Gothic", "Meiryo", sans-serif;
+  --font-mai-rodin: "CardViewer Zen Kaku", "Arial Black", sans-serif;
+  --font-mai-rodin-eb: "CardViewer Zen Kaku", "Impact", "Arial Black", sans-serif;
   /* Data/mono face for IDs, serials, and tabular figures. */
   --font-mono:
     ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
@@ -185,7 +184,7 @@ html.theme-anim *::after {
 
 @font-face {
   font-family: "CardViewer Zen Kaku";
-  src: url("/fonts/zen/ZenKakuGothicNew-Regular.ttf") format("truetype");
+  src: url("/official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -193,7 +192,7 @@ html.theme-anim *::after {
 
 @font-face {
   font-family: "CardViewer Zen Kaku";
-  src: url("/fonts/zen/ZenKakuGothicNew-Bold.ttf") format("truetype");
+  src: url("/official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -201,7 +200,7 @@ html.theme-anim *::after {
 
 @font-face {
   font-family: "CardViewer Zen Kaku";
-  src: url("/fonts/zen/ZenKakuGothicNew-Black.ttf") format("truetype");
+  src: url("/official/cardviewer/v1/fonts/zen/ZenKakuGothicNew-Black.ttf") format("truetype");
   font-weight: 900;
   font-style: normal;
   font-display: swap;
@@ -209,7 +208,7 @@ html.theme-anim *::after {
 
 @font-face {
   font-family: "CardViewer Zen Maru";
-  src: url("/fonts/zen/ZenMaruGothic-Regular.ttf") format("truetype");
+  src: url("/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -217,7 +216,7 @@ html.theme-anim *::after {
 
 @font-face {
   font-family: "CardViewer Zen Maru";
-  src: url("/fonts/zen/ZenMaruGothic-Medium.ttf") format("truetype");
+  src: url("/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Medium.ttf") format("truetype");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
@@ -225,7 +224,7 @@ html.theme-anim *::after {
 
 @font-face {
   font-family: "CardViewer Zen Maru";
-  src: url("/fonts/zen/ZenMaruGothic-Bold.ttf") format("truetype");
+  src: url("/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -233,7 +232,7 @@ html.theme-anim *::after {
 
 @font-face {
   font-family: "CardViewer Zen Maru";
-  src: url("/fonts/zen/ZenMaruGothic-Black.ttf") format("truetype");
+  src: url("/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Black.ttf") format("truetype");
   font-weight: 900;
   font-style: normal;
   font-display: swap;

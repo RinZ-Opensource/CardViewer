@@ -1,9 +1,9 @@
 # Repository Map
 
 This repository is the source boundary for the public Cloudflare CardViewer.
-It contains the browser application, Pages routing, the optional song database
-Worker, and their validation. Local source packages and asset-production
-workspaces are deliberately outside this boundary.
+It contains the browser application, Pages routing, the song database
+synchronization Worker, and their validation. Local source packages and
+asset-production workspaces are deliberately outside this boundary.
 
 ## Maintained paths
 
@@ -11,11 +11,14 @@ workspaces are deliberately outside this boundary.
   maimai, and O.N.G.E.K.I. score-card renderers.
 - `src/scorecard/`: controlled editors, persisted state, song database access,
   asset URL lookup, selection transitions, and preview renderers.
-- `public/`: reviewed redistributable files copied verbatim into `dist`.
+- `src/cardAssets.ts`, `src/layers.tsx`, `src/textRendering.ts`, and the holo and
+  font loaders: browser renderer source that reads allowlisted R2 objects; these
+  modules do not embed renderer assets.
+- `public/`: only `_headers` and `theme-init.js`, copied verbatim into `dist`.
 - `functions/official/[[path]].js`: Pages Function that exposes the reviewed
   `/official/*` surface through the `ASSETS_BUCKET` R2 binding.
-- `workers/songdb-sync/`: optional Worker for public song metadata, origin
-  jacket fallback, R2 caching, and scheduled/manual synchronization.
+- `workers/songdb-sync/`: scheduled/manual upstream metadata production plus
+  R2-only GET diagnostics; browser reads never use its origin.
 - `scripts/cloudflare/`: helper for deterministic, extension-specific R2 bulk
   upload manifests.
 - `tests/`: web behavior, module boundaries, Pages routing, persisted state,
@@ -27,7 +30,7 @@ workspaces are deliberately outside this boundary.
 ## External producer contract
 
 Extraction, conversion, and source asset review happen in a separate local
-workspace. This repository accepts no source packages, licensed fonts,
+workspace. This repository accepts no source packages, image or font binaries,
 generated packs, platform runtimes, or extraction code.
 
 An external producer hands off only objects ready for R2 publication:
@@ -37,21 +40,33 @@ An external producer hands off only objects ready for R2 publication:
 3. Versioned card images referenced by those manifests below
    `official/generated/**`.
 4. Score-card maps and versioned images below `official/scorecard/**`.
-5. The explicitly reviewed root card-back image listed in the Cloudflare runbook.
+5. Shared renderer UI, atlases, hologram textures, bitmap-font metrics, and
+   bitmap-font textures below `official/cardviewer/v1/runtime/**`.
+6. Redistributable web fonts and their matching license texts below
+   `official/cardviewer/v1/fonts/**`.
+7. Song metadata and regular/HD jacket publication objects below `songdb/**`;
+   browser access is fixed to the Pages `/official/songdb/**` mapping.
 
-Every handed-off object must use an allowed `.json`, `.png`, `.jpg`, `.jpeg`,
-or `.webp` extension. JSON must reference the final same-origin `/official/*`
-URL, not a producer filesystem path. Binary objects are uploaded before maps
-and manifests; manifests are published last. Generated logs, scripts, command
-files, process IDs, caches, raw data, and licensed fonts are never publication
+Generated, score-card, and renderer-runtime objects must use an allowed
+`.json`, `.png`, `.jpg`, `.jpeg`, or `.webp` extension. Current font release
+objects are limited to the seven reviewed Zen `.ttf` filenames and their two
+reviewed OFL `.txt` filenames; adding another font requires a Function
+allowlist, test, attribution, and publication-policy change.
+JSON must reference the final same-origin `/official/*` URL, not a producer
+filesystem path. Binary objects are uploaded before maps and manifests;
+manifests are published last. Generated logs, scripts, command files, process
+IDs, caches, raw data, and privately licensed fonts are never publication
 inputs.
 
 ## Enforced exclusions
 
 `tests/deployment-boundary.test.mjs` rejects tracked desktop or device source,
 source-extraction utilities, local asset roots, non-Node toolchain pins,
-deprecated platform documentation, and frontend imports tied to those removed
-surfaces. It also checks the root package scripts and direct dependencies.
+deprecated platform documentation, image/font/media binary extensions, and
+frontend imports tied to removed desktop or export surfaces. Pure browser
+renderer modules and their QR-code dependency remain inside the source
+boundary. The test also checks the root package scripts and direct
+dependencies.
 
 `.gitignore` prevents routine additions of the external-only roots. The test is
 the stronger gate because it still rejects files added with a forced Git add.
@@ -59,11 +74,11 @@ The tracked-secret scanner independently checks both committed blobs and
 changed working-tree variants.
 
 The Vite guard compares the entire `public/` tree with
-`public-asset-policy.json` before serving or building. `check-public-dist.mjs`
-then allows only those reviewed static files plus the expected Vite entry
-bundles. These safeguards are independent of the Pages Function allowlist: one
-protects static build contents, while the other limits which R2 objects can be
-read at runtime.
+`public-asset-policy.json` before serving or building. That policy allows only
+`_headers` and `theme-init.js`; `check-public-dist.mjs` then allows those files
+plus the expected Vite entry bundles. These safeguards are independent of the
+Pages Function allowlist: one protects static build contents, while the other
+limits which R2 objects can be read at runtime.
 
 ## Deployment boundary
 

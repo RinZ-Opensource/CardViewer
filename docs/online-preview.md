@@ -12,26 +12,34 @@ Cloudflare Pages
 |- dist/                         public Vite bundle
 `- /official/*                  allowlisted Pages Function -> R2 ASSETS_BUCKET
 
-Optional song database Worker
-`- VITE_SONGDB_BASE_URL         metadata, mirrored jackets, HD jacket tier
+R2 synchronization Worker
+`- upstream -> songdb/*         scheduled/manual metadata production only
 ```
 
 `functions/official/[[path]].js` requires an R2 binding named exactly
-`ASSETS_BUCKET`. It accepts only these public key spaces and root objects:
+`ASSETS_BUCKET`. It accepts only these public key spaces:
 
 - `official/generated/**`
 - `official/scorecard/**`
-- `official/C310Busb_CardBack.png`
+- `official/cardviewer/v1/runtime/**`
+- `official/cardviewer/v1/fonts/**`
+- browser `/official/songdb/**` routes mapped to bucket `songdb/**`
 
-Within those locations, the Function serves only `.json`, `.png`, `.jpg`,
-`.jpeg`, and `.webp`. Hidden, empty, dot, traversal-shaped, and otherwise
-abnormal path segments are rejected before R2 is read.
+The generated, score-card, and renderer-runtime routes serve only `.json`,
+`.png`, `.jpg`, `.jpeg`, and `.webp`. The font route is an exact file
+allowlist: the seven named Zen `.ttf` files and their two named OFL `.txt`
+license files are the only accepted objects. License text is kept beside the
+redistributable fonts it covers. Hidden, empty, dot, traversal-shaped, and
+otherwise abnormal path segments are rejected before R2 is read.
 
 | Browser request | R2 key |
 | --- | --- |
 | `/official/generated/cards.index.json` | `official/generated/cards.index.json` |
 | `/official/scorecard/mai/jackets/jacket-map.json` | `official/scorecard/mai/jackets/jacket-map.json` |
-| `/official/C310Busb_CardBack.png` | `official/C310Busb_CardBack.png` |
+| `/official/cardviewer/v1/runtime/C310Busb_CardBack.png` | `official/cardviewer/v1/runtime/C310Busb_CardBack.png` |
+| `/official/cardviewer/v1/fonts/zen/ZenMaruGothic-Regular.ttf` | `official/cardviewer/v1/fonts/zen/ZenMaruGothic-Regular.ttf` |
+| `/official/songdb/data/maimai/music-ex.json` | `songdb/data/maimai/music-ex.json` |
+| `/official/songdb/jackets/chunithm/example.png` | `songdb/jackets/chunithm/example.png` |
 
 Do not expose the bucket or a broader prefix through an R2 custom domain. That
 would bypass the Function allowlist. A successful static deployment does not
@@ -40,7 +48,7 @@ are blocked.
 
 ## External R2 artifact contract
 
-Source packages, licensed fonts, extraction code, conversion environments, and
+Source packages, font binaries, extraction code, conversion environments, and
 working output live outside this repository. The external producer hands off
 only reviewed publication objects:
 
@@ -50,6 +58,11 @@ official/generated/cards.index.json
 official/generated/cards.<game>.json
 official/generated/assets/<versioned files>
 official/scorecard/<game>/<maps and versioned files>
+official/cardviewer/v1/runtime/<shared UI, atlases, textures, and font data>
+official/cardviewer/v1/fonts/zen/<redistributable web fonts>
+official/cardviewer/v1/fonts/licenses/<matching license texts>
+songdb/data/<game>/music-ex.json
+songdb/{jackets,hd-jackets}/<game>/<safe image file>
 ```
 
 The browser uses `/official/generated/cards.json` by default and discovers the
@@ -61,8 +74,10 @@ Before publication, the producer must provide an inventory containing at least
 the R2 key, byte size, content type, and checksum for every object. Review the
 inventory and upload only entries that satisfy the Function path and extension
 rules. Never bulk-upload a producer working directory: logs, scripts, command
-files, process IDs, caches, raw data, and licensed fonts are not release
-objects.
+files, process IDs, caches, raw data, and privately licensed fonts are not
+release objects. Open-font binaries are release objects only when their
+matching license text and the attribution in `THIRD_PARTY_NOTICES.md` are both
+present.
 
 Publication order is deliberate:
 
@@ -159,21 +174,23 @@ directory. Review its output; do not treat generation as upload authorization.
 
 ## Song database Worker
 
-Set the optional public Worker origin at build time:
+The browser is fixed to the same-origin `/official/songdb/**` Pages route.
+There is no build-time Worker-origin override and no browser fallback to
+GitHub, jsDelivr, or another public endpoint.
 
-```powershell
-$env:VITE_SONGDB_BASE_URL="<songdb-worker-origin>"
-npm.cmd run build
-```
+The Worker separates publication from reading. Its authenticated `POST /sync`
+and scheduled handler fetch upstream `music-ex.json` and write it to R2. Its
+GET data, regular-jacket, and HD-jacket routes only return objects already in
+R2; every miss is a 404 and never starts an upstream fetch. Regular and HD
+jackets are uploaded as reviewed publication objects outside the browser read
+path.
 
-The value is embedded in browser JavaScript, so it must be credential-free and
-browser-reachable. When unset, the application uses its public otoge-db
-fallback. Worker secrets such as a manual-sync token belong in Cloudflare secret
-storage and must never use a `VITE_` name.
+Worker secrets such as the manual-sync token belong in Cloudflare secret
+storage. They are never browser configuration or `VITE_` variables.
 
 The Worker and Pages Function may share a physical bucket, but they use distinct
-bindings and prefixes: the Worker uses `SONGDB` and `songdb/*`; Pages uses
-`ASSETS_BUCKET` and only the approved `official/*` keys above.
+bindings and prefixes: the Worker writes `SONGDB` keys under `songdb/*`; Pages
+uses `ASSETS_BUCKET` and maps only the approved browser routes above.
 
 ## Release checklist
 
@@ -187,7 +204,8 @@ bindings and prefixes: the Worker uses `SONGDB` and `songdb/*`; Pages uses
    route that bypasses the Function.
 7. Deploy the bundle and Function from the intended commit.
 8. Request the app shell, `cards.json`, the card index and one shard, one
-   score-card asset, and one approved root object from the deployed origin.
+   score-card asset, one renderer-runtime object, one web font, and its license
+   text from the deployed origin.
 9. Confirm a disallowed key, hidden path, traversal-shaped path, unsupported
    extension, and `/fonts/private/*` all return a non-success response.
 10. Record built, locally verified, live verified, and deployed states

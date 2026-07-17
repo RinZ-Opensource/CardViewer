@@ -25,13 +25,10 @@ const forbiddenPaths = new Map([
   ["rustfmt.toml", "RUST_TOOLCHAIN"],
   ["docs/cardmaker-mobile-android-plan.md", "MOBILE_DOCUMENTATION"],
   ["docs/mobile-pack.md", "MOBILE_DOCUMENTATION"],
-  ["src/cardAssets.ts", "PRIVATE_CARD_RENDERER"],
-  ["src/fonts.ts", "PRIVATE_CARD_RENDERER"],
-  ["src/holoMaskMath.ts", "PRIVATE_CARD_RENDERER"],
-  ["src/holoMaskTypes.ts", "PRIVATE_CARD_RENDERER"],
-  ["src/layers.tsx", "PRIVATE_CARD_RENDERER"],
-  ["src/textRendering.ts", "PRIVATE_CARD_RENDERER"],
 ]);
+
+const forbiddenBinaryAssetPattern =
+  /\.(?:png|jpe?g|webp|gif|avif|bmp|ico|tiff?|ttf|otf|woff2?|dds|ktx2?|psd|mp3|wav|ogg|flac|aac|m4a|mp4|webm|mov|avi|mkv)$/i;
 
 const maintainedBoundaryDocs = [
   "README.md",
@@ -51,6 +48,10 @@ function pathViolation(relativePath) {
 
   if (/^src\/exportPng\.(?:[cm]?[jt]sx?)$/i.test(normalized)) {
     return "FRONTEND_EXPORT_PNG";
+  }
+
+  if (forbiddenBinaryAssetPattern.test(normalized)) {
+    return "TRACKED_BINARY_ASSET";
   }
 
   return null;
@@ -104,18 +105,22 @@ test("deployment path rules reject local product and toolchain scopes", () => {
     "docs/mobile-pack.md",
     "docs/cardmaker-mobile-android-plan.md",
     "src/exportPng.ts",
-    "src/cardAssets.ts",
-    "src/fonts.ts",
-    "src/holoMaskMath.ts",
-    "src/holoMaskTypes.ts",
-    "src/layers.tsx",
-    "src/textRendering.ts",
+    "public/runtime/card.png",
+    "src/assets/fallback.webp",
+    "public/fonts/zen/open-font.woff2",
+    "public/media/preview.mp4",
   ];
 
   for (const fixture of fixtures) {
     assert.ok(pathViolation(fixture), `expected a deployment-boundary rule for ${fixture}`);
   }
   assert.equal(pathViolation("src/App.tsx"), null);
+  assert.equal(pathViolation("src/cardAssets.ts"), null);
+  assert.equal(pathViolation("src/fonts.ts"), null);
+  assert.equal(pathViolation("src/holoMaskMath.ts"), null);
+  assert.equal(pathViolation("src/holoMaskTypes.ts"), null);
+  assert.equal(pathViolation("src/layers.tsx"), null);
+  assert.equal(pathViolation("src/textRendering.ts"), null);
   assert.equal(pathViolation("scripts/cloudflare/prepare_r2_bulk_manifest.mjs"), null);
 });
 
@@ -166,7 +171,7 @@ test("tracked deployment repository stays Cloudflare-only", () => {
     ...packageJson.dependencies,
     ...packageJson.devDependencies,
   });
-  for (const dependency of ["@tauri-apps/api", "@tauri-apps/cli", "@types/qrcode", "html-to-image", "qrcode"]) {
+  for (const dependency of ["@tauri-apps/api", "@tauri-apps/cli", "html-to-image"]) {
     if (dependencyNames.includes(dependency)) {
       findings.push(`FORBIDDEN_DEPENDENCY: ${dependency}`);
     }
@@ -175,7 +180,7 @@ test("tracked deployment repository stays Cloudflare-only", () => {
   const packageLock = JSON.parse(
     readFileSync(path.join(projectRoot, "package-lock.json"), "utf8"),
   );
-  for (const dependency of ["@tauri-apps/api", "@tauri-apps/cli", "@types/qrcode", "html-to-image", "qrcode"]) {
+  for (const dependency of ["@tauri-apps/api", "@tauri-apps/cli", "html-to-image"]) {
     if (packageLock.packages?.[`node_modules/${dependency}`]) {
       findings.push(`FORBIDDEN_LOCKFILE_PACKAGE: ${dependency}`);
     }

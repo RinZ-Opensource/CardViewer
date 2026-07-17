@@ -1,22 +1,24 @@
 # songdb-sync
 
-Cloudflare Worker that mirrors [otoge-db](https://github.com/zvuc/otoge-db) song
-metadata and jackets into R2 and serves them with
-`Access-Control-Allow-Origin: *`, so the browser score-card song picker works
-from any origin.
+Cloudflare Worker that synchronizes [otoge-db](https://github.com/zvuc/otoge-db)
+song metadata into R2. Its GET routes are R2-only diagnostics: they never fetch
+an upstream object on a read miss. The browser score-card picker does not use
+this Worker origin; it reads the same bucket through the same-origin Pages
+Function.
 
 ## Routes
 
 | Route | Behavior |
 | --- | --- |
-| `GET /data/{game}/music-ex.json` | Serve from R2; lazy-bootstraps from GitHub on first hit. |
-| `GET /jackets/{game}/{file}` | Serve from R2; lazy-mirrors the jacket from GitHub on miss (404 passes through). |
+| `GET /data/{game}/music-ex.json` | Serve from R2; return 404 on a miss. |
+| `GET /jackets/{game}/{file}` | Serve from R2; return 404 on a miss. |
 | `GET /hd-jackets/{game}/{file}` | R2 only — high-res override tier uploaded out-of-band. |
-| `POST /sync` | `Authorization: Bearer $SYNC_TOKEN`; runs the same metadata sync as the daily cron. |
+| `POST /sync` | `Authorization: Bearer $SYNC_TOKEN`; fetch upstream metadata and write it to R2, matching the daily cron. |
 
 `{game}` is one of `maimai`, `chunithm`, `ongeki`. Metadata is cached ~1 h,
 jackets ~30 d immutable. A daily cron refreshes `music-ex.json` (uploads are
-skipped when the stored sha-256 matches).
+skipped when the stored sha-256 matches). Regular and HD jackets are publication
+inputs uploaded separately; no GET request populates them.
 
 ## Bucket binding
 
@@ -51,25 +53,25 @@ npm run deploy
 suite. The suite fakes R2 and upstream fetches; it does not contact Cloudflare
 or prove a live bucket binding.
 
-Manual sync (optional — the cron and lazy bootstrap cover normal operation):
+Manual metadata sync (optional — the cron covers normal operation):
 
 ```powershell
 curl -X POST -H "Authorization: Bearer <token>" https://cardviewer-songdb.<account>.workers.dev/sync
 ```
 
-## Pointing the app at the worker
+## Browser read boundary
 
-Set the base URL for Vite builds/dev (empty/unset falls back to the public
-jsDelivr mirror of otoge-db, which also sends CORS headers):
+The app is fixed to the same-origin `/official/songdb/**` Pages route; there is
+no build-time origin override. It prefers
+`/official/songdb/hd-jackets/...`, falls back to
+`/official/songdb/jackets/...`, then to the same-origin R2 placeholder at
+`/official/cardviewer/v1/runtime/jacket-placeholder.png` per image (see
+`src/scorecard/songdb.ts`). No jacket or placeholder binary is bundled in the
+repository.
 
-```powershell
-$env:VITE_SONGDB_BASE_URL="https://cardviewer-songdb.<account>.workers.dev"
-npm.cmd run dev
-```
-
-With the worker base set, the app prefers `/hd-jackets/...` and falls back to
-`/jackets/...`, then to the bundled placeholder, per image (see
-`src/scorecard/songdb.ts`).
+Upstream access is confined to the authenticated `POST /sync` and scheduled
+metadata jobs. The Worker's GET routes only inspect existing R2 objects and
+return 404 on a miss; they are not an origin fallback for the browser.
 
 ## Uploading high-res jackets
 
@@ -89,7 +91,7 @@ by the external asset workspace use game-native names (`jacket_11818.png`,
 
 The deployed Pages Function already serves the shared R2 bucket below
 `/official/*`. Score cards therefore use a same-origin, versioned override
-before the optional songdb Worker and jsDelivr fallbacks:
+before the mirrored songdb R2 tier and terminal R2 placeholder:
 
 ```text
 official/scorecard/mai/jackets/jacket-map.json

@@ -12,7 +12,7 @@
     "dev:public": "npm run dev",
     "build": "tsc && vite build && npm run check:public-dist",
     "build:public": "npm run build",
-    "check": "npm run check:secrets && npm run test:secrets && npm run test:deployment-boundary && npm run test:boundaries && npm run test:public-dist && npm run test:functions && npm run test:persistence && npm run test:scorecard-input && npm run test:scorecard-defaults && npm run test:scorecard-selection && npm run test:cache && npm run build && npm run check:functions && npm run check:worker",
+    "check": "npm run check:secrets && npm run test:secrets && npm run test:deployment-boundary && npm run test:boundaries && npm run test:public-dist && npm run test:functions && npm run test:persistence && npm run test:scorecard-input && npm run test:scorecard-defaults && npm run test:scorecard-selection && npm run test:image-loader && npm run test:manifest-url && npm run test:holo-mask && npm run test:cache && npm run build && npm run check:functions && npm run check:worker",
     "check:all": "npm run check",
     "check:secrets": "node scripts/security/check-tracked-secrets.mjs",
     "check:functions": "node --check \"functions/official/[[path]].js\" && node --check \"functions/fonts/private/[[path]].js\"",
@@ -24,6 +24,9 @@
     "test:functions": "node --test tests/pages-functions.test.mjs",
     "test:boundaries": "node --test tests/module-boundaries.test.mjs",
     "test:deployment-boundary": "node --test tests/deployment-boundary.test.mjs",
+    "test:holo-mask": "node --test tests/holo-mask-math.test.mjs",
+    "test:image-loader": "node --test tests/image-loader.test.mjs",
+    "test:manifest-url": "node --test tests/manifest-url.test.mjs",
     "test:cache": "node --test tests/cache-reliability.test.mjs",
     "test:persistence": "node --test tests/persistence.test.mjs",
     "test:scorecard-defaults": "node --test tests/scorecard-defaults.test.mjs",
@@ -33,10 +36,12 @@
     "test:secrets": "node --test tests/tracked-secrets.test.mjs"
   },
   "dependencies": {
+    "qrcode": "^1.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.2",

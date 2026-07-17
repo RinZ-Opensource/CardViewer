@@ -37,6 +37,14 @@ const EXTENSION_POLICIES = Object.freeze({
     contentType: "application/json; charset=utf-8",
     cacheControl: "public, max-age=300, stale-while-revalidate=86400",
   },
+  ttf: {
+    contentType: "font/ttf",
+    cacheControl: "public, max-age=31536000, immutable",
+  },
+  txt: {
+    contentType: "text/plain; charset=utf-8",
+    cacheControl: "public, max-age=31536000, immutable",
+  },
 });
 
 function printUsage() {

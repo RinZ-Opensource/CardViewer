@@ -1,4 +1,5 @@
 import { STATIC_MANIFEST_URL } from "./constants";
+import { resolveManifestShardUrl } from "./manifestUrl";
 import { CardRecord, OnlineManifestIndex, OnlineManifestShard, ScanResult } from "./types";
 
 // Cap concurrent shard fetches and bound each request, so a many-shard manifest
@@ -72,12 +73,6 @@ function siblingManifestUrl(manifestUrl: string, fileName: string) {
   return url.toString();
 }
 
-function resolveManifestHref(href: string, manifestUrl: string) {
-  const pageBase = typeof window === "undefined" ? "http://localhost/" : window.location.href;
-  const absoluteManifestUrl = new URL(manifestUrl, pageBase);
-  return new URL(href, absoluteManifestUrl).toString();
-}
-
 function scanResultFromIndex(index: OnlineManifestIndex, cards: CardRecord[]): ScanResult {
   return {
     packageRoot: index.packageRoot,
@@ -115,7 +110,11 @@ export async function loadStaticScanResult(
         let result: OnlineManifestShard;
         try {
           result = await fetchJsonWithTimeout<OnlineManifestShard>(
-            resolveManifestHref(shard.href, indexUrl),
+            resolveManifestShardUrl(
+              shard.href,
+              indexUrl,
+              typeof window === "undefined" ? "http://localhost/" : window.location.href,
+            ),
             MANIFEST_FETCH_TIMEOUT_MS,
             shardController?.signal,
           );
