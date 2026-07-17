@@ -2,7 +2,10 @@ import React from "react";
 import { OFFICIAL_ASSET_ROOT } from "./constants";
 import { canvasFontLoadDescriptors } from "./fontLoading";
 import { LruMap } from "./lru";
+import { clampNumber } from "./numeric";
 import { Bounds, TmpFontMetrics, TmpGlyph, UnityFontMetrics } from "./types";
+
+export { clampNumber } from "./numeric";
 
 // Cap the canvas backing-store scale: 1x floor for crispness, 2.5x ceiling to
 // bound memory/CPU on hi-DPI displays; assume 2x during SSR (no window).
@@ -473,10 +476,6 @@ export function smoothAlpha(value: number, edge: number, softness: number) {
   const max = edge + softness;
   const t = clampNumber((value - min) / (max - min), 0, 1);
   return t * t * (3 - 2 * t);
-}
-
-export function clampNumber(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }
 
 export function measureTmpLine(

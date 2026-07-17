@@ -13,6 +13,11 @@ asset-production workspaces are deliberately outside this boundary.
   and preview renderers. `songdb.ts` is the stable public facade; `songdb/`
   separates fetch/cache orchestration, R2 URL and fallback policy, per-game
   normalization, chart helpers, field parsing, and internal models.
+- `src/cardRender/`: preview interaction, renderer dispatch, per-game visual
+  renderers, and shared MU3 layers. Each renderer consumes already-resolved
+  browser URLs and does not fetch or construct producer paths.
+- `src/cardData.ts` and `src/cardData/`: stable card-rule facade plus isolated
+  field access, formatting, holo, QR, MAI, and MU3 rules.
 - `src/cardAssets.ts`, `src/layers.tsx`, `src/textRendering.ts`, and the holo and
   font loaders: browser renderer source that reads allowlisted R2 objects; these
   modules do not embed renderer assets.
@@ -28,8 +33,9 @@ asset-production workspaces are deliberately outside this boundary.
   browser reads never use its origin.
 - `scripts/cloudflare/`: helper for deterministic, extension-specific R2 bulk
   upload manifests.
-- `tests/`: web behavior, module boundaries, Pages routing, persisted state,
-  secret scanning, public artifact checks, and this deployment boundary.
+- `tests/`: web behavior, per-feature module boundaries, an acyclic frontend
+  import graph, Pages routing, persisted state, secret scanning, public
+  artifact checks, and this deployment boundary.
 - `.github/workflows/ci.yml`: read-only validation for the Node web and Worker
   toolchains. It does not deploy or use repository secrets.
 - `docs/online-preview.md`: authoritative Cloudflare and R2 runbook.

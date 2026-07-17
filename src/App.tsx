@@ -3,7 +3,7 @@ import { selectedAssetSignature, usesPrimaryImageDataUrl } from "./cardAssets";
 import { applyEdits, effectiveCardEdits } from "./cardEdits";
 import { buildFilterConfig, cardMatchesFilters, uniqueOptions } from "./cardFilters";
 import { isSupportedCardRecord } from "./cardSupport";
-import { PreviewStage } from "./cards";
+import { PreviewStage } from "./cardRender/PreviewStage";
 import { EditorPanel } from "./EditorPanel";
 import { CARD_LIST_OVERSCAN, CARD_ROW_HEIGHT } from "./constants";
 import {

@@ -4,13 +4,20 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import ts from "typescript";
+import { importedModules, normalizeModule } from "./helpers/typescript-imports.mjs";
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 
 const boundaries = [
-  { file: "src/hooks.ts", forbidden: ["./cards"] },
-  { file: "src/cardData.ts", forbidden: ["./layers"] },
-  { file: "src/cardEdits.ts", allowed: ["./types"], typeOnly: true },
+  {
+    file: "src/hooks.ts",
+    forbidden: ["./cardRender/PreviewStage", "./cardRender/OfficialCardCanvas"],
+  },
+  {
+    file: "src/cardEdits.ts",
+    allowed: ["./types"],
+    typeOnly: true,
+  },
   {
     file: "src/useCardEdits.ts",
     allowed: ["react", "./cardEdits", "./persistence", "./types"],
@@ -237,51 +244,6 @@ const boundaries = [
     ],
   },
 ];
-
-function importedModules(file, source) {
-  const sourceFile = ts.createSourceFile(
-    file,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
-  const modules = [];
-
-  function visit(node) {
-    if (
-      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
-      node.moduleSpecifier &&
-      ts.isStringLiteral(node.moduleSpecifier)
-    ) {
-      modules.push({
-        specifier: node.moduleSpecifier.text,
-        typeOnly:
-          (ts.isImportDeclaration(node) && node.importClause?.isTypeOnly === true) ||
-          (ts.isExportDeclaration(node) && node.isTypeOnly),
-      });
-    }
-    if (
-      ts.isCallExpression(node) &&
-      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-      node.arguments.length === 1 &&
-      ts.isStringLiteral(node.arguments[0])
-    ) {
-      modules.push({ specifier: node.arguments[0].text, typeOnly: false });
-    }
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return modules;
-}
-
-function normalizeModule(specifier) {
-  return specifier
-    .replace(/\.(?:[cm]?[jt]sx?)$/i, "")
-    .replace(/\/index$/i, "")
-    .toLowerCase();
-}
 
 async function collectTypeScriptFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
