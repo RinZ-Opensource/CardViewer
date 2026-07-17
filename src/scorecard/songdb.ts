@@ -9,6 +9,8 @@ import {
   OngekiSong,
 } from "./ongekiTypes";
 import { MaiChart, MaiDifficulty, MaiSong } from "./types";
+import { parseSongDbEntries } from "../runtimeJson";
+import type { SongDbGameName, SongDbRawEntry } from "../runtimeJson";
 
 /**
  * Online song database (otoge-db) loader + normalizers.
@@ -18,7 +20,7 @@ import { MaiChart, MaiDifficulty, MaiSong } from "./types";
  * the app on the bundled sample songs.
  */
 
-export type SongDbGame = "maimai" | "chunithm" | "ongeki";
+export type SongDbGame = SongDbGameName;
 export type SongDbStatus = "loading" | "ready" | "error";
 
 const SAME_ORIGIN_SONGDB_ROOT = "/official/songdb";
@@ -94,9 +96,6 @@ export function jacketImgProps(
  * Fetch + normalize, cached per game (module map; HTTP caching handles the
  * rest — no IndexedDB).
  * ------------------------------------------------------------------------- */
-
-/** music-ex.json rows are flat string maps (numbers included). */
-type RawEntry = Record<string, string | undefined>;
 
 interface OfficialJacketMap {
   version: number;
@@ -227,7 +226,7 @@ export function invalidateSongDbCache(game: SongDbGame) {
   officialAssetsCache.delete(game);
 }
 
-async function fetchSongDbEntries(game: SongDbGame): Promise<RawEntry[]> {
+async function fetchSongDbEntries(game: SongDbGame): Promise<SongDbRawEntry[]> {
   const url = songdbDataUrl(game);
   const controller = new AbortController();
   let timedOut = false;
@@ -238,7 +237,7 @@ async function fetchSongDbEntries(game: SongDbGame): Promise<RawEntry[]> {
   try {
     const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) throw new Error(`songdb ${game}: HTTP ${response.status}`);
-    return (await response.json()) as RawEntry[];
+    return parseSongDbEntries(await response.json(), game);
   } catch (err) {
     if (timedOut) {
       throw new Error(
@@ -254,7 +253,7 @@ async function fetchSongDbEntries(game: SongDbGame): Promise<RawEntry[]> {
 
 function loadNormalized<Song>(
   game: SongDbGame,
-  normalize: (entries: RawEntry[], assets: SupplementalAssets) => Song[],
+  normalize: (entries: SongDbRawEntry[], assets: SupplementalAssets) => Song[],
 ): Promise<Song[]> {
   let pending = songCache.get(game) as Promise<Song[]> | undefined;
   if (!pending) {
@@ -314,7 +313,7 @@ const MAI_DIFF_FIELD: Array<[MaiDifficulty, string]> = [
 ];
 
 /** One chart set (lev_* = Standard, dx_lev_* = DX) of an otoge-db row. */
-function maiCharts(entry: RawEntry, prefix: "lev" | "dx_lev"): MaiChart[] {
+function maiCharts(entry: SongDbRawEntry, prefix: "lev" | "dx_lev"): MaiChart[] {
   const charts: MaiChart[] = [];
   for (const [difficulty, key] of MAI_DIFF_FIELD) {
     const level = entry[`${prefix}_${key}`];
@@ -334,7 +333,7 @@ function maiCharts(entry: RawEntry, prefix: "lev" | "dx_lev"): MaiChart[] {
   return charts;
 }
 
-function normalizeMai(entries: RawEntry[], assets: SupplementalAssets): MaiSong[] {
+function normalizeMai(entries: SongDbRawEntry[], assets: SupplementalAssets): MaiSong[] {
   const songs: MaiSong[] = [];
   for (const entry of entries) {
     if (!entry.title || !entry.image_url) continue;
@@ -380,7 +379,7 @@ const CHUNI_DIFF_FIELD: Array<[ChuniDifficulty, string]> = [
   ["ultima", "ult"],
 ];
 
-function normalizeChuni(entries: RawEntry[], assets: SupplementalAssets): ChuniSong[] {
+function normalizeChuni(entries: SongDbRawEntry[], assets: SupplementalAssets): ChuniSong[] {
   const songs: ChuniSong[] = [];
   for (const entry of entries) {
     if (!entry.title || !entry.image) continue;
@@ -442,7 +441,7 @@ const ONGEKI_DIFF_FIELD: Array<[OngekiDifficulty, string]> = [
   ["lunatic", "lnt"],
 ];
 
-function normalizeOngeki(entries: RawEntry[], assets: SupplementalAssets): OngekiSong[] {
+function normalizeOngeki(entries: SongDbRawEntry[], assets: SupplementalAssets): OngekiSong[] {
   const bossMap = assets.ongekiBosses;
   const bossCountsByCharacter = new Map<
     string,

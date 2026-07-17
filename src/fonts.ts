@@ -1,15 +1,16 @@
 import { loadEntriesIndependently } from "./assetLoading";
 import { officialData } from "./constants";
-import type { OfficialFontKey, TmpFontMetrics, UnityFontMetrics } from "./types";
+import { parseTmpFontMetrics, parseUnityFontMetrics } from "./runtimeJson";
+import type { OfficialFontKey, UnityFontMetrics } from "./types";
 
-async function loadRuntimeJson<T>(file: string): Promise<T> {
+async function loadRuntimeJson(file: string): Promise<unknown> {
   const response = await fetch(officialData(file), {
     credentials: "same-origin",
   });
   if (!response.ok) {
     throw new Error(`R2 runtime asset ${file} unavailable: ${response.status}`);
   }
-  return (await response.json()) as T;
+  return response.json();
 }
 
 const OFFICIAL_FONT_CATALOGS: Record<OfficialFontKey, string> = {
@@ -26,7 +27,8 @@ export function loadOfficialFont(key: OfficialFontKey) {
   const cached = officialFontPromises.get(key);
   if (cached) return cached;
 
-  const promise = loadRuntimeJson<UnityFontMetrics>(OFFICIAL_FONT_CATALOGS[key]);
+  const file = OFFICIAL_FONT_CATALOGS[key];
+  const promise = loadRuntimeJson(file).then((value) => parseUnityFontMetrics(value, file));
   officialFontPromises.set(key, promise);
   // A transient edge/R2 failure must not poison this font for future mounts.
   void promise.catch(() => {
@@ -53,5 +55,6 @@ export async function loadOfficialFonts() {
 
 /** Load the MU3 TMP bitmap-font catalog from the same R2 runtime bundle. */
 export function loadOfficialTmpFont() {
-  return loadRuntimeJson<TmpFontMetrics>("FONT_TMP_SEGA_HUMMING_B_SDF.json");
+  const file = "FONT_TMP_SEGA_HUMMING_B_SDF.json";
+  return loadRuntimeJson(file).then((value) => parseTmpFontMetrics(value, file));
 }
