@@ -23,16 +23,21 @@ The browser-facing asset contract is:
 - `/official/generated/cards.json` is the default card manifest.
 - `/official/generated/cards.index.json` and its referenced game shards form
   the sharded manifest contract.
-- Manifest asset URLs must stay under the allowlisted `/official/generated/**`
-  route.
-- Score-card maps and images use `/official/scorecard/**`.
+- Manifest asset URLs must use the reviewed game or thumbnail shapes below
+  `/official/generated/assets/`; arbitrary nesting under `/official/generated/`
+  is not public.
+- Score-card maps and images use the reviewed game, jacket, and ONGEKI boss
+  shapes below `/official/scorecard/`.
 - Shared card-renderer UI, atlases, hologram textures, and bitmap-font data use
-  `/official/cardviewer/v1/runtime/**`.
+  direct files or the reviewed `runtime/fonts/FONT_*` shape below
+  `/official/cardviewer/v1/runtime/`.
 - Redistributable web fonts and their license texts use
   `/official/cardviewer/v1/fonts/**`.
 - Runtime and generated objects use reviewed JSON/image extensions; the font
   route accepts only reviewed font binaries and license text.
 - Versioned image keys are uploaded before the JSON files that reference them.
+- External manifest, font-metric, and SongDB JSON is validated at runtime before
+  renderer code treats it as typed data.
 
 See [the Cloudflare runbook](docs/online-preview.md) for the complete
 route-specific allowlist, publication order, cache policy, and verification

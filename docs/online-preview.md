@@ -55,10 +55,15 @@ only reviewed publication objects:
 ```text
 official/generated/cards.json
 official/generated/cards.index.json
-official/generated/cards.<game>.json
-official/generated/assets/<versioned files>
-official/scorecard/<game>/<maps and versioned files>
-official/cardviewer/v1/runtime/<shared UI, atlases, textures, and font data>
+official/generated/cards.{chu,mai,mu3}.json
+official/generated/shards/cards-<release>.json
+official/generated/assets/{chu,mai,mu3}/<image>
+official/generated/assets/thumbs/{chu,mai,mu3}/<image>
+official/scorecard/{mai,chuni,ongeki}/<reviewed direct image or manifest>
+official/scorecard/<game>/jackets/{<image>,jacket-map.json,vN/<image>}
+official/scorecard/ongeki/boss/{boss-map.json,vN/<image>}
+official/cardviewer/v1/runtime/<direct shared UI, atlas, texture, or font data>
+official/cardviewer/v1/runtime/fonts/FONT_*.{json,png}
 official/cardviewer/v1/fonts/zen/<redistributable web fonts>
 official/cardviewer/v1/fonts/licenses/<matching license texts>
 songdb/data/<game>/music-ex.json
@@ -78,6 +83,11 @@ files, process IDs, caches, raw data, and privately licensed fonts are not
 release objects. Open-font binaries are release objects only when their
 matching license text and the attribution in `THIRD_PARTY_NOTICES.md` are both
 present.
+
+The Function implements these entries as structural allowlists, not broad
+prefix grants. Adding a game, manifest filename, asset directory, or runtime
+subdirectory therefore requires a matching Function rule and positive/negative
+tests before publication.
 
 Publication order is deliberate:
 

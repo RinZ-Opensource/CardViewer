@@ -38,18 +38,23 @@ An external producer hands off only objects ready for R2 publication:
 
 1. `official/generated/cards.json`.
 2. `official/generated/cards.index.json` plus every shard it references.
-3. Versioned card images referenced by those manifests below
-   `official/generated/**`.
-4. Score-card maps and versioned images below `official/scorecard/**`.
+3. Card images below `official/generated/assets/{chu,mai,mu3}/<image>` and
+   thumbnails below `official/generated/assets/thumbs/{chu,mai,mu3}/<image>`.
+4. Score-card direct images and reviewed manifests below
+   `official/scorecard/{mai,chuni,ongeki}/`, plus jacket maps/images and the
+   versioned ONGEKI boss map/icons.
 5. Shared renderer UI, atlases, hologram textures, bitmap-font metrics, and
-   bitmap-font textures below `official/cardviewer/v1/runtime/**`.
+   bitmap-font textures as direct runtime files or
+   `official/cardviewer/v1/runtime/fonts/FONT_*.{json,png}`.
 6. Redistributable web fonts and their matching license texts below
    `official/cardviewer/v1/fonts/**`.
 7. Song metadata and regular/HD jacket publication objects below `songdb/**`;
    browser access is fixed to the Pages `/official/songdb/**` mapping.
 
-Generated, score-card, and renderer-runtime objects must use an allowed
-`.json`, `.png`, `.jpg`, `.jpeg`, or `.webp` extension. Current font release
+Generated, score-card, and renderer-runtime objects must match both a reviewed
+path shape and an allowed `.json`, `.png`, `.jpg`, `.jpeg`, or `.webp`
+extension; an allowed extension does not make an arbitrary nested key public.
+Current font release
 objects are limited to the seven reviewed Zen `.ttf` filenames and their two
 reviewed OFL `.txt` filenames; adding another font requires a Function
 allowlist, test, attribution, and publication-policy change.
@@ -58,6 +63,13 @@ filesystem path. Binary objects are uploaded before maps and manifests;
 manifests are published last. Generated logs, scripts, command files, process
 IDs, caches, raw data, and privately licensed fonts are never publication
 inputs.
+
+External JSON crosses an explicit runtime boundary. Manifest indexes, shards,
+legacy manifests, bitmap-font catalogs, and SongDB payloads are parsed as
+`unknown` and validated before application code receives typed values. The
+SongDB producer separately rejects invalid MIME types, oversized bodies,
+malformed JSON, and unusable game records before inspecting or replacing an R2
+object.
 
 ## Enforced exclusions
 
